@@ -137,16 +137,17 @@
         </h3>
 
         {% for area in parsed.areas %}
+        {% set area_idx = loop.index0 %}
         <div style="background: var(--bg-dark); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 12px;">
             <!-- Area name (editable) -->
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                 <span style="color: var(--accent-orange); font-weight: 700; font-size: 14px; white-space: nowrap;">
                     AREA {{ loop.index }}:
                 </span>
-                <input type="text" name="area_{{ loop.index0 }}_name"
+                <input type="text" name="area_{{ area_idx }}_name"
                        value="{{ area.name }}"
                        style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--accent-orange); padding: 6px 10px; font-size: 14px; font-weight: 600; flex: 1;">
-                <input type="hidden" name="area_{{ loop.index0 }}_notes" value="{{ area.notes or '' }}">
+                <input type="hidden" name="area_{{ area_idx }}_notes" value="{{ area.notes or '' }}">
             </div>
 
             <!-- Layers table -->
@@ -167,13 +168,13 @@
                         </td>
                         <td style="padding: 4px 10px;">
                             <input type="text"
-                                   name="area_{{ loop.parent.loop.index0 }}_layer_{{ loop.index0 }}_product"
+                                   name="area_{{ area_idx }}_layer_{{ loop.index0 }}_product"
                                    value="{{ layer.product }}"
                                    style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); padding: 5px 8px; font-size: 13px; width: 100%;">
                         </td>
                         <td style="padding: 4px 10px; width: 200px;">
                             <input type="text"
-                                   name="area_{{ loop.parent.loop.index0 }}_layer_{{ loop.index0 }}_color"
+                                   name="area_{{ area_idx }}_layer_{{ loop.index0 }}_color"
                                    value="{{ layer.color }}"
                                    style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--accent-yellow); padding: 5px 8px; font-size: 13px; width: 100%;">
                         </td>
