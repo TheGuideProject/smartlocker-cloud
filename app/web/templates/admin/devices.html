@@ -1,15 +1,18 @@
 {% extends "base.html" %}
 {% set active = "devices" %}
 
-{% block title %}Devices - SmartLocker{% endblock %}
-{% block page_title %}Locker Devices{% endblock %}
+{% block title %}Device Monitoring - SmartLocker{% endblock %}
+{% block page_title %}Device Monitoring{% endblock %}
 
 {% block actions %}
 <button class="btn btn-primary" onclick="document.getElementById('addDevicePanel').style.display='block'">+ Register Device</button>
 {% endblock %}
 
 {% block content %}
-<!-- Register Device Form -->
+<!-- Auto-refresh every 30 seconds -->
+<meta http-equiv="refresh" content="30">
+
+<!-- Register Device Form (hidden by default) -->
 <div id="addDevicePanel" class="panel" style="display: none;">
     <div class="panel-title">Register New SmartLocker Device</div>
     <form action="/admin/devices/add" method="post">
@@ -44,60 +47,335 @@
     </form>
 </div>
 
+<!-- Summary Stats -->
 <div class="stats-grid" style="margin-bottom: 20px;">
     <div class="stat-card">
         <div class="label">Total Devices</div>
-        <div class="value blue">{{ devices|length }}</div>
+        <div class="value blue">{{ total_count }}</div>
     </div>
     <div class="stat-card">
         <div class="label">Online</div>
-        <div class="value green">{{ devices|selectattr('status', 'equalto', 'online')|list|length }}</div>
+        <div class="value green">{{ online_count }}</div>
     </div>
     <div class="stat-card">
         <div class="label">Offline</div>
-        <div class="value red">{{ devices|rejectattr('status', 'equalto', 'online')|list|length }}</div>
+        <div class="value red">{{ total_count - online_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Active Alerts</div>
+        <div class="value {% if all_alerts %}orange{% else %}green{% endif %}">{{ all_alerts|length }}</div>
     </div>
 </div>
 
-<table class="data-table">
-    <thead>
-        <tr>
-            <th>Device ID</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Software</th>
-            <th>Last Heartbeat</th>
-            <th>Registered</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for device in devices %}
-        <tr>
-            <td><strong><code style="background: var(--bg-input); padding: 2px 8px; border-radius: 3px;">{{ device.device_id }}</code></strong></td>
-            <td>{{ device.name or '-' }}</td>
-            <td>
-                <span class="status-badge {{ device.status or 'offline' }}">
-                    {{ (device.status or 'offline').upper() }}
+<!-- Active Alerts Section -->
+{% if all_alerts %}
+<div class="panel" style="border-left: 3px solid var(--accent-orange); margin-bottom: 20px;">
+    <div class="panel-title" style="color: var(--accent-orange);">Active Alerts</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Level</th>
+                <th>Device</th>
+                <th>Sensor</th>
+                <th>Message</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alert in all_alerts %}
+            <tr>
+                <td>
+                    {% if alert.level == 'error' %}
+                    <span class="status-badge" style="background: rgba(230,57,70,0.2); color: var(--accent-red);">ERROR</span>
+                    {% elif alert.level == 'warning' %}
+                    <span class="status-badge" style="background: rgba(244,162,97,0.2); color: var(--accent-orange);">WARNING</span>
+                    {% endif %}
+                </td>
+                <td>{{ alert.device_name }}</td>
+                <td>{{ alert.sensor }}</td>
+                <td>{{ alert.message }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Device Cards -->
+{% for item in devices %}
+{% set d = item.device %}
+<div class="panel device-card" style="border-left: 3px solid {% if item.is_online %}var(--accent-green){% else %}var(--accent-red){% endif %}; margin-bottom: 15px;">
+    <!-- Device Header Row -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div>
+            <span style="font-size: 17px; font-weight: 600;">{{ d.name or d.device_id }}</span>
+            {% if d.name %}
+            <code style="background: var(--bg-input); padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-left: 8px; color: var(--text-muted);">{{ d.device_id }}</code>
+            {% endif %}
+            <span style="color: var(--text-muted); font-size: 13px; margin-left: 10px;">{{ item.vessel_name }}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="status-badge {% if item.is_online %}online{% else %}offline{% endif %}">
+                {% if item.is_online %}ONLINE{% else %}OFFLINE{% endif %}
+            </span>
+            <span style="color: var(--text-muted); font-size: 13px;">
+                Last seen: <strong style="color: {% if item.is_online %}var(--accent-green){% else %}var(--accent-red){% endif %};">{{ item.last_seen_ago }}</strong>
+            </span>
+            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="toggleDetail('detail-{{ d.id }}')">Details</button>
+        </div>
+    </div>
+
+    <!-- Quick Info Row -->
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+        <!-- Driver Config Dots -->
+        <div style="display: flex; gap: 6px; align-items: center;">
+            <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Drivers:</span>
+            {% if d.driver_status %}
+                {% for driver_name, driver_mode in d.driver_status.items() %}
+                <span title="{{ driver_name }}: {{ driver_mode }}"
+                      style="display: inline-flex; align-items: center; gap: 3px; background: var(--bg-input); padding: 2px 8px; border-radius: 10px; font-size: 11px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+                          background: {% if driver_mode == 'real' %}var(--accent-green){% else %}var(--text-muted){% endif %};"></span>
+                    {{ driver_name }}
                 </span>
-            </td>
-            <td>{{ device.software_version or '-' }}</td>
-            <td>
-                {% if device.last_heartbeat %}
-                {{ device.last_heartbeat.strftime('%Y-%m-%d %H:%M') }}
-                {% else %}
-                <span style="color: var(--text-muted);">Never</span>
-                {% endif %}
-            </td>
-            <td>{{ device.created_at.strftime('%Y-%m-%d') if device.created_at else '-' }}</td>
-        </tr>
-        {% endfor %}
-        {% if not devices %}
-        <tr>
-            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
-                No devices registered. Click "+ Register Device" to add one, or <a href="/admin/fleet" style="color: var(--accent-blue);">create a vessel first</a>.
-            </td>
-        </tr>
+                {% endfor %}
+            {% else %}
+                <span style="color: var(--text-muted); font-size: 12px;">No driver info</span>
+            {% endif %}
+        </div>
+
+        <!-- Sensor Health Summary -->
+        <div style="display: flex; gap: 6px; align-items: center;">
+            <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Health:</span>
+            {% if d.sensor_health %}
+                {% for sensor_name, sensor_info in d.sensor_health.items() %}
+                    {% if sensor_info is mapping %}
+                        {% set st = sensor_info.get('status', 'unknown') %}
+                    {% else %}
+                        {% set st = 'unknown' %}
+                    {% endif %}
+                    <span title="{{ sensor_name }}: {{ st }}"
+                          style="display: inline-flex; align-items: center; gap: 3px; background: var(--bg-input); padding: 2px 8px; border-radius: 10px; font-size: 11px;">
+                        {% if st == 'ok' %}
+                            <span style="color: var(--accent-green);">OK</span>
+                        {% elif st == 'warning' or st == 'out_of_range' %}
+                            <span style="color: var(--accent-orange);">WARN</span>
+                        {% elif st == 'error' or st == 'disconnected' %}
+                            <span style="color: var(--accent-red);">ERR</span>
+                        {% else %}
+                            <span style="color: var(--text-muted);">?</span>
+                        {% endif %}
+                        {{ sensor_name }}
+                    </span>
+                {% endfor %}
+            {% else %}
+                <span style="color: var(--text-muted); font-size: 12px;">No health data</span>
+            {% endif %}
+        </div>
+
+        <!-- System Info Quick -->
+        {% if d.system_info %}
+        <div style="display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--text-secondary);">
+            {% if d.system_info.uptime_seconds is defined %}
+                {% set uptime_h = (d.system_info.uptime_seconds / 3600)|round(1) %}
+                <span title="Uptime">Up: {{ uptime_h }}h</span>
+            {% endif %}
+            {% if d.system_info.events_pending_sync is defined %}
+                <span title="Events pending sync"
+                      style="{% if d.system_info.events_pending_sync > 0 %}color: var(--accent-orange);{% endif %}">
+                    Pending: {{ d.system_info.events_pending_sync }}
+                </span>
+            {% endif %}
+            {% if d.system_info.db_size_mb is defined %}
+                <span title="Local DB size">DB: {{ d.system_info.db_size_mb }}MB</span>
+            {% endif %}
+        </div>
         {% endif %}
-    </tbody>
-</table>
+
+        <!-- Software Version -->
+        <div style="font-size: 12px; color: var(--text-muted);">
+            v{{ d.software_version or '?' }}
+        </div>
+    </div>
+
+    <!-- Sensor Alerts for this device -->
+    {% if item.sensor_alerts %}
+    <div style="margin-top: 10px; padding: 8px 12px; background: rgba(244,162,97,0.08); border-radius: 6px;">
+        {% for alert in item.sensor_alerts %}
+        <div style="font-size: 13px; padding: 3px 0;">
+            {% if alert.level == 'error' %}
+                <span style="color: var(--accent-red);">&#x2716;</span>
+            {% else %}
+                <span style="color: var(--accent-orange);">&#x26A0;</span>
+            {% endif %}
+            <strong>{{ alert.sensor }}:</strong> {{ alert.message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Expandable Detail Section -->
+    <div id="detail-{{ d.id }}" class="device-detail" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Full Sensor Health Details -->
+            <div>
+                <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);">Sensor Health Details</div>
+                {% if d.sensor_health %}
+                <table class="data-table" style="font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th>Sensor</th>
+                            <th>Status</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sensor_name, sensor_info in d.sensor_health.items() %}
+                        <tr>
+                            <td><strong>{{ sensor_name }}</strong></td>
+                            <td>
+                                {% if sensor_info is mapping %}
+                                    {% set st = sensor_info.get('status', 'unknown') %}
+                                    {% if st == 'ok' %}
+                                        <span style="color: var(--accent-green);">OK</span>
+                                    {% elif st == 'warning' or st == 'out_of_range' %}
+                                        <span style="color: var(--accent-orange);">{{ st|upper }}</span>
+                                    {% elif st == 'error' or st == 'disconnected' %}
+                                        <span style="color: var(--accent-red);">{{ st|upper }}</span>
+                                    {% else %}
+                                        <span style="color: var(--text-muted);">{{ st }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color: var(--text-muted);">{{ sensor_info }}</span>
+                                {% endif %}
+                            </td>
+                            <td style="color: var(--text-muted); font-size: 12px;">
+                                {% if sensor_info is mapping %}
+                                    {{ sensor_info.get('message', '') }}
+                                    {% if sensor_info.get('last_value') is not none %}
+                                        (val: {{ sensor_info.last_value }})
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="color: var(--text-muted); font-size: 13px;">No sensor health data received yet.</p>
+                {% endif %}
+            </div>
+
+            <!-- Configuration & System Info -->
+            <div>
+                <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);">Configuration</div>
+                <table class="data-table" style="font-size: 13px;">
+                    <tbody>
+                        <tr>
+                            <td style="color: var(--text-muted);">Device ID</td>
+                            <td><code style="background: var(--bg-input); padding: 2px 8px; border-radius: 3px;">{{ d.device_id }}</code></td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">Device UUID</td>
+                            <td style="font-size: 11px; color: var(--text-muted);">{{ d.id }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">Vessel</td>
+                            <td>{{ item.vessel_name }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">Software</td>
+                            <td>{{ d.software_version or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">Config Version</td>
+                            <td>{{ d.config_version }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">Registered</td>
+                            <td>{{ d.created_at.strftime('%Y-%m-%d %H:%M') if d.created_at else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">Installed</td>
+                            <td>{{ d.installed_at.strftime('%Y-%m-%d %H:%M') if d.installed_at else '-' }}</td>
+                        </tr>
+                        {% if d.system_info %}
+                        <tr>
+                            <td style="color: var(--text-muted);">Uptime</td>
+                            <td>{{ (d.system_info.uptime_seconds / 3600)|round(1) if d.system_info.uptime_seconds else '-' }} hours</td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">Pending Events</td>
+                            <td>{{ d.system_info.get('events_pending_sync', '-') }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">DB Size</td>
+                            <td>{{ d.system_info.get('db_size_mb', '-') }} MB</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+
+                <!-- Driver Modes -->
+                {% if d.driver_status %}
+                <div style="font-size: 14px; font-weight: 600; margin: 15px 0 8px; color: var(--text-secondary);">Driver Modes</div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    {% for driver_name, driver_mode in d.driver_status.items() %}
+                    <div style="background: var(--bg-input); padding: 8px 14px; border-radius: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+                              background: {% if driver_mode == 'real' %}var(--accent-green){% else %}var(--text-muted){% endif %};"></span>
+                        <span style="font-size: 13px; font-weight: 600;">{{ driver_name|upper }}</span>
+                        <span style="font-size: 12px; color: var(--text-muted);">{{ driver_mode }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Password Change -->
+                <div style="font-size: 14px; font-weight: 600; margin: 15px 0 8px; color: var(--text-secondary);">Change Device Password</div>
+                {% if d.pending_admin_password %}
+                <p style="color: var(--accent-orange); font-size: 13px; margin-bottom: 8px;">
+                    Password change pending -- will be sent on next config sync.
+                </p>
+                {% endif %}
+                <form action="/admin/devices/{{ d.id }}/change-password" method="post" style="display: flex; gap: 10px; align-items: end;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label>New Admin Password</label>
+                        <input type="text" name="new_password" placeholder="Enter new password" required style="font-size: 13px;">
+                    </div>
+                    <button type="submit" class="btn btn-secondary" style="padding: 9px 16px; font-size: 13px; height: fit-content;">Set Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% if not devices %}
+<div class="panel" style="text-align: center; padding: 40px;">
+    <p style="color: var(--text-muted); font-size: 15px;">
+        No devices registered. Click "+ Register Device" to add one, or <a href="/admin/fleet" style="color: var(--accent-blue);">create a vessel first</a>.
+    </p>
+</div>
+{% endif %}
+
+<style>
+    .device-card {
+        transition: border-color 0.3s;
+    }
+    .device-card:hover {
+        border-color: var(--accent-blue) !important;
+        border-left-width: 3px;
+    }
+</style>
+
+<script>
+function toggleDetail(id) {
+    var el = document.getElementById(id);
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
+}
+</script>
 {% endblock %}

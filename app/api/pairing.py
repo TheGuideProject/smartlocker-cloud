@@ -303,4 +303,9 @@ async def get_device_config(
     if chart_data:
         response["maintenance_chart"] = chart_data
 
+    # If admin has set a new password for this device, include it (one-time delivery)
+    if device.pending_admin_password:
+        response["admin_password"] = device.pending_admin_password
+        device.pending_admin_password = None  # Clear after sending
+
     return response

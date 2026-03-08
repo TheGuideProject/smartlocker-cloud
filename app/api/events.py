@@ -46,6 +46,10 @@ class HeartbeatIn(BaseModel):
     software_version: Optional[str] = None
     uptime_hours: Optional[float] = None
     sync_queue_depth: Optional[int] = None
+    # Extended monitoring fields
+    driver_status: Optional[dict] = None   # {"rfid": "real", "weight": "fake", ...}
+    sensor_health: Optional[dict] = None   # Per-sensor health data
+    system_info: Optional[dict] = None     # {"uptime_seconds": ..., "events_pending_sync": ...}
 
 
 # ---- Device Auth Helper ----
@@ -155,5 +159,13 @@ async def device_heartbeat(
     device.status = "online"
     if heartbeat.software_version:
         device.software_version = heartbeat.software_version
+
+    # Store extended monitoring data
+    if heartbeat.driver_status is not None:
+        device.driver_status = heartbeat.driver_status
+    if heartbeat.sensor_health is not None:
+        device.sensor_health = heartbeat.sensor_health
+    if heartbeat.system_info is not None:
+        device.system_info = heartbeat.system_info
 
     return {"status": "ok"}

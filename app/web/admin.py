@@ -161,18 +161,50 @@ async def admin_events(request: Request, db: AsyncSession = Depends(get_db)):
 
 @router.get("/devices", response_class=HTMLResponse)
 async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
-    """Device management."""
-    result = await db.execute(select(LockerDevice).order_by(LockerDevice.created_at.desc()))
+    """Device monitoring dashboard."""
+    result = await db.execute(
+        select(LockerDevice)
+        .options(selectinload(LockerDevice.vessel))
+        .order_by(LockerDevice.last_heartbeat.desc().nullslast())
+    )
     devices = result.scalars().all()
 
-    # Get vessels for dropdown
+    # Get vessels for dropdown (for register form)
     vessels_result = await db.execute(select(Vessel).order_by(Vessel.name))
     vessels = vessels_result.scalars().all()
 
+    # Build enriched device list with monitoring info
+    device_list = []
+    for d in devices:
+        sensor_alerts = _check_sensor_health(d.sensor_health) if d.sensor_health else []
+        device_list.append({
+            'device': d,
+            'is_online': d.is_online,
+            'last_seen_ago': d.last_seen_ago,
+            'sensor_alerts': sensor_alerts,
+            'vessel_name': d.vessel.name if d.vessel else 'Unassigned',
+        })
+
+    online_count = sum(1 for d in device_list if d['is_online'])
+
+    # Collect all active alerts across devices
+    all_alerts = []
+    for d in device_list:
+        for alert in d['sensor_alerts']:
+            all_alerts.append({
+                'device_name': d['device'].name or d['device'].device_id,
+                'level': alert['level'],
+                'message': alert['message'],
+                'sensor': alert['sensor'],
+            })
+
     return templates.TemplateResponse("admin/devices.html", {
         "request": request,
-        "devices": devices,
+        "devices": device_list,
         "vessels": vessels,
+        "online_count": online_count,
+        "total_count": len(device_list),
+        "all_alerts": all_alerts,
     })
 
 
@@ -622,6 +654,66 @@ async def admin_chart_detail(
         "chart": chart,
         "active": "charts",
     })
+
+
+@router.post("/devices/{device_id}/change-password")
+async def admin_change_device_password(
+    device_id: str,
+    request: Request,
+    new_password: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Set a pending admin password for a device (pushed on next config sync)."""
+    result = await db.execute(
+        select(LockerDevice).where(LockerDevice.id == device_id)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        return RedirectResponse(url="/admin/devices", status_code=303)
+
+    device.pending_admin_password = new_password
+    return RedirectResponse(url="/admin/devices", status_code=303)
+
+
+def _check_sensor_health(health_data: dict) -> list:
+    """
+    Analyze sensor health data and return a list of alerts.
+
+    Each alert: {"sensor": str, "level": "ok"|"warning"|"error", "message": str}
+    """
+    alerts = []
+    if not health_data:
+        return alerts
+
+    for sensor_name, sensor_info in health_data.items():
+        if not isinstance(sensor_info, dict):
+            continue
+
+        status = sensor_info.get("status", "unknown")
+        if status == "error" or status == "disconnected":
+            alerts.append({
+                "sensor": sensor_name,
+                "level": "error",
+                "message": sensor_info.get("message", f"{sensor_name} is not responding"),
+            })
+        elif status == "warning":
+            alerts.append({
+                "sensor": sensor_name,
+                "level": "warning",
+                "message": sensor_info.get("message", f"{sensor_name} has a warning"),
+            })
+        elif status == "out_of_range":
+            alerts.append({
+                "sensor": sensor_name,
+                "level": "warning",
+                "message": sensor_info.get(
+                    "message",
+                    f"{sensor_name} reading out of expected range"
+                ),
+            })
+        # "ok" status generates no alert
+
+    return alerts
 
 
 def _generate_ppg_code(name: str) -> str:

@@ -111,3 +111,24 @@ async def _migrate_add_columns():
                 except Exception:
                     pass  # Already applied
             logger.info("  Maintenance chart schema fixes applied")
+
+        # Add device monitoring columns if missing
+        monitoring_columns = {
+            "driver_status": "JSONB",
+            "sensor_health": "JSONB",
+            "system_info": "JSONB",
+            "pending_admin_password": "VARCHAR(255)",
+        }
+        for col_name, col_type in monitoring_columns.items():
+            try:
+                result = await conn.execute(text(
+                    "SELECT column_name FROM information_schema.columns "
+                    f"WHERE table_name = 'locker_devices' AND column_name = '{col_name}'"
+                ))
+                if not result.scalar_one_or_none():
+                    await conn.execute(text(
+                        f"ALTER TABLE locker_devices ADD COLUMN {col_name} {col_type}"
+                    ))
+                    logger.info(f"  Added locker_devices.{col_name} column")
+            except Exception as e:
+                logger.debug(f"  Column {col_name} already exists or error: {e}")
