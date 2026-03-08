@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}{{ chart.name }} - SmartLocker{% endblock %}
+{% block page_title %}{{ chart.name }}{% endblock %}
+
+{% block actions %}
+<a href="/admin/charts" class="btn btn-secondary">Back to Charts</a>
+{% endblock %}
+
+{% block content %}
+{% set active = "charts" %}
+
+<!-- Vessel Info -->
+<div class="panel">
+    <h3 class="panel-title" style="color: var(--accent-blue);">Chart Information</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        <div>
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">VESSEL</div>
+            <div style="font-size: 16px; font-weight: 600;">
+                {% if chart.parsed_data and chart.parsed_data.vessel_name %}
+                    {{ chart.parsed_data.vessel_name }}
+                {% else %}
+                    -
+                {% endif %}
+            </div>
+        </div>
+        <div>
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">IMO NUMBER</div>
+            <div style="font-size: 16px;">{{ chart.imo_number or '-' }}</div>
+        </div>
+        <div>
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">CREATED</div>
+            <div style="font-size: 14px; color: var(--text-secondary);">
+                {{ chart.created_at.strftime('%Y-%m-%d %H:%M') if chart.created_at else '-' }}
+            </div>
+        </div>
+        <div>
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">SOURCE</div>
+            <div style="font-size: 14px; color: var(--text-secondary);">{{ chart.description or '-' }}</div>
+        </div>
+    </div>
+</div>
+
+{% if chart.parsed_data %}
+{% set data = chart.parsed_data %}
+
+<!-- Products -->
+{% if data.products %}
+<div class="panel">
+    <h3 class="panel-title" style="color: var(--accent-green);">
+        Products ({{ data.products|length }})
+    </h3>
+    <table class="data-table" style="margin-bottom: 0;">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Product</th>
+                <th>Thinner</th>
+                <th>Components</th>
+                <th>Ratio</th>
+                <th>Coverage</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in data.products %}
+            <tr>
+                <td style="color: var(--text-muted);">{{ loop.index }}</td>
+                <td style="font-weight: 600; color: var(--accent-green);">{{ p.name }}</td>
+                <td style="color: var(--text-secondary);">{{ p.thinner or '-' }}</td>
+                <td>{{ p.components }}-comp</td>
+                <td>
+                    {% if p.components == 2 %}
+                        {{ p.base_ratio }}:{{ p.hardener_ratio }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ p.coverage_m2_per_liter or '-' }} m2/L</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Areas -->
+{% if data.areas %}
+<div class="panel">
+    <h3 class="panel-title" style="color: var(--accent-orange);">
+        Vessel Areas ({{ data.areas|length }})
+    </h3>
+
+    {% for area in data.areas %}
+    <div style="background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; padding: 12px 15px; margin-bottom: 10px;">
+        <div style="font-weight: 700; color: var(--accent-orange); margin-bottom: 8px; font-size: 14px;">
+            {{ area.name }}
+        </div>
+        {% if area.layers %}
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <th style="text-align: left; padding: 4px 10px; font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Layer</th>
+                <th style="text-align: left; padding: 4px 10px; font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Product</th>
+                <th style="text-align: left; padding: 4px 10px; font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Color</th>
+            </tr>
+            {% for layer in area.layers %}
+            <tr>
+                <td style="padding: 4px 10px; color: var(--text-muted); width: 60px;">{{ layer.layer_number }}</td>
+                <td style="padding: 4px 10px; color: var(--text-primary);">{{ layer.product }}</td>
+                <td style="padding: 4px 10px; color: var(--accent-yellow);">{{ layer.color or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% endif %}
+        {% if area.notes %}
+        <div style="margin-top: 6px; font-size: 12px; color: var(--text-muted);">{{ area.notes }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Marking Colors -->
+{% if data.marking_colors %}
+<div class="panel">
+    <h3 class="panel-title" style="color: var(--accent-yellow);">
+        Marking Colors ({{ data.marking_colors|length }})
+    </h3>
+    <table class="data-table" style="margin-bottom: 0;">
+        <thead>
+            <tr>
+                <th>Purpose</th>
+                <th>Color</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mc in data.marking_colors %}
+            <tr>
+                <td>{{ mc.purpose }}</td>
+                <td style="color: var(--accent-yellow);">{{ mc.color }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% else %}
+<div class="panel" style="text-align: center; padding: 40px;">
+    <p style="color: var(--text-muted);">No parsed data available for this chart.</p>
+</div>
+{% endif %}
+
+{% endblock %}

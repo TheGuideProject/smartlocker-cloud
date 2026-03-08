@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block title %}Chart Preview - SmartLocker{% endblock %}
+{% block page_title %}Review Parsed Chart{% endblock %}
+
+{% block actions %}
+<a href="/admin/charts" class="btn btn-secondary">Cancel</a>
+{% endblock %}
+
+{% block content %}
+{% set active = "charts" %}
+
+<div style="background: rgba(95,168,211,0.12); border: 1px solid var(--accent-blue); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+    <strong style="color: var(--accent-blue);">PDF Parsed Successfully!</strong>
+    <span style="color: var(--text-secondary); margin-left: 8px;">
+        Review the data below. You can edit any field before saving.
+        Products will be auto-created in the catalog.
+    </span>
+</div>
+
+<form action="/admin/charts/confirm" method="POST">
+    <!-- Hidden fields -->
+    <input type="hidden" name="pdf_path" value="{{ pdf_path }}">
+    <input type="hidden" name="pdf_filename" value="{{ pdf_filename }}">
+
+    <!-- ========== VESSEL INFO ========== -->
+    <div class="panel">
+        <h3 class="panel-title" style="color: var(--accent-blue);">Vessel Information</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Chart Name</label>
+                <input type="text" name="chart_name"
+                       value="{{ parsed.vessel_name or pdf_filename }}"
+                       placeholder="Chart name">
+            </div>
+            <div class="form-group">
+                <label>Vessel Name (from PDF)</label>
+                <input type="text" name="vessel_name"
+                       value="{{ parsed.vessel_name }}"
+                       placeholder="Vessel name">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>IMO Number</label>
+                <input type="text" name="imo_number"
+                       value="{{ parsed.imo_number }}"
+                       placeholder="7-digit IMO">
+            </div>
+            <div class="form-group">
+                <label>Link to Vessel</label>
+                <select name="vessel_id">
+                    <option value="">-- Not linked --</option>
+                    {% for v in vessels %}
+                    <option value="{{ v.id }}" {% if v.id == vessel_id %}selected{% endif %}>
+                        {{ v.name }}{% if v.imo_number %} (IMO {{ v.imo_number }}){% endif %}
+                        {% if v.fleet and v.fleet.company %} - {{ v.fleet.company.name }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== PRODUCTS ========== -->
+    <div class="panel">
+        <h3 class="panel-title" style="color: var(--accent-green);">
+            Products Found ({{ parsed.products|length }})
+            <small style="color: var(--text-muted); font-weight: normal; font-size: 13px; margin-left: 10px;">
+                These will be auto-created in the product catalog
+            </small>
+        </h3>
+
+        {% if parsed.products %}
+        <table class="data-table" style="margin-bottom: 0;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Product Name</th>
+                    <th>Thinner</th>
+                    <th>Components</th>
+                    <th>Ratio (Base:Hard)</th>
+                    <th>Coverage (m2/L)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in parsed.products %}
+                <tr>
+                    <td style="color: var(--text-muted);">{{ loop.index }}</td>
+                    <td>
+                        <input type="text" name="product_{{ loop.index0 }}_name"
+                               value="{{ p.name }}"
+                               style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--accent-green); padding: 6px 10px; font-size: 14px; font-weight: 600; width: 100%;">
+                    </td>
+                    <td>
+                        <input type="text" name="product_{{ loop.index0 }}_thinner"
+                               value="{{ p.thinner or '' }}"
+                               style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); padding: 6px 10px; font-size: 13px; width: 100%;">
+                    </td>
+                    <td>
+                        <input type="number" name="product_{{ loop.index0 }}_components"
+                               value="{{ p.components }}" min="1" max="3"
+                               style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); padding: 6px 10px; font-size: 13px; width: 70px;">
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <input type="number" name="product_{{ loop.index0 }}_base_ratio"
+                                   value="{{ p.base_ratio }}" min="0" max="100"
+                                   style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); padding: 6px 8px; font-size: 13px; width: 60px;">
+                            <span style="color: var(--text-muted);">:</span>
+                            <input type="number" name="product_{{ loop.index0 }}_hardener_ratio"
+                                   value="{{ p.hardener_ratio }}" min="0" max="100"
+                                   style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); padding: 6px 8px; font-size: 13px; width: 60px;">
+                        </div>
+                    </td>
+                    <td>
+                        <input type="number" name="product_{{ loop.index0 }}_coverage"
+                               value="{{ p.coverage_m2_per_liter }}" min="0"
+                               style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); padding: 6px 10px; font-size: 13px; width: 80px;">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color: var(--text-muted);">No products detected in the PDF.</p>
+        {% endif %}
+    </div>
+
+    <!-- ========== AREAS WITH LAYERS ========== -->
+    <div class="panel">
+        <h3 class="panel-title" style="color: var(--accent-orange);">
+            Vessel Areas ({{ parsed.areas|length }})
+            <small style="color: var(--text-muted); font-weight: normal; font-size: 13px; margin-left: 10px;">
+                Each area has coating layers with products and colors
+            </small>
+        </h3>
+
+        {% for area in parsed.areas %}
+        <div style="background: var(--bg-dark); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 12px;">
+            <!-- Area name (editable) -->
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <span style="color: var(--accent-orange); font-weight: 700; font-size: 14px; white-space: nowrap;">
+                    AREA {{ loop.index }}:
+                </span>
+                <input type="text" name="area_{{ loop.index0 }}_name"
+                       value="{{ area.name }}"
+                       style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--accent-orange); padding: 6px 10px; font-size: 14px; font-weight: 600; flex: 1;">
+                <input type="hidden" name="area_{{ loop.index0 }}_notes" value="{{ area.notes or '' }}">
+            </div>
+
+            <!-- Layers table -->
+            {% if area.layers %}
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="padding: 6px 10px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Layer</th>
+                        <th style="padding: 6px 10px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Product</th>
+                        <th style="padding: 6px 10px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Color</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for layer in area.layers %}
+                    <tr>
+                        <td style="padding: 4px 10px; color: var(--text-secondary); width: 60px;">
+                            {{ layer.layer_number }}
+                        </td>
+                        <td style="padding: 4px 10px;">
+                            <input type="text"
+                                   name="area_{{ loop.parent.loop.index0 }}_layer_{{ loop.index0 }}_product"
+                                   value="{{ layer.product }}"
+                                   style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); padding: 5px 8px; font-size: 13px; width: 100%;">
+                        </td>
+                        <td style="padding: 4px 10px; width: 200px;">
+                            <input type="text"
+                                   name="area_{{ loop.parent.loop.index0 }}_layer_{{ loop.index0 }}_color"
+                                   value="{{ layer.color }}"
+                                   style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--accent-yellow); padding: 5px 8px; font-size: 13px; width: 100%;">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: var(--text-muted); font-size: 13px;">No layers detected for this area.</p>
+            {% endif %}
+
+            {% if area.notes %}
+            <div style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+                Note: {{ area.notes }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- ========== MARKING COLORS ========== -->
+    {% if parsed.marking_colors %}
+    <div class="panel">
+        <h3 class="panel-title" style="color: var(--accent-yellow);">
+            Marking Colors ({{ parsed.marking_colors|length }})
+        </h3>
+        <table class="data-table" style="margin-bottom: 0;">
+            <thead>
+                <tr>
+                    <th>Purpose</th>
+                    <th>Color</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mc in parsed.marking_colors %}
+                <tr>
+                    <td>
+                        <input type="text" name="marking_{{ loop.index0 }}_purpose"
+                               value="{{ mc.purpose }}"
+                               style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); padding: 5px 8px; font-size: 13px; width: 100%;">
+                    </td>
+                    <td>
+                        <input type="text" name="marking_{{ loop.index0 }}_color"
+                               value="{{ mc.color }}"
+                               style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--accent-yellow); padding: 5px 8px; font-size: 13px; width: 100%;">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- ========== CONFIRM BUTTON ========== -->
+    <div style="display: flex; gap: 15px; align-items: center; padding: 20px 0; border-top: 1px solid var(--border); margin-top: 10px;">
+        <button type="submit" class="btn btn-success" style="font-size: 16px; padding: 12px 30px;">
+            Confirm & Save Chart
+        </button>
+        <a href="/admin/charts" class="btn btn-secondary" style="padding: 12px 20px;">
+            Discard & Go Back
+        </a>
+        <span style="color: var(--text-muted); font-size: 13px; margin-left: auto;">
+            {{ parsed.products|length }} products will be created &bull;
+            {{ parsed.areas|length }} areas &bull;
+            PDF: {{ pdf_filename }}
+        </span>
+    </div>
+</form>
+
+{% endblock %}

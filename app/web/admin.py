@@ -1,12 +1,17 @@
 """PPG Admin Portal - Web routes with Jinja2 templates."""
 
-from fastapi import APIRouter, Request, Depends, Form
+import os
+import json
+import logging
+
+from fastapi import APIRouter, Request, Depends, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models.product import Product, MixingRecipe
 from app.models.device import LockerDevice
@@ -14,6 +19,9 @@ from app.models.event import DeviceEvent
 from app.models.company import Company
 from app.models.fleet import Fleet, Vessel
 from app.models.pairing import PairingCode
+from app.models.maintenance import MaintenanceChart
+
+logger = logging.getLogger("smartlocker.admin")
 
 router = APIRouter(prefix="/admin", tags=["admin-web"])
 templates = Jinja2Templates(directory="app/web/templates")
@@ -325,3 +333,326 @@ async def admin_generate_pairing_code(
     )
     db.add(pairing)
     return RedirectResponse(url="/admin/pairing", status_code=303)
+
+
+# ---- Maintenance Charts ----
+
+@router.get("/charts", response_class=HTMLResponse)
+async def admin_charts(request: Request, db: AsyncSession = Depends(get_db)):
+    """Maintenance chart management page."""
+    # Get all charts
+    charts_result = await db.execute(
+        select(MaintenanceChart).order_by(MaintenanceChart.created_at.desc())
+    )
+    charts = charts_result.scalars().all()
+
+    # Get vessels for dropdown
+    vessels_result = await db.execute(
+        select(Vessel)
+        .options(selectinload(Vessel.fleet).selectinload(Fleet.company))
+        .order_by(Vessel.name)
+    )
+    vessels = vessels_result.scalars().all()
+
+    return templates.TemplateResponse("admin/charts.html", {
+        "request": request,
+        "charts": charts,
+        "vessels": vessels,
+        "active": "charts",
+    })
+
+
+@router.post("/charts/upload", response_class=HTMLResponse)
+async def admin_upload_chart(
+    request: Request,
+    vessel_id: str = Form(""),
+    pdf_file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload a PDF maintenance chart and show parsed preview for editing."""
+    from app.services.chart_parser import parse_maintenance_chart
+
+    # Validate file type
+    if not pdf_file.filename.lower().endswith(".pdf"):
+        # Get vessels for re-rendering the page
+        vessels_result = await db.execute(
+            select(Vessel)
+            .options(selectinload(Vessel.fleet).selectinload(Fleet.company))
+            .order_by(Vessel.name)
+        )
+        vessels = vessels_result.scalars().all()
+        charts_result = await db.execute(
+            select(MaintenanceChart).order_by(MaintenanceChart.created_at.desc())
+        )
+        charts = charts_result.scalars().all()
+        return templates.TemplateResponse("admin/charts.html", {
+            "request": request,
+            "charts": charts,
+            "vessels": vessels,
+            "active": "charts",
+            "error": "Only PDF files are accepted.",
+        })
+
+    # Read PDF bytes
+    pdf_bytes = await pdf_file.read()
+
+    # Save PDF to disk
+    os.makedirs(os.path.join(settings.UPLOAD_DIR, "charts"), exist_ok=True)
+    safe_name = pdf_file.filename.replace(" ", "_")
+    pdf_path = os.path.join(settings.UPLOAD_DIR, "charts", safe_name)
+    with open(pdf_path, "wb") as f:
+        f.write(pdf_bytes)
+
+    # Parse the PDF
+    try:
+        parsed = parse_maintenance_chart(pdf_bytes)
+    except Exception as e:
+        logger.error(f"PDF parse error: {e}")
+        vessels_result = await db.execute(
+            select(Vessel)
+            .options(selectinload(Vessel.fleet).selectinload(Fleet.company))
+            .order_by(Vessel.name)
+        )
+        vessels = vessels_result.scalars().all()
+        charts_result = await db.execute(
+            select(MaintenanceChart).order_by(MaintenanceChart.created_at.desc())
+        )
+        charts = charts_result.scalars().all()
+        return templates.TemplateResponse("admin/charts.html", {
+            "request": request,
+            "charts": charts,
+            "vessels": vessels,
+            "active": "charts",
+            "error": f"Error parsing PDF: {str(e)}",
+        })
+
+    # Get vessels for the vessel selector
+    vessels_result = await db.execute(
+        select(Vessel)
+        .options(selectinload(Vessel.fleet).selectinload(Fleet.company))
+        .order_by(Vessel.name)
+    )
+    vessels = vessels_result.scalars().all()
+
+    # Auto-match vessel by IMO number
+    matched_vessel_id = vessel_id or ""
+    if not matched_vessel_id and parsed.get("imo_number"):
+        for v in vessels:
+            if v.imo_number == parsed["imo_number"]:
+                matched_vessel_id = v.id
+                break
+
+    return templates.TemplateResponse("admin/chart_preview.html", {
+        "request": request,
+        "parsed": parsed,
+        "parsed_json": json.dumps(parsed),
+        "pdf_path": pdf_path,
+        "pdf_filename": pdf_file.filename,
+        "vessel_id": matched_vessel_id,
+        "vessels": vessels,
+        "active": "charts",
+    })
+
+
+@router.post("/charts/confirm", response_class=HTMLResponse)
+async def admin_confirm_chart(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Save the edited chart data + auto-create products."""
+    form = await request.form()
+
+    vessel_id = form.get("vessel_id", "")
+    pdf_path = form.get("pdf_path", "")
+    pdf_filename = form.get("pdf_filename", "")
+    chart_name = form.get("chart_name", pdf_filename or "Maintenance Chart")
+    imo_number = form.get("imo_number", "")
+    vessel_name = form.get("vessel_name", "")
+
+    # Rebuild the parsed data from the edited form fields
+    # Products
+    products_data = []
+    idx = 0
+    while True:
+        pname = form.get(f"product_{idx}_name")
+        if pname is None:
+            break
+        products_data.append({
+            "name": pname,
+            "thinner": form.get(f"product_{idx}_thinner", ""),
+            "components": int(form.get(f"product_{idx}_components", "1")),
+            "base_ratio": int(form.get(f"product_{idx}_base_ratio", "100")),
+            "hardener_ratio": int(form.get(f"product_{idx}_hardener_ratio", "0")),
+            "coverage_m2_per_liter": int(form.get(f"product_{idx}_coverage", "0")),
+        })
+        idx += 1
+
+    # Areas with layers
+    areas_data = []
+    area_idx = 0
+    while True:
+        area_name = form.get(f"area_{area_idx}_name")
+        if area_name is None:
+            break
+        layers = []
+        layer_idx = 0
+        while True:
+            lproduct = form.get(f"area_{area_idx}_layer_{layer_idx}_product")
+            if lproduct is None:
+                break
+            layers.append({
+                "layer_number": layer_idx + 1,
+                "product": lproduct,
+                "color": form.get(f"area_{area_idx}_layer_{layer_idx}_color", ""),
+            })
+            layer_idx += 1
+        areas_data.append({
+            "name": area_name,
+            "layers": layers,
+            "notes": form.get(f"area_{area_idx}_notes", ""),
+        })
+        area_idx += 1
+
+    # Marking colors
+    marking_data = []
+    mc_idx = 0
+    while True:
+        mc_purpose = form.get(f"marking_{mc_idx}_purpose")
+        if mc_purpose is None:
+            break
+        marking_data.append({
+            "purpose": mc_purpose,
+            "color": form.get(f"marking_{mc_idx}_color", ""),
+        })
+        mc_idx += 1
+
+    # Final parsed data
+    final_data = {
+        "vessel_name": vessel_name,
+        "imo_number": imo_number,
+        "products": products_data,
+        "areas": areas_data,
+        "marking_colors": marking_data,
+    }
+
+    # ---- Auto-create products in the catalog ----
+    created_products = 0
+    for p in products_data:
+        pname = p["name"].strip()
+        if not pname:
+            continue
+
+        # Check if product already exists (by name)
+        existing = await db.execute(
+            select(Product).where(Product.name == pname)
+        )
+        if existing.scalar_one_or_none():
+            continue  # Already in catalog
+
+        # Determine product type based on name/components
+        if p.get("components", 1) == 2:
+            # It's a 2-component system — create base and hardener pair
+            product_type = "base_paint"
+        elif "THERM" in pname.upper():
+            product_type = "base_paint"
+        elif "PRIME" in pname.upper():
+            product_type = "primer"
+        elif "DUR" in pname.upper() or "RITE" in pname.upper():
+            product_type = "base_paint"
+        else:
+            product_type = "base_paint"
+
+        # Generate a PPG code from the name (e.g. "SIGMACOVER 280" → "SC-280")
+        ppg_code = _generate_ppg_code(pname)
+
+        # Check ppg_code uniqueness
+        existing_code = await db.execute(
+            select(Product).where(Product.ppg_code == ppg_code)
+        )
+        if existing_code.scalar_one_or_none():
+            ppg_code = ppg_code + "-AUTO"
+
+        new_product = Product(
+            ppg_code=ppg_code,
+            name=pname,
+            product_type=product_type,
+            density_g_per_ml=1.0,
+            description=f"Auto-imported from maintenance chart: {chart_name}",
+        )
+        db.add(new_product)
+        created_products += 1
+
+    # ---- Save the MaintenanceChart record ----
+    chart = MaintenanceChart(
+        name=chart_name,
+        vessel_id=vessel_id if vessel_id else None,
+        imo_number=imo_number,
+        pdf_file_path=pdf_path,
+        parsed_data=final_data,
+        description=f"Parsed from: {pdf_filename}",
+    )
+    db.add(chart)
+    await db.flush()
+
+    logger.info(
+        f"Chart saved: {chart_name}, {created_products} new products created, "
+        f"{len(areas_data)} areas"
+    )
+
+    # Redirect to charts page with success message
+    return RedirectResponse(
+        url=f"/admin/charts?saved=1&products={created_products}",
+        status_code=303,
+    )
+
+
+@router.get("/charts/{chart_id}", response_class=HTMLResponse)
+async def admin_chart_detail(
+    chart_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """View a saved chart with its data."""
+    chart = await db.get(MaintenanceChart, chart_id)
+    if not chart:
+        return RedirectResponse(url="/admin/charts", status_code=303)
+
+    return templates.TemplateResponse("admin/chart_detail.html", {
+        "request": request,
+        "chart": chart,
+        "active": "charts",
+    })
+
+
+def _generate_ppg_code(name: str) -> str:
+    """Generate a short PPG code from a product name.
+
+    E.g. 'SIGMACOVER 280' → 'SC-280'
+         'SIGMADUR 550' → 'SD-550'
+         'SIGMAPRIME 200' → 'SP-200'
+    """
+    import re
+    name = name.strip().upper()
+
+    # Extract the number part
+    num_match = re.search(r"(\d+)", name)
+    num = num_match.group(1) if num_match else "000"
+
+    # Common abbreviations
+    abbrevs = {
+        "SIGMACOVER": "SC",
+        "SIGMADUR": "SD",
+        "SIGMAGUARD": "SG",
+        "SIGMAPRIME": "SP",
+        "SIGMARINE": "SM",
+        "SIGMATHERM": "ST",
+        "SIGMARITE": "SR",
+    }
+
+    prefix = "SX"  # Default
+    for full, short in abbrevs.items():
+        if full in name:
+            prefix = short
+            break
+
+    return f"{prefix}-{num}"
