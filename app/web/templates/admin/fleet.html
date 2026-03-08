@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% set active = "fleet" %}
+
+{% block title %}Fleet Management - SmartLocker{% endblock %}
+{% block page_title %}Fleet Management{% endblock %}
+
+{% block actions %}
+<button class="btn btn-primary" onclick="document.getElementById('addCompanyPanel').style.display='block'">+ Add Company</button>
+{% endblock %}
+
+{% block content %}
+<!-- Add Company Form -->
+<div id="addCompanyPanel" class="panel" style="display: none;">
+    <div class="panel-title">Add Ship Owner Company</div>
+    <form action="/admin/companies/add" method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Company Name</label>
+                <input type="text" name="name" placeholder="e.g. Mediterranean Shipping Co." required>
+            </div>
+            <div class="form-group">
+                <label>Contact Email</label>
+                <input type="email" name="contact_email" placeholder="e.g. fleet@company.com">
+            </div>
+            <div class="form-group">
+                <label>Contact Phone</label>
+                <input type="text" name="contact_phone" placeholder="e.g. +39 123 456 7890">
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button type="submit" class="btn btn-success">Save Company</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('addCompanyPanel').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
+{% if not companies %}
+<div class="panel" style="text-align: center; padding: 40px;">
+    <div style="font-size: 48px; margin-bottom: 15px;">🏢</div>
+    <div style="color: var(--text-secondary); font-size: 16px; margin-bottom: 10px;">No companies registered yet</div>
+    <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">
+        Start by adding a ship owner company, then create fleets and vessels.
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('addCompanyPanel').style.display='block'">+ Add First Company</button>
+</div>
+{% endif %}
+
+<!-- Company → Fleet → Vessel Hierarchy -->
+{% for company in companies %}
+<div class="panel" style="margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <div>
+            <div class="panel-title" style="margin-bottom: 2px;">🏢 {{ company.name }}</div>
+            <div style="color: var(--text-muted); font-size: 12px;">
+                {{ company.contact_email or 'No email' }}
+                {% if company.contact_phone %} · {{ company.contact_phone }}{% endif %}
+            </div>
+        </div>
+        <button class="btn btn-secondary" style="font-size: 12px;"
+                onclick="document.getElementById('addFleet-{{ company.id[:8] }}').style.display = document.getElementById('addFleet-{{ company.id[:8] }}').style.display === 'none' ? 'block' : 'none'">
+            + Add Fleet
+        </button>
+    </div>
+
+    <!-- Add Fleet Form (hidden) -->
+    <div id="addFleet-{{ company.id[:8] }}" style="display: none; margin-bottom: 15px; padding: 12px; background: var(--bg-input); border-radius: 6px;">
+        <form action="/admin/fleets/add" method="post" style="display: flex; gap: 10px; align-items: end;">
+            <input type="hidden" name="company_id" value="{{ company.id }}">
+            <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                <label>Fleet Name</label>
+                <input type="text" name="name" placeholder="e.g. Mediterranean Fleet" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                <label>Region</label>
+                <input type="text" name="region" placeholder="e.g. Mediterranean">
+            </div>
+            <button type="submit" class="btn btn-success" style="height: 36px;">Save</button>
+        </form>
+    </div>
+
+    {% if company.fleets %}
+    {% for fleet in company.fleets %}
+    <div style="margin-left: 20px; padding: 12px; border-left: 2px solid var(--accent-blue); margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div>
+                <span style="color: var(--accent-blue); font-weight: 600;">⚓ {{ fleet.name }}</span>
+                <span style="color: var(--text-muted); font-size: 12px; margin-left: 8px;">{{ fleet.region or '' }}</span>
+                <span style="color: var(--text-muted); font-size: 12px; margin-left: 8px;">· {{ fleet.vessels|length }} vessel{{ 's' if fleet.vessels|length != 1 else '' }}</span>
+            </div>
+            <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;"
+                    onclick="document.getElementById('addVessel-{{ fleet.id[:8] }}').style.display = document.getElementById('addVessel-{{ fleet.id[:8] }}').style.display === 'none' ? 'block' : 'none'">
+                + Vessel
+            </button>
+        </div>
+
+        <!-- Add Vessel Form (hidden) -->
+        <div id="addVessel-{{ fleet.id[:8] }}" style="display: none; margin-bottom: 10px; padding: 10px; background: var(--bg-dark); border-radius: 6px;">
+            <form action="/admin/vessels/add" method="post" style="display: flex; gap: 8px; align-items: end; flex-wrap: wrap;">
+                <input type="hidden" name="fleet_id" value="{{ fleet.id }}">
+                <div class="form-group" style="margin-bottom: 0; min-width: 150px; flex: 1;">
+                    <label>Vessel Name</label>
+                    <input type="text" name="name" placeholder="e.g. MV Pacific Star" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0; min-width: 120px;">
+                    <label>IMO Number</label>
+                    <input type="text" name="imo_number" placeholder="e.g. 9876543">
+                </div>
+                <div class="form-group" style="margin-bottom: 0; min-width: 120px;">
+                    <label>Type</label>
+                    <select name="vessel_type">
+                        <option value="">Select...</option>
+                        <option value="bulk_carrier">Bulk Carrier</option>
+                        <option value="container">Container</option>
+                        <option value="tanker">Tanker</option>
+                        <option value="general_cargo">General Cargo</option>
+                        <option value="ro_ro">Ro-Ro</option>
+                        <option value="passenger">Passenger</option>
+                        <option value="offshore">Offshore</option>
+                        <option value="yacht">Yacht</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-success" style="height: 36px;">Save</button>
+            </form>
+        </div>
+
+        {% if fleet.vessels %}
+        <table class="data-table" style="margin-top: 8px;">
+            <thead>
+                <tr>
+                    <th>Vessel</th>
+                    <th>IMO</th>
+                    <th>Type</th>
+                    <th>Devices</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vessel in fleet.vessels %}
+                <tr>
+                    <td><strong>🚢 {{ vessel.name }}</strong></td>
+                    <td>{{ vessel.imo_number or '-' }}</td>
+                    <td>{{ (vessel.vessel_type or '-').replace('_', ' ').title() }}</td>
+                    <td>
+                        <span class="status-badge {{ 'online' if vessel.devices|length > 0 else 'offline' }}">
+                            {{ vessel.devices|length }} locker{{ 's' if vessel.devices|length != 1 else '' }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="color: var(--text-muted); font-size: 13px; padding: 8px 0;">No vessels yet. Click "+ Vessel" to add one.</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div style="margin-left: 20px; color: var(--text-muted); font-size: 13px;">No fleets yet. Click "+ Add Fleet" to create one.</div>
+    {% endif %}
+</div>
+{% endfor %}
+
+<div class="panel" style="margin-top: 20px;">
+    <div class="panel-title">How it works</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="font-size: 28px; margin-bottom: 5px;">🏢</div>
+            <div style="color: var(--text-primary); font-weight: 600; font-size: 13px;">1. Company</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Ship owner</div>
+        </div>
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="font-size: 28px; margin-bottom: 5px;">⚓</div>
+            <div style="color: var(--text-primary); font-weight: 600; font-size: 13px;">2. Fleet</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Group of vessels</div>
+        </div>
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="font-size: 28px; margin-bottom: 5px;">🚢</div>
+            <div style="color: var(--text-primary); font-weight: 600; font-size: 13px;">3. Vessel</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Individual ship</div>
+        </div>
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="font-size: 28px; margin-bottom: 5px;">📦</div>
+            <div style="color: var(--text-primary); font-weight: 600; font-size: 13px;">4. SmartLocker</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Edge device (RPi)</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

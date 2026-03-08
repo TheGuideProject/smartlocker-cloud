@@ -4,7 +4,46 @@
 {% block title %}Devices - SmartLocker{% endblock %}
 {% block page_title %}Locker Devices{% endblock %}
 
+{% block actions %}
+<button class="btn btn-primary" onclick="document.getElementById('addDevicePanel').style.display='block'">+ Register Device</button>
+{% endblock %}
+
 {% block content %}
+<!-- Register Device Form -->
+<div id="addDevicePanel" class="panel" style="display: none;">
+    <div class="panel-title">Register New SmartLocker Device</div>
+    <form action="/admin/devices/add" method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Device ID (must match edge config)</label>
+                <input type="text" name="device_id" placeholder="e.g. LOCKER-DEV-001" required>
+            </div>
+            <div class="form-group">
+                <label>Assign to Vessel</label>
+                <select name="vessel_id" required>
+                    <option value="">-- Select Vessel --</option>
+                    {% for vessel in vessels %}
+                    <option value="{{ vessel.id }}">{{ vessel.name }}{% if vessel.imo_number %} (IMO {{ vessel.imo_number }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Name (optional)</label>
+                <input type="text" name="name" placeholder="e.g. Main Paint Locker">
+            </div>
+        </div>
+        {% if not vessels %}
+        <p style="color: var(--accent-orange); font-size: 13px; margin-bottom: 10px;">
+            No vessels found. <a href="/admin/fleet" style="color: var(--accent-blue);">Create a company and vessel first</a>.
+        </p>
+        {% endif %}
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button type="submit" class="btn btn-success" {% if not vessels %}disabled{% endif %}>Register Device</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('addDevicePanel').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
 <div class="stats-grid" style="margin-bottom: 20px;">
     <div class="stat-card">
         <div class="label">Total Devices</div>
@@ -16,7 +55,7 @@
     </div>
     <div class="stat-card">
         <div class="label">Offline</div>
-        <div class="value red">{{ devices|selectattr('status', 'equalto', 'offline')|list|length }}</div>
+        <div class="value red">{{ devices|rejectattr('status', 'equalto', 'online')|list|length }}</div>
     </div>
 </div>
 
@@ -24,11 +63,10 @@
     <thead>
         <tr>
             <th>Device ID</th>
-            <th>Vessel</th>
+            <th>Name</th>
             <th>Status</th>
             <th>Software</th>
             <th>Last Heartbeat</th>
-            <th>Config Version</th>
             <th>Registered</th>
         </tr>
     </thead>
@@ -36,7 +74,7 @@
         {% for device in devices %}
         <tr>
             <td><strong><code style="background: var(--bg-input); padding: 2px 8px; border-radius: 3px;">{{ device.device_id }}</code></strong></td>
-            <td>{{ device.vessel.name if device.vessel else 'Unassigned' }}</td>
+            <td>{{ device.name or '-' }}</td>
             <td>
                 <span class="status-badge {{ device.status or 'offline' }}">
                     {{ (device.status or 'offline').upper() }}
@@ -50,30 +88,16 @@
                 <span style="color: var(--text-muted);">Never</span>
                 {% endif %}
             </td>
-            <td>{{ device.config_version or 1 }}</td>
             <td>{{ device.created_at.strftime('%Y-%m-%d') if device.created_at else '-' }}</td>
         </tr>
         {% endfor %}
         {% if not devices %}
         <tr>
-            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
-                No devices registered yet. Use the API to register edge devices.
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                No devices registered. Click "+ Register Device" to add one, or <a href="/admin/fleet" style="color: var(--accent-blue);">create a vessel first</a>.
             </td>
         </tr>
         {% endif %}
     </tbody>
 </table>
-
-<div class="panel" style="margin-top: 20px;">
-    <div class="panel-title">Device Registration</div>
-    <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 10px;">
-        Edge devices register automatically via the API endpoint:
-    </p>
-    <code style="background: var(--bg-input); padding: 8px 15px; border-radius: 6px; display: block; color: var(--accent-blue); font-size: 13px;">
-        POST /api/devices/{device_id}/heartbeat
-    </code>
-    <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">
-        The device will appear here once it sends its first heartbeat.
-    </p>
-</div>
 {% endblock %}

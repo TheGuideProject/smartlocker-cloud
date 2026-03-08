@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -11,6 +12,7 @@ from app.models.product import Product, MixingRecipe
 from app.models.device import LockerDevice
 from app.models.event import DeviceEvent
 from app.models.company import Company
+from app.models.fleet import Fleet, Vessel
 
 router = APIRouter(prefix="/admin", tags=["admin-web"])
 templates = Jinja2Templates(directory="app/web/templates")
@@ -105,15 +107,15 @@ async def admin_recipes(request: Request, db: AsyncSession = Depends(get_db)):
 async def admin_add_recipe(
     request: Request,
     name: str = Form(...),
-    base_product_id: int = Form(...),
-    hardener_product_id: int = Form(...),
+    base_product_id: str = Form(...),
+    hardener_product_id: str = Form(...),
     ratio_base: float = Form(3.0),
     ratio_hardener: float = Form(1.0),
     tolerance_pct: float = Form(5.0),
     thinner_pct_brush: float = Form(0),
     thinner_pct_roller: float = Form(0),
     thinner_pct_spray: float = Form(5),
-    recommended_thinner_id: int = Form(None),
+    recommended_thinner_id: str = Form(None),
     pot_life_minutes: int = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -153,7 +155,111 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
     """Device management."""
     result = await db.execute(select(LockerDevice).order_by(LockerDevice.created_at.desc()))
     devices = result.scalars().all()
+
+    # Get vessels for dropdown
+    vessels_result = await db.execute(select(Vessel).order_by(Vessel.name))
+    vessels = vessels_result.scalars().all()
+
     return templates.TemplateResponse("admin/devices.html", {
         "request": request,
         "devices": devices,
+        "vessels": vessels,
     })
+
+
+@router.post("/devices/add")
+async def admin_add_device(
+    request: Request,
+    device_id: str = Form(...),
+    vessel_id: str = Form(...),
+    name: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Register a new device from admin UI."""
+    api_key = LockerDevice.generate_api_key()
+    device = LockerDevice(
+        device_id=device_id,
+        vessel_id=vessel_id,
+        name=name or None,
+        api_key_hash=api_key,  # Store plaintext for MVP; hash in production
+    )
+    db.add(device)
+    await db.flush()  # So we can redirect
+    return RedirectResponse(url="/admin/devices", status_code=303)
+
+
+# ---- Fleet Management (Company → Fleet → Vessel) ----
+
+@router.get("/fleet", response_class=HTMLResponse)
+async def admin_fleet(request: Request, db: AsyncSession = Depends(get_db)):
+    """Fleet management: companies, fleets, vessels."""
+    # Get companies with their fleets and vessels (eager load)
+    companies_result = await db.execute(
+        select(Company).options(
+            selectinload(Company.fleets)
+            .selectinload(Fleet.vessels)
+            .selectinload(Vessel.devices)
+        ).order_by(Company.name)
+    )
+    companies = companies_result.scalars().all()
+
+    return templates.TemplateResponse("admin/fleet.html", {
+        "request": request,
+        "companies": companies,
+    })
+
+
+@router.post("/companies/add")
+async def admin_add_company(
+    request: Request,
+    name: str = Form(...),
+    contact_email: str = Form(""),
+    contact_phone: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Add a new company (ship owner)."""
+    company = Company(
+        name=name,
+        contact_email=contact_email or None,
+        contact_phone=contact_phone or None,
+    )
+    db.add(company)
+    return RedirectResponse(url="/admin/fleet", status_code=303)
+
+
+@router.post("/fleets/add")
+async def admin_add_fleet(
+    request: Request,
+    company_id: str = Form(...),
+    name: str = Form(...),
+    region: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Add a new fleet under a company."""
+    fleet = Fleet(
+        company_id=company_id,
+        name=name,
+        region=region or None,
+    )
+    db.add(fleet)
+    return RedirectResponse(url="/admin/fleet", status_code=303)
+
+
+@router.post("/vessels/add")
+async def admin_add_vessel(
+    request: Request,
+    fleet_id: str = Form(...),
+    name: str = Form(...),
+    imo_number: str = Form(""),
+    vessel_type: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Add a new vessel under a fleet."""
+    vessel = Vessel(
+        fleet_id=fleet_id,
+        name=name,
+        imo_number=imo_number or None,
+        vessel_type=vessel_type or None,
+    )
+    db.add(vessel)
+    return RedirectResponse(url="/admin/fleet", status_code=303)

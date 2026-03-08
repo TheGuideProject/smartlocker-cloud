@@ -9,12 +9,13 @@ Starts the web server with:
 """
 
 import os
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 
 from app.config import settings
 from app.database import init_db, async_session
@@ -70,6 +71,22 @@ from app.web.dashboard import router as dashboard_router
 
 app.include_router(admin_router)
 app.include_router(dashboard_router)
+
+
+# ---- Error Handler (shows traceback in browser for debugging) ----
+
+@app.exception_handler(Exception)
+async def debug_exception_handler(request: Request, exc: Exception):
+    """Show detailed error info instead of generic 500."""
+    tb = traceback.format_exc()
+    return HTMLResponse(
+        content=f"<html><body style='background:#0d1b2a;color:#e8ecf1;font-family:monospace;padding:20px;'>"
+                f"<h2 style='color:#e63946;'>Error: {type(exc).__name__}</h2>"
+                f"<p style='color:#f4a261;'>{exc}</p>"
+                f"<pre style='background:#1b2838;padding:15px;border-radius:8px;overflow-x:auto;'>{tb}</pre>"
+                f"</body></html>",
+        status_code=500,
+    )
 
 
 # ---- Root Routes ----
