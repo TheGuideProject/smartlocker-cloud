@@ -100,12 +100,14 @@ async def _migrate_add_columns():
             except Exception as e:
                 logger.error(f"  Migration error: {e}")
         else:
-            # Fix column types that changed after initial creation
-            try:
-                await conn.execute(text(
-                    "ALTER TABLE maintenance_charts "
-                    "ALTER COLUMN version TYPE VARCHAR(20) USING version::VARCHAR"
-                ))
-                logger.info("  Fixed version column type to VARCHAR")
-            except Exception:
-                pass  # Already correct type
+            # Fix column types and constraints that changed after initial creation
+            fixes = [
+                "ALTER TABLE maintenance_charts ALTER COLUMN version TYPE VARCHAR(20) USING version::VARCHAR",
+                "ALTER TABLE maintenance_charts ALTER COLUMN version DROP NOT NULL",
+            ]
+            for sql in fixes:
+                try:
+                    await conn.execute(text(sql))
+                except Exception:
+                    pass  # Already applied
+            logger.info("  Maintenance chart schema fixes applied")
