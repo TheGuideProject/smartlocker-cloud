@@ -13,6 +13,7 @@ from app.models.device import LockerDevice
 from app.models.event import DeviceEvent
 from app.models.company import Company
 from app.models.fleet import Fleet, Vessel
+from app.models.pairing import PairingCode
 
 router = APIRouter(prefix="/admin", tags=["admin-web"])
 templates = Jinja2Templates(directory="app/web/templates")
@@ -263,3 +264,64 @@ async def admin_add_vessel(
     )
     db.add(vessel)
     return RedirectResponse(url="/admin/fleet", status_code=303)
+
+
+# ---- Pairing Code Management ----
+
+@router.get("/pairing", response_class=HTMLResponse)
+async def admin_pairing(request: Request, db: AsyncSession = Depends(get_db)):
+    """Pairing code management page."""
+    # Get all pairing codes with vessel info
+    codes_result = await db.execute(
+        select(PairingCode)
+        .options(
+            selectinload(PairingCode.vessel),
+            selectinload(PairingCode.device),
+        )
+        .order_by(PairingCode.created_at.desc())
+    )
+    codes = codes_result.scalars().all()
+
+    # Get vessels for the dropdown (with fleet/company info)
+    vessels_result = await db.execute(
+        select(Vessel)
+        .options(selectinload(Vessel.fleet).selectinload(Fleet.company))
+        .order_by(Vessel.name)
+    )
+    vessels = vessels_result.scalars().all()
+
+    return templates.TemplateResponse("admin/pairing.html", {
+        "request": request,
+        "codes": codes,
+        "vessels": vessels,
+    })
+
+
+@router.post("/pairing/generate")
+async def admin_generate_pairing_code(
+    request: Request,
+    vessel_id: str = Form(...),
+    device_name: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a new 6-digit pairing code for a vessel."""
+    # Generate unique code (retry if collision)
+    for _ in range(10):
+        code = PairingCode.generate_code()
+        existing = await db.execute(
+            select(PairingCode).where(PairingCode.code == code)
+        )
+        if not existing.scalar_one_or_none():
+            break
+    else:
+        # Extremely unlikely, but handle gracefully
+        code = PairingCode.generate_code()
+
+    pairing = PairingCode(
+        code=code,
+        vessel_id=vessel_id,
+        device_name=device_name or None,
+        expires_at=PairingCode.default_expiry(),
+    )
+    db.add(pairing)
+    return RedirectResponse(url="/admin/pairing", status_code=303)

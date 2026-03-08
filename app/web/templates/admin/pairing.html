@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% set active = "pairing" %}
+
+{% block title %}Device Pairing - SmartLocker{% endblock %}
+{% block page_title %}Device Pairing{% endblock %}
+
+{% block actions %}
+<button class="btn btn-primary" onclick="document.getElementById('generatePanel').style.display='block'">+ Generate Code</button>
+{% endblock %}
+
+{% block content %}
+<!-- Generate Code Form -->
+<div id="generatePanel" class="panel" style="display: none;">
+    <div class="panel-title">Generate Pairing Code</div>
+    <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">
+        Generate a 6-digit code for a technician to pair a new SmartLocker device.
+        The code expires in 48 hours.
+    </p>
+    <form action="/admin/pairing/generate" method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Assign to Vessel</label>
+                <select name="vessel_id" required>
+                    <option value="">-- Select Vessel --</option>
+                    {% for vessel in vessels %}
+                    <option value="{{ vessel.id }}">
+                        {{ vessel.name }}
+                        {% if vessel.imo_number %}(IMO {{ vessel.imo_number }}){% endif %}
+                        {% if vessel.fleet %} — {{ vessel.fleet.company.name }} / {{ vessel.fleet.name }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Device Name (optional)</label>
+                <input type="text" name="device_name" placeholder="e.g. Main Paint Locker">
+            </div>
+        </div>
+        {% if not vessels %}
+        <p style="color: var(--accent-orange); font-size: 13px; margin-bottom: 10px;">
+            No vessels found. <a href="/admin/fleet" style="color: var(--accent-blue);">Create a company and vessel first</a>.
+        </p>
+        {% endif %}
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button type="submit" class="btn btn-success" {% if not vessels %}disabled{% endif %}>Generate Code</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('generatePanel').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<!-- How Pairing Works -->
+<div class="panel" style="margin-bottom: 20px;">
+    <div class="panel-title">How Device Pairing Works</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="font-size: 28px; margin-bottom: 5px;">1️⃣</div>
+            <div style="color: var(--text-primary); font-weight: 600; font-size: 13px;">Generate Code</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Admin creates a 6-digit code for a vessel</div>
+        </div>
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="font-size: 28px; margin-bottom: 5px;">2️⃣</div>
+            <div style="color: var(--text-primary); font-weight: 600; font-size: 13px;">Share Code</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Send code to on-site technician</div>
+        </div>
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="font-size: 28px; margin-bottom: 5px;">3️⃣</div>
+            <div style="color: var(--text-primary); font-weight: 600; font-size: 13px;">Enter on Device</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Technician enters code on SmartLocker first boot</div>
+        </div>
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="font-size: 28px; margin-bottom: 5px;">4️⃣</div>
+            <div style="color: var(--text-primary); font-weight: 600; font-size: 13px;">Paired!</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Device receives API key & config automatically</div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid" style="margin-bottom: 20px;">
+    <div class="stat-card">
+        <div class="label">Total Codes</div>
+        <div class="value blue">{{ codes|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Active</div>
+        <div class="value green">{{ codes|selectattr('status_label', 'equalto', 'active')|list|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Used</div>
+        <div class="value" style="color: var(--text-muted);">{{ codes|selectattr('status_label', 'equalto', 'used')|list|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Expired</div>
+        <div class="value red">{{ codes|selectattr('status_label', 'equalto', 'expired')|list|length }}</div>
+    </div>
+</div>
+
+<!-- Codes Table -->
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Pairing Code</th>
+            <th>Vessel</th>
+            <th>Device Name</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Expires</th>
+            <th>Used By</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for code in codes %}
+        <tr>
+            <td>
+                <strong>
+                    <code style="
+                        background: {% if code.status_label == 'active' %}var(--accent-green){% elif code.status_label == 'used' %}var(--bg-input){% else %}var(--bg-input){% endif %};
+                        color: {% if code.status_label == 'active' %}#000{% else %}var(--text-muted){% endif %};
+                        padding: 4px 12px;
+                        border-radius: 4px;
+                        font-size: 18px;
+                        font-weight: 700;
+                        letter-spacing: 3px;
+                    ">{{ code.code }}</code>
+                </strong>
+            </td>
+            <td>
+                {% if code.vessel %}
+                {{ code.vessel.name }}
+                {% if code.vessel.imo_number %}
+                <span style="color: var(--text-muted); font-size: 11px;">(IMO {{ code.vessel.imo_number }})</span>
+                {% endif %}
+                {% else %}
+                <span style="color: var(--text-muted);">-</span>
+                {% endif %}
+            </td>
+            <td>{{ code.device_name or '-' }}</td>
+            <td>
+                <span class="status-badge {{ code.status_label }}">
+                    {{ code.status_label.upper() }}
+                </span>
+            </td>
+            <td>{{ code.created_at.strftime('%Y-%m-%d %H:%M') if code.created_at else '-' }}</td>
+            <td>
+                {% if code.status_label == 'active' %}
+                <span style="color: var(--accent-orange);">{{ code.expires_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                {% else %}
+                {{ code.expires_at.strftime('%Y-%m-%d %H:%M') if code.expires_at else '-' }}
+                {% endif %}
+            </td>
+            <td>
+                {% if code.is_used and code.device %}
+                <code style="background: var(--bg-input); padding: 2px 8px; border-radius: 3px;">{{ code.device.device_id }}</code>
+                <span style="color: var(--text-muted); font-size: 11px;">{{ code.used_at.strftime('%m/%d %H:%M') if code.used_at else '' }}</span>
+                {% else %}
+                <span style="color: var(--text-muted);">-</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not codes %}
+        <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                No pairing codes generated yet. Click "+ Generate Code" to create one.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<!-- API endpoint info for developers -->
+<div class="panel" style="margin-top: 20px;">
+    <div class="panel-title">API Endpoint</div>
+    <div style="background: var(--bg-dark); padding: 15px; border-radius: 6px; font-family: monospace; font-size: 13px;">
+        <div style="color: var(--accent-green); margin-bottom: 8px;">POST /api/devices/pair</div>
+        <div style="color: var(--text-muted); margin-bottom: 10px;">Edge device sends this on first boot:</div>
+        <pre style="color: var(--text-secondary); margin: 0; overflow-x: auto;">{
+    "pairing_code": "A3K7M2",
+    "device_id": "LOCKER-DEV-001",
+    "device_name": "Main Paint Locker",
+    "software_version": "1.0.0"
+}</pre>
+        <div style="color: var(--text-muted); margin-top: 10px;">Response includes API key, vessel info, and full product catalog.</div>
+    </div>
+</div>
+{% endblock %}

@@ -9,11 +9,12 @@ from app.models.maintenance import MaintenanceChart, VesselAreaType, CoatingCycl
 from app.models.event import DeviceEvent
 from app.models.inventory import InventorySnapshot, ConsumptionRecord
 from app.models.mixing import MixingSessionCloud
+from app.models.pairing import PairingCode
 
 __all__ = [
     "User", "Company", "Fleet", "Vessel", "LockerDevice",
     "Product", "MixingRecipe",
     "MaintenanceChart", "VesselAreaType", "CoatingCycle", "CoatingLayer",
     "DeviceEvent", "InventorySnapshot", "ConsumptionRecord",
-    "MixingSessionCloud",
+    "MixingSessionCloud", "PairingCode",
 ]

@@ -149,8 +149,10 @@ body {
 .type-badge.primer { background: rgba(233,196,106,0.2); color: var(--accent-yellow); }
 
 .status-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
-.status-badge.online { background: rgba(46,196,182,0.2); color: var(--accent-green); }
-.status-badge.offline { background: rgba(141,153,174,0.2); color: var(--text-muted); }
+.status-badge.online, .status-badge.active { background: rgba(46,196,182,0.2); color: var(--accent-green); }
+.status-badge.offline, .status-badge.expired { background: rgba(141,153,174,0.2); color: var(--text-muted); }
+.status-badge.used { background: rgba(95,168,211,0.2); color: var(--accent-blue); }
+.status-badge.delayed { background: rgba(244,162,97,0.2); color: var(--accent-orange); }
 
 /* ---- Buttons ---- */
 .btn {
