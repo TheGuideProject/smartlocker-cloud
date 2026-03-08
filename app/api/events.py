@@ -1,16 +1,17 @@
 """Event Ingestion API - Receives batched events from edge devices."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
-from sqlalchemy import select, text
+from sqlalchemy import select, text, and_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.device import LockerDevice
 from app.models.event import DeviceEvent
+from app.models.health_log import SensorHealthLog
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
@@ -169,3 +170,199 @@ async def device_heartbeat(
         device.system_info = heartbeat.system_info
 
     return {"status": "ok"}
+
+
+# ---- Health Log Ingestion ----
+
+class HealthLogIn(BaseModel):
+    id: Optional[int] = None  # Edge local ID (not stored in cloud)
+    timestamp: str
+    sensor: str
+    status: str
+    message: Optional[str] = ""
+    value: Optional[str] = ""
+
+
+class HealthLogBatch(BaseModel):
+    logs: List[HealthLogIn]
+
+
+@router.post("/{device_id}/health-logs")
+async def receive_health_logs(
+    device_id: str,
+    batch: HealthLogBatch,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Receive a batch of sensor health logs from an edge device.
+    Called when edge device comes back online after offline period.
+    """
+    result = await db.execute(
+        select(LockerDevice).where(LockerDevice.device_id == device_id)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail=f"Device {device_id} not registered")
+
+    received = 0
+    for log in batch.logs:
+        try:
+            # Parse timestamp (ISO format from edge)
+            try:
+                ts = datetime.fromisoformat(log.timestamp.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                ts = datetime.utcnow()
+
+            entry = SensorHealthLog(
+                device_id=device.id,
+                timestamp=ts,
+                sensor=log.sensor,
+                status=log.status,
+                message=log.message or '',
+                value=log.value or '',
+                received_at=datetime.utcnow(),
+            )
+            db.add(entry)
+            received += 1
+        except Exception:
+            continue  # Skip individual failures
+
+    return {"received": received}
+
+
+# ---- Health Summary (smart aggregation) ----
+
+@router.get("/{device_id}/health-summary")
+async def get_health_summary(
+    device_id: str,
+    hours: int = 48,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get smart-aggregated health summary for a device.
+
+    Instead of returning raw logs, this groups consecutive errors into
+    periods and returns a concise summary per sensor:
+      - If error: "FAILING for 2 days (576 errors since Mar 7)"
+      - If ok: "Operating normally (since Mar 8 14:30)"
+    """
+    result = await db.execute(
+        select(LockerDevice).where(LockerDevice.device_id == device_id)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    summary = await _aggregate_sensor_issues(db, device.id, hours=hours)
+    return {"device_id": device_id, "hours": hours, "sensors": summary}
+
+
+async def _aggregate_sensor_issues(
+    db: AsyncSession, device_id: str, hours: int = 48
+) -> list:
+    """
+    Smart aggregation: group consecutive errors into periods.
+
+    Instead of showing 100 individual errors, produce summaries like:
+        "Weight sensor FAILING for 2 days (576 errors since Mar 7)"
+        "RFID: Operating normally (since Mar 8 14:30)"
+    """
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+    # Get distinct sensors that have logs in the time window
+    sensor_result = await db.execute(
+        select(SensorHealthLog.sensor).where(
+            and_(
+                SensorHealthLog.device_id == device_id,
+                SensorHealthLog.timestamp >= cutoff,
+            )
+        ).distinct()
+    )
+    sensors = [row[0] for row in sensor_result.fetchall()]
+
+    aggregated = []
+
+    for sensor_name in sensors:
+        # Get all logs for this sensor, ordered by timestamp DESC
+        logs_result = await db.execute(
+            select(SensorHealthLog).where(
+                and_(
+                    SensorHealthLog.device_id == device_id,
+                    SensorHealthLog.sensor == sensor_name,
+                    SensorHealthLog.timestamp >= cutoff,
+                )
+            ).order_by(desc(SensorHealthLog.timestamp))
+        )
+        logs = logs_result.scalars().all()
+
+        if not logs:
+            continue
+
+        # Latest log determines current status
+        latest = logs[0]
+        current_status = latest.status
+
+        if current_status in ('error', 'disconnected', 'warning', 'out_of_range'):
+            # Find the start of the current error streak
+            # (walk backwards from latest while status is non-ok)
+            streak_start = latest.timestamp
+            error_count = 0
+            last_message = latest.message
+
+            for log in logs:
+                if log.status in ('error', 'disconnected', 'warning', 'out_of_range'):
+                    streak_start = log.timestamp
+                    error_count += 1
+                    if not last_message and log.message:
+                        last_message = log.message
+                else:
+                    break  # Hit an OK status, streak ends here
+
+            # Calculate duration
+            duration = datetime.utcnow() - streak_start
+            duration_hours = round(duration.total_seconds() / 3600, 1)
+
+            # Build human-readable duration
+            if duration_hours < 1:
+                duration_str = f"{int(duration.total_seconds() / 60)} minutes"
+            elif duration_hours < 24:
+                duration_str = f"{duration_hours} hours"
+            else:
+                days = round(duration_hours / 24, 1)
+                duration_str = f"{days} days"
+
+            streak_start_str = streak_start.strftime('%b %d %H:%M')
+            summary_text = (
+                f"{sensor_name.upper()} FAILING for {duration_str} "
+                f"({error_count} errors since {streak_start_str})"
+            )
+
+            aggregated.append({
+                "sensor": sensor_name,
+                "current_status": current_status,
+                "streak_start": streak_start.isoformat(),
+                "streak_duration_hours": duration_hours,
+                "error_count": error_count,
+                "last_message": last_message,
+                "summary": summary_text,
+            })
+        else:
+            # Sensor is OK -- find when it became OK (last error before current OK streak)
+            ok_since = latest.timestamp
+            for log in logs:
+                if log.status == 'ok':
+                    ok_since = log.timestamp
+                else:
+                    break
+
+            ok_since_str = ok_since.strftime('%b %d %H:%M')
+            summary_text = f"Operating normally (since {ok_since_str})"
+
+            aggregated.append({
+                "sensor": sensor_name,
+                "current_status": "ok",
+                "ok_since": ok_since.isoformat(),
+                "summary": summary_text,
+            })
+
+    return aggregated

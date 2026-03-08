@@ -20,6 +20,7 @@ from app.models.company import Company
 from app.models.fleet import Fleet, Vessel
 from app.models.pairing import PairingCode
 from app.models.maintenance import MaintenanceChart
+from app.api.events import _aggregate_sensor_issues
 
 logger = logging.getLogger("smartlocker.admin")
 
@@ -173,16 +174,24 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
     vessels_result = await db.execute(select(Vessel).order_by(Vessel.name))
     vessels = vessels_result.scalars().all()
 
-    # Build enriched device list with monitoring info
+    # Build enriched device list with monitoring info + aggregated health
     device_list = []
     for d in devices:
         sensor_alerts = _check_sensor_health(d.sensor_health) if d.sensor_health else []
+
+        # Smart aggregation: get aggregated health from stored health logs
+        try:
+            health_summary = await _aggregate_sensor_issues(db, d.id, hours=48)
+        except Exception:
+            health_summary = []
+
         device_list.append({
             'device': d,
             'is_online': d.is_online,
             'last_seen_ago': d.last_seen_ago,
             'sensor_alerts': sensor_alerts,
             'vessel_name': d.vessel.name if d.vessel else 'Unassigned',
+            'health_summary': health_summary,
         })
 
     online_count = sum(1 for d in device_list if d['is_online'])

@@ -112,6 +112,38 @@ async def _migrate_add_columns():
                     pass  # Already applied
             logger.info("  Maintenance chart schema fixes applied")
 
+        # Create sensor_health_logs table if not exists
+        try:
+            result = await conn.execute(text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_name = 'sensor_health_logs'"
+            ))
+            if not result.scalar_one_or_none():
+                await conn.execute(text("""
+                    CREATE TABLE sensor_health_logs (
+                        id SERIAL PRIMARY KEY,
+                        device_id VARCHAR(36) NOT NULL REFERENCES locker_devices(id),
+                        timestamp TIMESTAMP NOT NULL,
+                        sensor VARCHAR(50) NOT NULL,
+                        status VARCHAR(20) NOT NULL,
+                        message TEXT DEFAULT '',
+                        value TEXT DEFAULT '',
+                        received_at TIMESTAMP DEFAULT now()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX idx_health_logs_device ON sensor_health_logs(device_id)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX idx_health_logs_timestamp ON sensor_health_logs(timestamp)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX idx_health_logs_sensor ON sensor_health_logs(sensor)"
+                ))
+                logger.info("  Created sensor_health_logs table")
+        except Exception as e:
+            logger.debug(f"  sensor_health_logs table check: {e}")
+
         # Add device monitoring columns if missing
         monitoring_columns = {
             "driver_status": "JSONB",

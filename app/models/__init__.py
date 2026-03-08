@@ -10,11 +10,12 @@ from app.models.event import DeviceEvent
 from app.models.inventory import InventorySnapshot, ConsumptionRecord
 from app.models.mixing import MixingSessionCloud
 from app.models.pairing import PairingCode
+from app.models.health_log import SensorHealthLog
 
 __all__ = [
     "User", "Company", "Fleet", "Vessel", "LockerDevice",
     "Product", "MixingRecipe",
     "MaintenanceChart", "VesselAreaType", "CoatingCycle", "CoatingLayer",
     "DeviceEvent", "InventorySnapshot", "ConsumptionRecord",
-    "MixingSessionCloud", "PairingCode",
+    "MixingSessionCloud", "PairingCode", "SensorHealthLog",
 ]
