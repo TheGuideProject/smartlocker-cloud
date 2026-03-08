@@ -23,6 +23,7 @@ from app.models.pairing import PairingCode
 from app.models.fleet import Vessel, Fleet
 from app.models.company import Company
 from app.models.product import Product, MixingRecipe
+from app.models.maintenance import MaintenanceChart
 
 router = APIRouter(prefix="/api/devices", tags=["pairing"])
 
@@ -152,6 +153,17 @@ async def pair_device(
     )
     recipes = recipes_result.scalars().all()
 
+    # Load maintenance chart for the vessel (if any)
+    chart_data = None
+    chart_result = await db.execute(
+        select(MaintenanceChart)
+        .where(MaintenanceChart.vessel_id == vessel.id)
+        .order_by(MaintenanceChart.updated_at.desc())
+    )
+    chart = chart_result.scalar_one_or_none()
+    if chart and chart.parsed_data:
+        chart_data = chart.parsed_data
+
     # Build config payload
     config = {
         "products": [
@@ -189,6 +201,10 @@ async def pair_device(
         "sync_interval_seconds": 300,  # Sync every 5 minutes
         "heartbeat_interval_seconds": 60,
     }
+
+    # Include maintenance chart if available
+    if chart_data:
+        config["maintenance_chart"] = chart_data
 
     return PairResponse(
         success=True,
@@ -234,7 +250,19 @@ async def get_device_config(
     )
     recipes = recipes_result.scalars().all()
 
-    return {
+    # Load maintenance chart for the device's vessel
+    chart_data = None
+    if device.vessel_id:
+        chart_result = await db.execute(
+            select(MaintenanceChart)
+            .where(MaintenanceChart.vessel_id == device.vessel_id)
+            .order_by(MaintenanceChart.updated_at.desc())
+        )
+        chart = chart_result.scalar_one_or_none()
+        if chart and chart.parsed_data:
+            chart_data = chart.parsed_data
+
+    response = {
         "config_version": device.config_version,
         "products": [
             {
@@ -270,3 +298,9 @@ async def get_device_config(
         "sync_interval_seconds": 300,
         "heartbeat_interval_seconds": 60,
     }
+
+    # Include maintenance chart if available
+    if chart_data:
+        response["maintenance_chart"] = chart_data
+
+    return response
