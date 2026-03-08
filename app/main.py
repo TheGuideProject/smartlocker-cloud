@@ -27,10 +27,10 @@ from app.models import *  # noqa
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    # Create tables (development only; Alembic handles production)
-    if settings.ENVIRONMENT == "development":
-        await init_db()
-        await _seed_admin_user()
+    # Create tables automatically on startup
+    # (In production, switch to Alembic migrations once schema is stable)
+    await init_db()
+    await _seed_admin_user()
 
     # Create upload directory
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

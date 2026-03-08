@@ -9,11 +9,12 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
 
-# Fix Railway DATABASE_URL (they use postgres:// but asyncpg needs postgresql+asyncpg://)
+# Fix DATABASE_URL for asyncpg driver
+# Railway may provide: postgres://, postgresql://, or postgresql+asyncpg://
 database_url = settings.DATABASE_URL
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
-elif database_url.startswith("postgresql://"):
+elif database_url.startswith("postgresql://") and "+asyncpg" not in database_url:
     database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 # SQLite needs different config than PostgreSQL
