@@ -71,17 +71,31 @@ async def _migrate_add_columns():
     This is safe to run multiple times — it checks IF NOT EXISTS.
     Replace with Alembic once the schema is stable.
     """
-    migrations = [
-        # maintenance_charts new columns (added for chart PDF upload)
-        "ALTER TABLE maintenance_charts ADD COLUMN IF NOT EXISTS vessel_id VARCHAR(36) REFERENCES vessels(id)",
-        "ALTER TABLE maintenance_charts ADD COLUMN IF NOT EXISTS imo_number VARCHAR(20)",
-        "ALTER TABLE maintenance_charts ADD COLUMN IF NOT EXISTS parsed_data JSON",
-        # version column type change: was Integer, now String
-        # If it already exists as integer, this won't break — we just leave it
-    ]
+    import logging
+    logger = logging.getLogger("smartlocker.db")
+
     async with engine.begin() as conn:
-        for sql in migrations:
+        # Check if maintenance_charts needs schema update
+        # by checking if vessel_id column exists
+        try:
+            result = await conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'maintenance_charts' AND column_name = 'vessel_id'"
+            ))
+            has_vessel_id = result.scalar_one_or_none() is not None
+        except Exception:
+            has_vessel_id = True  # Table might not exist yet
+
+        if not has_vessel_id:
+            logger.info("Rebuilding maintenance_charts table with new schema...")
+            # Drop old tables (cascade) and let create_all rebuild them
             try:
-                await conn.execute(text(sql))
-            except Exception:
-                pass  # Column may already exist or other minor issue
+                await conn.execute(text("DROP TABLE IF EXISTS coating_layers CASCADE"))
+                await conn.execute(text("DROP TABLE IF EXISTS coating_cycles CASCADE"))
+                await conn.execute(text("DROP TABLE IF EXISTS maintenance_charts CASCADE"))
+                logger.info("  Dropped old maintenance tables")
+                # Recreate with new schema
+                await conn.run_sync(Base.metadata.create_all)
+                logger.info("  Recreated maintenance tables with new schema")
+            except Exception as e:
+                logger.error(f"  Migration error: {e}")
