@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% set active = "events" %}
+
+{% block title %}Events - SmartLocker{% endblock %}
+{% block page_title %}Event Log{% endblock %}
+
+{% block content %}
+<div class="panel" style="margin-bottom: 15px; padding: 12px 20px;">
+    <div style="display: flex; align-items: center; gap: 15px; color: var(--text-secondary); font-size: 13px;">
+        <span>Showing last <strong style="color: var(--text-primary);">{{ events|length }}</strong> events</span>
+        <span style="color: var(--text-muted);">|</span>
+        <span>Events are received from edge devices via API</span>
+    </div>
+</div>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Received</th>
+            <th>Device</th>
+            <th>Event Type</th>
+            <th>Shelf</th>
+            <th>Slot</th>
+            <th>User</th>
+            <th>Tag</th>
+            <th>Session</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for event in events %}
+        <tr>
+            <td style="white-space: nowrap;">{{ event.received_at.strftime('%Y-%m-%d %H:%M:%S') if event.received_at else '-' }}</td>
+            <td><code style="background: var(--bg-input); padding: 2px 6px; border-radius: 3px; font-size: 12px;">{{ event.device_id }}</code></td>
+            <td>
+                {% if 'mix' in (event.event_type or '')|lower %}
+                <span class="type-badge hardener">{{ event.event_type }}</span>
+                {% elif 'place' in (event.event_type or '')|lower or 'return' in (event.event_type or '')|lower %}
+                <span class="type-badge thinner">{{ event.event_type }}</span>
+                {% elif 'remove' in (event.event_type or '')|lower or 'alert' in (event.event_type or '')|lower %}
+                <span class="type-badge" style="background: rgba(230,57,70,0.2); color: var(--accent-red);">{{ event.event_type }}</span>
+                {% else %}
+                <span class="type-badge base_paint">{{ event.event_type }}</span>
+                {% endif %}
+            </td>
+            <td>{{ event.shelf_id or '-' }}</td>
+            <td>{{ event.slot_id or '-' }}</td>
+            <td>{{ event.user_name or '-' }}</td>
+            <td style="font-size: 12px;">{{ event.tag_id[:12] ~ '...' if event.tag_id and event.tag_id|length > 12 else event.tag_id or '-' }}</td>
+            <td style="font-size: 12px;">{{ event.session_id[:8] ~ '...' if event.session_id and event.session_id|length > 8 else event.session_id or '-' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not events %}
+        <tr>
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                No events received yet. Connect an edge device to start syncing events.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+{% endblock %}

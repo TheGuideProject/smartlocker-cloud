@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% set active = "products" %}
+
+{% block title %}Products - SmartLocker{% endblock %}
+{% block page_title %}Product Catalog{% endblock %}
+
+{% block actions %}
+<button class="btn btn-primary" onclick="document.getElementById('addProductPanel').style.display='block'">+ Add Product</button>
+{% endblock %}
+
+{% block content %}
+<!-- Add Product Form (hidden by default) -->
+<div id="addProductPanel" class="panel" style="display: none;">
+    <div class="panel-title">Add New Product</div>
+    <form action="/admin/products/add" method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label>PPG Code</label>
+                <input type="text" name="ppg_code" placeholder="e.g. PPG-SIG-EP-100" required>
+            </div>
+            <div class="form-group">
+                <label>Product Name</label>
+                <input type="text" name="name" placeholder="e.g. Sigma EcoFleet 290" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Type</label>
+                <select name="product_type" required>
+                    <option value="base_paint">Base Paint</option>
+                    <option value="hardener">Hardener</option>
+                    <option value="thinner">Thinner</option>
+                    <option value="primer">Primer</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Density (g/ml)</label>
+                <input type="number" name="density_g_per_ml" value="1.0" step="0.01" min="0.1" max="5.0">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Pot Life (minutes)</label>
+                <input type="number" name="pot_life_minutes" placeholder="Leave empty if N/A">
+            </div>
+            <div class="form-group">
+                <label>Hazard Class</label>
+                <input type="text" name="hazard_class" placeholder="e.g. Class 3">
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button type="submit" class="btn btn-success">Save Product</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('addProductPanel').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<!-- Products Table -->
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>PPG Code</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Density</th>
+            <th>Pot Life</th>
+            <th>Hazard</th>
+            <th>Created</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for product in products %}
+        <tr>
+            <td><strong>{{ product.ppg_code }}</strong></td>
+            <td>{{ product.name }}</td>
+            <td><span class="type-badge {{ product.product_type }}">{{ product.product_type.replace('_', ' ').title() }}</span></td>
+            <td>{{ product.density_g_per_ml }} g/ml</td>
+            <td>{{ product.pot_life_minutes ~ ' min' if product.pot_life_minutes else '-' }}</td>
+            <td>{{ product.hazard_class or '-' }}</td>
+            <td>{{ product.created_at.strftime('%Y-%m-%d') if product.created_at else '-' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not products %}
+        <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                No products yet. Click "+ Add Product" to create one.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+{% endblock %}

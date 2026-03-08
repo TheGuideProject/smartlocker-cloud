@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Fleet Dashboard - SmartLocker{% endblock %}
+{% block page_title %}Fleet Overview{% endblock %}
+
+{% block nav %}
+<li><a href="/dashboard/" class="active">Fleet Overview</a></li>
+<li class="nav-divider"></li>
+<li><a href="/admin/">Admin Portal</a></li>
+<li><a href="/docs" target="_blank">API Docs</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-title">Ship Owner Dashboard</div>
+    <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;">
+        Welcome to the SmartLocker Fleet Dashboard. This portal gives ship owners a
+        read-only view of their fleet's paint inventory, consumption data, and device status.
+    </p>
+    <div style="margin-top: 20px; padding: 25px; background: var(--bg-input); border-radius: 8px; text-align: center;">
+        <div style="font-size: 40px; margin-bottom: 10px;">🚢</div>
+        <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">
+            Fleet data will appear here once vessels and devices are configured by PPG.
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <div class="stat-card" style="min-width: 120px;">
+                <div class="label">Vessels</div>
+                <div class="value blue">0</div>
+            </div>
+            <div class="stat-card" style="min-width: 120px;">
+                <div class="label">Devices</div>
+                <div class="value green">0</div>
+            </div>
+            <div class="stat-card" style="min-width: 120px;">
+                <div class="label">Alerts</div>
+                <div class="value orange">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Coming Soon</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="color: var(--accent-blue); font-weight: 600; margin-bottom: 5px;">Inventory Levels</div>
+            <div style="color: var(--text-muted); font-size: 13px;">Real-time stock per vessel with low-stock alerts</div>
+        </div>
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="color: var(--accent-green); font-weight: 600; margin-bottom: 5px;">Consumption Reports</div>
+            <div style="color: var(--text-muted); font-size: 13px;">Paint usage by period, product, and vessel</div>
+        </div>
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="color: var(--accent-orange); font-weight: 600; margin-bottom: 5px;">Restock Predictions</div>
+            <div style="color: var(--text-muted); font-size: 13px;">AI-powered forecasting for paint resupply</div>
+        </div>
+        <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
+            <div style="color: var(--accent-yellow); font-weight: 600; margin-bottom: 5px;">Maintenance Charts</div>
+            <div style="color: var(--text-muted); font-size: 13px;">View coating specifications per vessel area</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

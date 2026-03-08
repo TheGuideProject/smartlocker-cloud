@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% set active = "dashboard" %}
+
+{% block title %}Dashboard - SmartLocker{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="label">Products</div>
+        <div class="value blue">{{ products_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Recipes</div>
+        <div class="value green">{{ recipes_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Devices</div>
+        <div class="value orange">{{ devices_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Events</div>
+        <div class="value blue">{{ events_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Companies</div>
+        <div class="value green">{{ companies_count }}</div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Recent Events</div>
+    {% if recent_events %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Device</th>
+                <th>Type</th>
+                <th>Shelf / Slot</th>
+                <th>User</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in recent_events %}
+            <tr>
+                <td>{{ event.received_at.strftime('%Y-%m-%d %H:%M') if event.received_at else '-' }}</td>
+                <td>{{ event.device_id }}</td>
+                <td><span class="type-badge base_paint">{{ event.event_type }}</span></td>
+                <td>{{ event.shelf_id or '-' }} / {{ event.slot_id or '-' }}</td>
+                <td>{{ event.user_name or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: var(--text-muted); padding: 20px 0; text-align: center;">No events yet. Connect a device to start receiving data.</p>
+    {% endif %}
+</div>
+
+<div class="stats-grid">
+    <div class="panel" style="grid-column: span 2;">
+        <div class="panel-title">Quick Actions</div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="/admin/products" class="btn btn-primary">Manage Products</a>
+            <a href="/admin/recipes" class="btn btn-primary">Manage Recipes</a>
+            <a href="/admin/devices" class="btn btn-secondary">View Devices</a>
+            <a href="/admin/events" class="btn btn-secondary">Event Log</a>
+            <a href="/docs" target="_blank" class="btn btn-secondary">API Docs</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
