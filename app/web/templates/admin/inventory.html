@@ -1,379 +1,50 @@
 {% extends "base.html" %}
 {% set active = "inventory" %}
-
-{% block title %}Inventory Monitoring - SmartLocker{% endblock %}
-{% block page_title %}Inventory Monitoring{% endblock %}
+{% block title %}Inventory - SmartLocker{% endblock %}
+{% block page_title %}Inventory Management{% endblock %}
 
 {% block actions %}
-<a href="/admin/inventory/analytics" class="btn btn-secondary" style="margin-right: 8px;">Analytics</a>
-<button class="btn btn-primary" onclick="document.getElementById('adjustPanel').style.display='block'">+ Adjustment</button>
-<button class="btn btn-secondary" onclick="document.getElementById('importPanel').style.display='block'" style="margin-left: 8px;">Import PDF</button>
+<a href="/admin/inventory/analytics" class="btn btn-secondary">Analytics</a>
 {% endblock %}
 
 {% block content %}
-<!-- Auto-refresh every 60 seconds -->
-<meta http-equiv="refresh" content="60">
-
-{% if request.query_params.get('imported') %}
-<div class="panel" style="border-left: 3px solid var(--accent-green); margin-bottom: 15px;">
-    <span style="color: var(--accent-green); font-weight: 600;">PDF import successful:</span> {{ request.query_params.get('imported') }} items imported.
-</div>
-{% endif %}
-
-{% if request.query_params.get('error') %}
-<div class="panel" style="border-left: 3px solid var(--accent-red); margin-bottom: 15px;">
-    <span style="color: var(--accent-red); font-weight: 600;">Error:</span> {{ request.query_params.get('error') }}
-</div>
-{% endif %}
-
-<!-- Manual Adjustment Panel (hidden) -->
-<div id="adjustPanel" class="panel" style="display: none; border-left: 3px solid var(--accent-blue);">
-    <div class="panel-title">Manual Inventory Adjustment</div>
-    <form action="/admin/inventory/adjust" method="post">
-        <div class="form-row">
-            <div class="form-group">
-                <label>Product</label>
-                <select name="product_id" required>
-                    <option value="">-- Select Product --</option>
-                    {% for p in products %}
-                    <option value="{{ p.id }}">{{ p.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Adjustment Type</label>
-                <select name="adjustment_type" required>
-                    <option value="manual_add">Add Stock</option>
-                    <option value="manual_remove">Remove Stock</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Device / Vessel (optional)</label>
-                <select name="device_id">
-                    <option value="">-- All / General --</option>
-                    {% for d in devices %}
-                    <option value="{{ d.id }}">{{ d.name or d.device_id }}{% if d.vessel %} ({{ d.vessel.name }}){% endif %}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Quantity (cans)</label>
-                <input type="number" name="quantity_cans" value="0" min="0">
-            </div>
-            <div class="form-group">
-                <label>Quantity (liters)</label>
-                <input type="number" name="quantity_liters" value="0" min="0" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Lot Number</label>
-                <input type="text" name="lot_number" placeholder="Optional">
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Notes</label>
-            <input type="text" name="notes" placeholder="Reason for adjustment">
-        </div>
-        <div style="display: flex; gap: 10px; margin-top: 10px;">
-            <button type="submit" class="btn btn-success">Save Adjustment</button>
-            <button type="button" class="btn btn-secondary" onclick="document.getElementById('adjustPanel').style.display='none'">Cancel</button>
-        </div>
-    </form>
+<div class="stats-grid">
+    <div class="stat-card"><div class="label">Total Vessels</div><div class="value blue">{{ total_vessels }}</div></div>
+    <div class="stat-card"><div class="label">Total Cans</div><div class="value green">{{ total_cans }}</div></div>
+    <div class="stat-card"><div class="label">Total Liters</div><div class="value orange">{{ total_liters }}</div></div>
+    <div class="stat-card"><div class="label">Low Stock Alerts</div><div class="value {% if alerts > 0 %}red{% else %}green{% endif %}">{{ alerts }}</div></div>
 </div>
 
-<!-- PDF Import Panel (hidden) -->
-<div id="importPanel" class="panel" style="display: none; border-left: 3px solid var(--accent-orange);">
-    <div class="panel-title">Import from Purchase Order PDF</div>
-    <form action="/admin/inventory/import-pdf" method="post" enctype="multipart/form-data">
-        <div class="form-row">
-            <div class="form-group">
-                <label>PDF File</label>
-                <input type="file" name="pdf_file" accept=".pdf" required style="padding: 8px;">
-            </div>
-            <div class="form-group">
-                <label>Assign to Device (optional)</label>
-                <select name="device_id">
-                    <option value="">-- General Stock --</option>
-                    {% for d in devices %}
-                    <option value="{{ d.id }}">{{ d.name or d.device_id }}{% if d.vessel %} ({{ d.vessel.name }}){% endif %}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-        <div style="display: flex; gap: 10px; margin-top: 10px;">
-            <button type="submit" class="btn btn-primary">Upload & Parse</button>
-            <button type="button" class="btn btn-secondary" onclick="document.getElementById('importPanel').style.display='none'">Cancel</button>
-        </div>
-    </form>
-</div>
-
-<!-- Summary Stats -->
-<div class="stats-grid" style="margin-bottom: 20px;">
-    <div class="stat-card">
-        <div class="label">Total Liters (all vessels)</div>
-        <div class="value blue">{{ total_liters }}L</div>
+{% for company in companies %}
+<div class="panel">
+    <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>{{ company.name }}</span>
+        <span class="type-badge base_paint">{{ company.vessels|length }} vessels</span>
     </div>
-    <div class="stat-card">
-        <div class="label">Total Cans Tracked</div>
-        <div class="value green">{{ total_cans }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="label">Cans In Use</div>
-        <div class="value orange">{{ total_in_use }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="label">Low Stock Alerts</div>
-        <div class="value {% if low_stock_alerts %}red{% else %}green{% endif %}">{{ low_stock_alerts|length }}</div>
-    </div>
-</div>
-
-<!-- Low Stock Alerts -->
-{% if low_stock_alerts %}
-<div class="panel" style="border-left: 3px solid var(--accent-red); margin-bottom: 20px;">
-    <div class="panel-title" style="color: var(--accent-red);">Low Stock Alerts</div>
     <table class="data-table">
         <thead>
-            <tr>
-                <th>Vessel</th>
-                <th>Product</th>
-                <th>Remaining</th>
-                <th>Current Stock</th>
-            </tr>
+            <tr><th>Vessel</th><th>IMO</th><th>Devices</th><th>Products</th><th>Stock Status</th><th></th></tr>
         </thead>
         <tbody>
-            {% for alert in low_stock_alerts %}
-            <tr>
-                <td>{{ alert.vessel }}</td>
-                <td>{{ alert.product }}</td>
-                <td>
-                    <span style="color: var(--accent-red); font-weight: 600;">{{ alert.remaining_pct }}%</span>
-                </td>
-                <td>{{ alert.current_liters }}L</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% endif %}
-
-<!-- Filters -->
-<div class="panel" style="margin-bottom: 20px; padding: 12px 20px;">
-    <form method="get" action="/admin/inventory" style="display: flex; gap: 15px; align-items: end;">
-        <div class="form-group" style="margin-bottom: 0; flex: 1;">
-            <label>Filter by Device</label>
-            <select name="device">
-                <option value="">All Devices</option>
-                {% for d in devices %}
-                <option value="{{ d.id }}" {% if device_filter == d.id %}selected{% endif %}>
-                    {{ d.name or d.device_id }}{% if d.vessel %} ({{ d.vessel.name }}){% endif %}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group" style="margin-bottom: 0; flex: 1;">
-            <label>Filter by Product</label>
-            <select name="product">
-                <option value="">All Products</option>
-                {% for p in products %}
-                <option value="{{ p.id }}" {% if product_filter == p.id %}selected{% endif %}>{{ p.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit" class="btn btn-secondary" style="height: fit-content;">Filter</button>
-        {% if device_filter or product_filter %}
-        <a href="/admin/inventory" class="btn btn-secondary" style="height: fit-content;">Clear</a>
-        {% endif %}
-    </form>
-</div>
-
-<!-- Per-Vessel Inventory Cards -->
-{% for vi in vessel_inventory %}
-<div class="panel" style="border-left: 3px solid {% if vi.is_online %}var(--accent-green){% else %}var(--accent-red){% endif %}; margin-bottom: 15px;">
-    <!-- Vessel Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <div>
-            <span style="font-size: 17px; font-weight: 600;">{{ vi.vessel_name }}</span>
-            <code style="background: var(--bg-input); padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-left: 8px; color: var(--text-muted);">{{ vi.device.device_id }}</code>
-        </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span class="status-badge {% if vi.is_online %}online{% else %}offline{% endif %}">
-                {% if vi.is_online %}ONLINE{% else %}OFFLINE{% endif %}
-            </span>
-            <span style="color: var(--text-muted); font-size: 13px;">
-                {{ vi.total_cans }} cans | {{ vi.cans_in_use }} in use
-            </span>
-        </div>
-    </div>
-
-    <!-- Slot Visualization -->
-    {% if vi.cans %}
-    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 15px;">
-        {% for can in vi.cans %}
-        <div title="Tag: {{ can.tag_uid }}&#10;Status: {{ can.status }}&#10;Weight: {{ can.weight_current_g|round(0) if can.weight_current_g else '?' }}g"
-             style="width: 36px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; cursor: default;
-                    {% if can.status == 'in_stock' %}
-                        background: rgba(46,196,182,0.2); border: 1px solid rgba(46,196,182,0.4); color: var(--accent-green);
-                    {% elif can.status == 'in_use' %}
-                        background: rgba(244,162,97,0.2); border: 1px solid rgba(244,162,97,0.4); color: var(--accent-orange);
-                    {% elif can.status == 'consumed' %}
-                        background: rgba(141,153,174,0.15); border: 1px solid rgba(141,153,174,0.3); color: var(--text-muted);
-                    {% elif can.status == 'removed' %}
-                        background: rgba(230,57,70,0.15); border: 1px solid rgba(230,57,70,0.3); color: var(--accent-red);
-                    {% else %}
-                        background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted);
-                    {% endif %}">
-            {{ can.slot_id[:3] if can.slot_id else '?' }}
-        </div>
+        {% for vessel in company.vessels %}
+        <tr>
+            <td><strong>{{ vessel.name }}</strong></td>
+            <td>{{ vessel.imo_number or '-' }}</td>
+            <td>{{ vessel.device_count }}</td>
+            <td>{{ vessel.product_count }}</td>
+            <td>
+                {% if vessel.low_stock %}<span style="color:var(--danger);">Low Stock</span>
+                {% else %}<span style="color:var(--success);">OK</span>{% endif %}
+            </td>
+            <td><a href="/admin/inventory/{{ vessel.id }}" class="btn btn-primary" style="font-size:13px; padding:5px 12px;">View Inventory</a></td>
+        </tr>
         {% endfor %}
-    </div>
-    <div style="display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); margin-bottom: 15px;">
-        <span><span style="display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: rgba(46,196,182,0.3); margin-right: 4px;"></span>In Stock</span>
-        <span><span style="display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: rgba(244,162,97,0.3); margin-right: 4px;"></span>In Use</span>
-        <span><span style="display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: rgba(141,153,174,0.2); margin-right: 4px;"></span>Consumed</span>
-        <span><span style="display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: rgba(230,57,70,0.2); margin-right: 4px;"></span>Removed</span>
-    </div>
-    {% endif %}
-
-    <!-- Product Breakdown Table -->
-    {% if vi.product_breakdown %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Product</th>
-                <th>Cans</th>
-                <th>Full Liters</th>
-                <th>Current Liters</th>
-                <th>Used %</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for pname, pb in vi.product_breakdown.items() %}
-            <tr>
-                <td><strong>{{ pname }}</strong></td>
-                <td>{{ pb.can_count }}</td>
-                <td>{{ pb.full_liters|round(1) }}L</td>
-                <td>{{ pb.current_liters|round(1) }}L</td>
-                <td>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div style="flex: 1; max-width: 100px; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden;">
-                            <div style="width: {{ pb.used_pct }}%; height: 100%; background: {% if pb.used_pct > 80 %}var(--accent-red){% elif pb.used_pct > 50 %}var(--accent-orange){% else %}var(--accent-green){% endif %}; border-radius: 4px;"></div>
-                        </div>
-                        <span style="font-size: 13px; {% if pb.used_pct > 80 %}color: var(--accent-red); font-weight: 600;{% endif %}">{{ pb.used_pct }}%</span>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
         </tbody>
     </table>
-    {% else %}
-    <p style="color: var(--text-muted); text-align: center; padding: 15px 0;">No product data available for this device.</p>
-    {% endif %}
 </div>
 {% endfor %}
 
-{% if not vessel_inventory %}
-<div class="panel" style="text-align: center; padding: 40px;">
-    <p style="color: var(--text-muted); font-size: 15px;">
-        No inventory data yet. Inventory is built automatically as events arrive from edge devices.
-    </p>
-    <p style="color: var(--text-muted); font-size: 13px; margin-top: 10px;">
-        You can also <button class="btn btn-secondary" style="font-size: 13px; padding: 4px 12px;" onclick="document.getElementById('adjustPanel').style.display='block'">add stock manually</button>
-        or <button class="btn btn-secondary" style="font-size: 13px; padding: 4px 12px;" onclick="document.getElementById('importPanel').style.display='block'">import from a PDF</button>.
-    </p>
-</div>
+{% if not companies %}
+<div class="panel"><p style="color: var(--text-muted); padding: 20px; text-align: center;">No vessels found. Add vessels via Fleet Management first.</p></div>
 {% endif %}
-
-<!-- Recent Inventory Events -->
-{% if recent_events %}
-<div class="panel" style="margin-top: 10px;">
-    <div class="panel-title">Recent Inventory Activity</div>
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Time</th>
-                <th>Event</th>
-                <th>Tag</th>
-                <th>Slot</th>
-                <th>User</th>
-                <th>Details</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for event in recent_events %}
-            <tr>
-                <td>{{ event.timestamp.strftime('%Y-%m-%d %H:%M') if event.timestamp else '-' }}</td>
-                <td>
-                    {% if event.event_type == 'can_placed' %}
-                        <span class="status-badge online">PLACED</span>
-                    {% elif event.event_type == 'can_removed' %}
-                        <span class="status-badge" style="background: rgba(244,162,97,0.2); color: var(--accent-orange);">REMOVED</span>
-                    {% elif event.event_type == 'can_returned' %}
-                        <span class="status-badge" style="background: rgba(95,168,211,0.2); color: var(--accent-blue);">RETURNED</span>
-                    {% elif event.event_type == 'can_consumed' %}
-                        <span class="status-badge offline">CONSUMED</span>
-                    {% elif event.event_type == 'unauthorized_removal' %}
-                        <span class="status-badge" style="background: rgba(230,57,70,0.2); color: var(--accent-red);">UNAUTHORIZED</span>
-                    {% else %}
-                        <span class="type-badge base_paint">{{ event.event_type }}</span>
-                    {% endif %}
-                </td>
-                <td style="font-family: monospace; font-size: 12px;">{{ event.tag_id or '-' }}</td>
-                <td>{{ event.slot_id or '-' }}</td>
-                <td>{{ event.user_name or '-' }}</td>
-                <td style="font-size: 12px; color: var(--text-muted);">
-                    {% if event.data %}
-                        {% if event.data.get('weight_g') %}{{ event.data.weight_g|round(0) }}g{% endif %}
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% endif %}
-
-<!-- Recent Adjustments -->
-{% if adjustments %}
-<div class="panel" style="margin-top: 10px;">
-    <div class="panel-title">Recent Inventory Adjustments</div>
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Product</th>
-                <th>Cans</th>
-                <th>Liters</th>
-                <th>Lot</th>
-                <th>Notes</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for adj in adjustments %}
-            <tr>
-                <td>{{ adj.created_at.strftime('%Y-%m-%d %H:%M') if adj.created_at else '-' }}</td>
-                <td>
-                    {% if adj.adjustment_type == 'manual_add' %}
-                        <span class="status-badge online">ADD</span>
-                    {% elif adj.adjustment_type == 'manual_remove' %}
-                        <span class="status-badge" style="background: rgba(244,162,97,0.2); color: var(--accent-orange);">REMOVE</span>
-                    {% elif adj.adjustment_type == 'pdf_import' %}
-                        <span class="status-badge" style="background: rgba(95,168,211,0.2); color: var(--accent-blue);">PDF</span>
-                    {% else %}
-                        <span class="status-badge offline">{{ adj.adjustment_type }}</span>
-                    {% endif %}
-                </td>
-                <td>{{ adj.product_id[:8] }}...</td>
-                <td>{{ adj.quantity_cans }}</td>
-                <td>{{ adj.quantity_liters }}</td>
-                <td style="font-size: 12px;">{{ adj.lot_number or '-' }}</td>
-                <td style="font-size: 12px; color: var(--text-muted);">{{ adj.notes or '-' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% endif %}
-
 {% endblock %}

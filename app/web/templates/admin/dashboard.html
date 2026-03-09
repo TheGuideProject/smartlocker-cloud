@@ -28,33 +28,75 @@
     </div>
 </div>
 
+<!-- Offline Devices Alert -->
+{% if offline_devices %}
+<div class="panel" style="border-left: 4px solid var(--danger);">
+    <div class="panel-title" style="color: var(--danger);">⚠️ Offline Devices ({{ offline_devices|length }})</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Device</th>
+                <th>Vessel</th>
+                <th>Last Seen</th>
+                <th>Version</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for device in offline_devices %}
+            <tr>
+                <td><strong>{{ device.name or device.device_id }}</strong></td>
+                <td>{{ device.vessel.name if device.vessel else '-' }}</td>
+                <td style="color: var(--danger);">
+                    {% if device.last_heartbeat %}
+                    {{ device.last_heartbeat.strftime('%Y-%m-%d %H:%M') }}
+                    {% else %}-{% endif %}
+                </td>
+                <td>{{ device.software_version or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Recent Errors -->
 <div class="panel">
-    <div class="panel-title">Recent Events</div>
-    {% if recent_events %}
+    <div class="panel-title" style="color: var(--danger);">🔴 Recent Errors & Alerts</div>
+    {% if recent_errors %}
     <table class="data-table">
         <thead>
             <tr>
                 <th>Time</th>
                 <th>Device</th>
-                <th>Type</th>
+                <th>Error Type</th>
                 <th>Shelf / Slot</th>
-                <th>User</th>
+                <th>Details</th>
             </tr>
         </thead>
         <tbody>
-            {% for event in recent_events %}
+            {% for event in recent_errors %}
             <tr>
                 <td>{{ event.received_at.strftime('%Y-%m-%d %H:%M') if event.received_at else '-' }}</td>
                 <td>{{ event.device_id }}</td>
-                <td><span class="type-badge base_paint">{{ event.event_type }}</span></td>
+                <td>
+                    {% if 'unauthorized' in event.event_type %}
+                    <span class="type-badge" style="background: rgba(237,69,82,0.15); color: #ed4552;">🚨 {{ event.event_type }}</span>
+                    {% elif 'anomaly' in event.event_type %}
+                    <span class="type-badge" style="background: rgba(251,166,64,0.15); color: #fba640;">⚠️ {{ event.event_type }}</span>
+                    {% elif 'error' in event.event_type %}
+                    <span class="type-badge" style="background: rgba(237,69,82,0.15); color: #ed4552;">❌ {{ event.event_type }}</span>
+                    {% else %}
+                    <span class="type-badge base_paint">{{ event.event_type }}</span>
+                    {% endif %}
+                </td>
                 <td>{{ event.shelf_id or '-' }} / {{ event.slot_id or '-' }}</td>
-                <td>{{ event.user_name or '-' }}</td>
+                <td style="color: var(--text-muted);">{{ event.user_name or '-' }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <p style="color: var(--text-muted); padding: 20px 0; text-align: center;">No events yet. Connect a device to start receiving data.</p>
+    <p style="color: var(--success); padding: 20px 0; text-align: center;">✅ No recent errors. All systems operating normally.</p>
     {% endif %}
 </div>
 
@@ -65,6 +107,7 @@
             <a href="/admin/products" class="btn btn-primary">Manage Products</a>
             <a href="/admin/recipes" class="btn btn-primary">Manage Recipes</a>
             <a href="/admin/devices" class="btn btn-secondary">View Devices</a>
+            <a href="/admin/inventory" class="btn btn-secondary">Inventory</a>
             <a href="/admin/events" class="btn btn-secondary">Event Log</a>
             <a href="/docs" target="_blank" class="btn btn-secondary">API Docs</a>
         </div>

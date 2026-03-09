@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% set active = "inventory" %}
+{% block title %}{{ vessel.name }} Inventory{% endblock %}
+{% block page_title %}
+<a href="/admin/inventory" style="color: var(--text-muted); text-decoration: none;">Inventory</a> &rsaquo; {{ vessel.name }}
+{% endblock %}
+{% block content %}
+
+{% if request.query_params.get('imported') %}
+<div class="panel" style="border-left: 3px solid var(--accent-green); margin-bottom: 15px;">
+    <span style="color: var(--accent-green); font-weight: 600;">PDF import successful:</span> {{ request.query_params.get('imported') }} items imported.
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') %}
+<div class="panel" style="border-left: 3px solid var(--accent-red); margin-bottom: 15px;">
+    <span style="color: var(--accent-red); font-weight: 600;">Error:</span> {{ request.query_params.get('error') }}
+</div>
+{% endif %}
+
+<!-- Stats cards -->
+<div class="stats-grid">
+    <div class="stat-card"><div class="label">Cans On Board</div><div class="value blue">{{ total_cans }}</div></div>
+    <div class="stat-card"><div class="label">Total Liters</div><div class="value green">{{ total_liters }}</div></div>
+    <div class="stat-card"><div class="label">Products</div><div class="value orange">{{ product_count }}</div></div>
+    <div class="stat-card"><div class="label">Low Stock</div><div class="value {% if low_stock_count > 0 %}red{% else %}green{% endif %}">{{ low_stock_count }}</div></div>
+</div>
+
+<!-- Actions bar -->
+<div class="panel" style="padding: 12px 16px;">
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <button onclick="document.getElementById('addModal').style.display='flex'" class="btn btn-primary">+ Add Stock</button>
+        <button onclick="document.getElementById('removeModal').style.display='flex'" class="btn btn-secondary">- Remove Stock</button>
+        <form action="/admin/inventory/{{ vessel.id }}/import-pdf" method="post" enctype="multipart/form-data" style="display:inline-flex; gap:8px; align-items:center;">
+            <input type="file" name="pdf_file" accept=".pdf" id="pdfInput" style="display:none" onchange="this.form.submit()">
+            <button type="button" onclick="document.getElementById('pdfInput').click()" class="btn btn-secondary">Import PDF Order</button>
+        </form>
+        <span style="color: var(--text-muted); font-size: 13px; margin-left: auto;">Email import coming soon</span>
+    </div>
+</div>
+
+<!-- Product inventory table -->
+<div class="panel">
+    <div class="panel-title">Products On Board</div>
+    <table class="data-table">
+        <thead>
+            <tr><th>Product</th><th>Type</th><th>Colors</th><th>Cans</th><th>Est. Liters</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+        {% for item in products %}
+        <tr{% if item.is_hardener_pair %} style="background: rgba(255,165,0,0.05);"{% endif %}>
+            <td>
+                <strong>{{ item.name }}</strong>
+                {% if item.hardener_name %}
+                <br><small style="color: var(--text-muted);">Hardener: {{ item.hardener_name }}</small>
+                {% endif %}
+            </td>
+            <td><span class="type-badge {{ item.product_type }}">{{ item.product_type_label }}</span></td>
+            <td>
+                {% for color in item.colors %}
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:{{ color.hex }}; border:1px solid rgba(255,255,255,0.2); vertical-align:middle; margin-right:3px;" title="{{ color.name }}"></span>
+                {% endfor %}
+                {% if item.colors %}<small style="color:var(--text-muted);">{{ item.colors|map(attribute='name')|join(', ') }}</small>{% endif %}
+            </td>
+            <td><strong>{{ item.can_count }}</strong></td>
+            <td>{{ item.liters }} L</td>
+            <td>
+                {% if item.low_stock %}<span style="color:var(--danger);">Low</span>
+                {% else %}<span style="color:var(--success);">OK</span>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not products %}
+        <tr><td colspan="6" style="color:var(--text-muted); text-align:center; padding: 20px;">No products on board yet. Use "Add Stock" or "Import PDF Order" to add inventory.</td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Recent adjustments -->
+<div class="panel">
+    <div class="panel-title">Recent Changes</div>
+    <table class="data-table">
+        <thead><tr><th>Date</th><th>Type</th><th>Product</th><th>Qty</th><th>Source</th></tr></thead>
+        <tbody>
+        {% for adj in adjustments %}
+        <tr>
+            <td>{{ adj.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td><span class="type-badge {{ 'base_paint' if adj.adjustment_type == 'manual_add' else 'thinner' }}">{{ adj.adjustment_type }}</span></td>
+            <td>{{ adj.product_name or '-' }}</td>
+            <td>{{ adj.quantity_cans or '-' }} cans / {{ adj.quantity_liters or '-' }} L</td>
+            <td>{{ adj.source_document or adj.notes or '-' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not adjustments %}<tr><td colspan="5" style="color:var(--text-muted); text-align:center;">No adjustments yet</td></tr>{% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Modal -->
+<div id="addModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; max-width: 400px; width: 90%;">
+        <h3 style="margin: 0 0 16px;">Add Stock</h3>
+        <form action="/admin/inventory/{{ vessel.id }}/adjust" method="post">
+            <input type="hidden" name="adjustment_type" value="manual_add">
+            <div style="margin-bottom: 12px;">
+                <label>Product</label>
+                <select name="product_id" required style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+                    {% for p in all_products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label>Quantity (cans)</label>
+                <input type="number" name="quantity_cans" min="1" value="1" required style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label>Liters per can</label>
+                <input type="number" name="quantity_liters" step="0.1" min="0" style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label>Notes</label>
+                <input type="text" name="notes" style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button type="button" onclick="this.closest('[id=addModal]').style.display='none'" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Remove Modal -->
+<div id="removeModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; max-width: 400px; width: 90%;">
+        <h3 style="margin: 0 0 16px;">Remove Stock</h3>
+        <form action="/admin/inventory/{{ vessel.id }}/adjust" method="post">
+            <input type="hidden" name="adjustment_type" value="manual_remove">
+            <div style="margin-bottom: 12px;">
+                <label>Product</label>
+                <select name="product_id" required style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+                    {% for p in all_products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label>Quantity (cans)</label>
+                <input type="number" name="quantity_cans" min="1" value="1" required style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label>Reason</label>
+                <input type="text" name="notes" style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button type="button" onclick="this.closest('[id=removeModal]').style.display='none'" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background:var(--danger);">Remove</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
