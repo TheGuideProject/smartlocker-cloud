@@ -10,8 +10,8 @@
 {% block content %}
 <div class="stats-grid">
     <div class="stat-card"><div class="label">Total Vessels</div><div class="value blue">{{ total_vessels }}</div></div>
-    <div class="stat-card"><div class="label">Total Cans</div><div class="value green">{{ total_cans }}</div></div>
-    <div class="stat-card"><div class="label">Total Liters</div><div class="value orange">{{ total_liters }}</div></div>
+    <div class="stat-card"><div class="label">Total Liters</div><div class="value green">{{ total_liters }}</div></div>
+    <div class="stat-card"><div class="label">Products</div><div class="value orange">{{ total_products }}</div></div>
     <div class="stat-card"><div class="label">Low Stock Alerts</div><div class="value {% if alerts > 0 %}red{% else %}green{% endif %}">{{ alerts }}</div></div>
 </div>
 

@@ -936,8 +936,8 @@ async def admin_inventory(
 
     # Build company data with vessel summaries
     total_vessels = 0
-    total_cans = 0
     total_liters = 0.0
+    total_products_set = set()
     alerts = 0
 
     company_list = []
@@ -948,8 +948,7 @@ async def admin_inventory(
                 total_vessels += 1
                 device_ids = [d.id for d in vessel.devices]
 
-                # Count cans and liters for this vessel
-                vessel_cans = 0
+                # Count liters for this vessel
                 vessel_liters = 0.0
                 vessel_products = set()
                 vessel_low_stock = False
@@ -957,7 +956,6 @@ async def admin_inventory(
                 for did in device_ids:
                     device_cans = cans_by_device.get(did, [])
                     for can in device_cans:
-                        vessel_cans += 1
                         if can.product_id:
                             vessel_products.add(can.product_id)
                             p = products_by_id.get(can.product_id)
@@ -974,9 +972,11 @@ async def admin_inventory(
                     for adj in device_adjs:
                         if adj.product_id:
                             vessel_products.add(adj.product_id)
+                        if adj.quantity_liters:
+                            vessel_liters += adj.quantity_liters
 
-                total_cans += vessel_cans
                 total_liters += vessel_liters
+                total_products_set.update(vessel_products)
                 if vessel_low_stock:
                     alerts += 1
 
@@ -986,7 +986,7 @@ async def admin_inventory(
                     "imo_number": vessel.imo_number,
                     "device_count": len(vessel.devices),
                     "product_count": len(vessel_products),
-                    "can_count": vessel_cans,
+                    "liters": round(vessel_liters, 1),
                     "low_stock": vessel_low_stock,
                 })
 
@@ -1000,8 +1000,8 @@ async def admin_inventory(
         "request": request,
         "companies": company_list,
         "total_vessels": total_vessels,
-        "total_cans": total_cans,
         "total_liters": round(total_liters, 1),
+        "total_products": len(total_products_set),
         "alerts": alerts,
     })
 
@@ -1236,7 +1236,6 @@ async def admin_inventory_vessel(
                 "name": pname,
                 "product_type": product_type,
                 "product_type_label": product_type.replace("_", " ").title(),
-                "can_count": 0,
                 "liters": 0.0,
                 "full_liters": 0.0,
                 "low_stock": False,
@@ -1246,7 +1245,6 @@ async def admin_inventory_vessel(
             }
 
         ps = product_summary[pname]
-        ps["can_count"] += 1
         if can.weight_current_g and density > 0:
             ps["liters"] += (can.weight_current_g / density) / 1000.0
         if can.weight_full_g and density > 0:
@@ -1274,19 +1272,36 @@ async def admin_inventory_vessel(
         for adj in vessel_adjustments_for_products:
             if adj.product_id and adj.product_id in products_by_id:
                 p = products_by_id[adj.product_id]
-                if p.name not in product_summary:
+                adj_liters = adj.quantity_liters or 0
+                if p.name in product_summary:
+                    # Add liters to existing product entry
+                    product_summary[p.name]["liters"] += adj_liters
+                else:
                     product_summary[p.name] = {
                         "name": p.name,
                         "product_type": p.product_type,
                         "product_type_label": p.product_type.replace("_", " ").title(),
-                        "can_count": adj.quantity_cans or 0,
-                        "liters": round(adj.quantity_liters or 0, 1),
+                        "liters": round(adj_liters, 1),
                         "full_liters": 0.0,
                         "low_stock": False,
                         "colors": vessel_product_colors.get(p.name, []),
                         "hardener_name": None,
                         "is_hardener_pair": False,
                     }
+        # Also handle manual_remove adjustments
+        adj_remove_result = await db.execute(
+            select(InventoryAdjustment).where(
+                InventoryAdjustment.device_id.in_(device_ids),
+                InventoryAdjustment.adjustment_type == "manual_remove",
+            )
+        )
+        for adj in adj_remove_result.scalars().all():
+            if adj.product_id and adj.product_id in products_by_id:
+                p = products_by_id[adj.product_id]
+                if p.name in product_summary:
+                    product_summary[p.name]["liters"] -= (adj.quantity_liters or 0)
+                    if product_summary[p.name]["liters"] < 0:
+                        product_summary[p.name]["liters"] = 0
 
     products_list = sorted(product_summary.values(), key=lambda x: x["name"])
 
@@ -1312,13 +1327,11 @@ async def admin_inventory_vessel(
                 "notes": adj.notes,
             })
 
-    total_cans = sum(ps["can_count"] for ps in products_list)
     total_liters = round(sum(ps["liters"] for ps in products_list), 1)
 
     return templates.TemplateResponse("admin/inventory_vessel.html", {
         "request": request,
         "vessel": vessel,
-        "total_cans": total_cans,
         "total_liters": total_liters,
         "product_count": len(products_list),
         "low_stock_count": low_stock_count,
@@ -1334,12 +1347,11 @@ async def admin_adjust_vessel_inventory(
     request: Request,
     product_id: str = Form(...),
     adjustment_type: str = Form(...),
-    quantity_cans: int = Form(1),
     quantity_liters: float = Form(0.0),
     notes: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a manual inventory adjustment for a specific vessel."""
+    """Create a manual inventory adjustment for a specific vessel (liters only)."""
     # Get a device for this vessel to attach the adjustment
     device_result = await db.execute(
         select(LockerDevice).where(LockerDevice.vessel_id == vessel_id).limit(1)
@@ -1361,7 +1373,7 @@ async def admin_adjust_vessel_inventory(
         device_id=device_id,
         product_id=product_id,
         adjustment_type=adjustment_type,
-        quantity_cans=quantity_cans,
+        quantity_cans=0,
         quantity_liters=quantity_liters,
         weight_g=weight_g,
         notes=notes or None,

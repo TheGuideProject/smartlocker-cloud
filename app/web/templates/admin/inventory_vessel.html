@@ -20,9 +20,8 @@
 
 <!-- Stats cards -->
 <div class="stats-grid">
-    <div class="stat-card"><div class="label">Cans On Board</div><div class="value blue">{{ total_cans }}</div></div>
-    <div class="stat-card"><div class="label">Total Liters</div><div class="value green">{{ total_liters }}</div></div>
-    <div class="stat-card"><div class="label">Products</div><div class="value orange">{{ product_count }}</div></div>
+    <div class="stat-card"><div class="label">Total Liters</div><div class="value blue">{{ total_liters }}</div></div>
+    <div class="stat-card"><div class="label">Products</div><div class="value green">{{ product_count }}</div></div>
     <div class="stat-card"><div class="label">Low Stock</div><div class="value {% if low_stock_count > 0 %}red{% else %}green{% endif %}">{{ low_stock_count }}</div></div>
 </div>
 
@@ -44,7 +43,7 @@
     <div class="panel-title">Products On Board</div>
     <table class="data-table">
         <thead>
-            <tr><th>Product</th><th>Type</th><th>Colors</th><th>Cans</th><th>Est. Liters</th><th>Status</th></tr>
+            <tr><th>Product</th><th>Type</th><th>Colors</th><th>Liters</th><th>Status</th></tr>
         </thead>
         <tbody>
         {% for item in products %}
@@ -62,8 +61,7 @@
                 {% endfor %}
                 {% if item.colors %}<small style="color:var(--text-muted);">{{ item.colors|map(attribute='name')|join(', ') }}</small>{% endif %}
             </td>
-            <td><strong>{{ item.can_count }}</strong></td>
-            <td>{{ item.liters }} L</td>
+            <td><strong>{{ item.liters }} L</strong></td>
             <td>
                 {% if item.low_stock %}<span style="color:var(--danger);">Low</span>
                 {% else %}<span style="color:var(--success);">OK</span>{% endif %}
@@ -71,7 +69,7 @@
         </tr>
         {% endfor %}
         {% if not products %}
-        <tr><td colspan="6" style="color:var(--text-muted); text-align:center; padding: 20px;">No products on board yet. Use "Add Stock" or "Import PDF Order" to add inventory.</td></tr>
+        <tr><td colspan="5" style="color:var(--text-muted); text-align:center; padding: 20px;">No products on board yet. Use "Add Stock" or "Import PDF Order" to add inventory.</td></tr>
         {% endif %}
         </tbody>
     </table>
@@ -81,14 +79,14 @@
 <div class="panel">
     <div class="panel-title">Recent Changes</div>
     <table class="data-table">
-        <thead><tr><th>Date</th><th>Type</th><th>Product</th><th>Qty</th><th>Source</th></tr></thead>
+        <thead><tr><th>Date</th><th>Type</th><th>Product</th><th>Liters</th><th>Source</th></tr></thead>
         <tbody>
         {% for adj in adjustments %}
         <tr>
             <td>{{ adj.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-            <td><span class="type-badge {{ 'base_paint' if adj.adjustment_type == 'manual_add' else 'thinner' }}">{{ adj.adjustment_type }}</span></td>
+            <td><span class="type-badge {{ 'base_paint' if adj.adjustment_type == 'manual_add' or adj.adjustment_type == 'pdf_import' else 'thinner' }}">{{ adj.adjustment_type.replace('_', ' ').title() }}</span></td>
             <td>{{ adj.product_name or '-' }}</td>
-            <td>{{ adj.quantity_cans or '-' }} cans / {{ adj.quantity_liters or '-' }} L</td>
+            <td>{{ adj.quantity_liters or '-' }} L</td>
             <td>{{ adj.source_document or adj.notes or '-' }}</td>
         </tr>
         {% endfor %}
@@ -110,16 +108,12 @@
                 </select>
             </div>
             <div style="margin-bottom: 12px;">
-                <label>Quantity (cans)</label>
-                <input type="number" name="quantity_cans" min="1" value="1" required style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
-            </div>
-            <div style="margin-bottom: 12px;">
-                <label>Liters per can</label>
-                <input type="number" name="quantity_liters" step="0.1" min="0" style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+                <label>Liters</label>
+                <input type="number" name="quantity_liters" step="0.1" min="0.1" required style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;" placeholder="e.g. 16, 20, 4">
             </div>
             <div style="margin-bottom: 12px;">
                 <label>Notes</label>
-                <input type="text" name="notes" style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+                <input type="text" name="notes" style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;" placeholder="e.g. Order #1234">
             </div>
             <div style="display:flex; gap:10px; justify-content:flex-end;">
                 <button type="button" onclick="this.closest('[id=addModal]').style.display='none'" class="btn btn-secondary">Cancel</button>
@@ -142,8 +136,8 @@
                 </select>
             </div>
             <div style="margin-bottom: 12px;">
-                <label>Quantity (cans)</label>
-                <input type="number" name="quantity_cans" min="1" value="1" required style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;">
+                <label>Liters</label>
+                <input type="number" name="quantity_liters" step="0.1" min="0.1" required style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px;" placeholder="e.g. 16, 20">
             </div>
             <div style="margin-bottom: 12px;">
                 <label>Reason</label>
