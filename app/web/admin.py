@@ -340,6 +340,9 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
         # Count open support requests (already eagerly loaded)
         open_support = [sr for sr in d.support_requests if sr.status in ('open', 'in_progress')] if d.support_requests else []
 
+        # Set as attribute on model so template can access d.open_support_count
+        d.open_support_count = len(open_support)
+
         device_list.append({
             'device': d,
             'is_online': d.is_online,

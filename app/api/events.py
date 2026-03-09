@@ -482,10 +482,35 @@ async def _aggregate_sensor_issues(
 
 class SlotState(BaseModel):
     slot_id: str
+    # Accept both cloud names and edge names (edge sends current_tag_id, current_product_id, etc.)
     tag_uid: Optional[str] = None
+    current_tag_id: Optional[str] = None
     product_id: Optional[str] = None
+    current_product_id: Optional[str] = None
     weight_g: Optional[float] = None
+    weight_current_g: Optional[float] = None
+    weight_when_placed_g: Optional[float] = None
     status: str = "empty"  # empty, occupied, in_use
+    product_name: Optional[str] = None
+    product_type: Optional[str] = None
+    batch_number: Optional[str] = None
+    can_size_ml: Optional[float] = None
+    last_change_at: Optional[str] = None
+
+    @property
+    def resolved_tag_uid(self) -> Optional[str]:
+        """Return tag UID from either field name."""
+        return self.tag_uid or self.current_tag_id
+
+    @property
+    def resolved_product_id(self) -> Optional[str]:
+        """Return product ID from either field name."""
+        return self.product_id or self.current_product_id
+
+    @property
+    def resolved_weight_g(self) -> Optional[float]:
+        """Return weight from either field name."""
+        return self.weight_g or self.weight_current_g
 
 
 class InventorySnapshotIn(BaseModel):
@@ -515,14 +540,18 @@ async def receive_inventory_snapshot(
 
     updated = 0
     for slot in payload.slots:
-        if not slot.tag_uid:
+        tag = slot.resolved_tag_uid
+        if not tag:
             continue
+
+        prod_id = slot.resolved_product_id
+        weight = slot.resolved_weight_g
 
         # Find or create can tracking record
         can_result = await db.execute(
             select(CanTracking).where(
                 and_(
-                    CanTracking.tag_uid == slot.tag_uid,
+                    CanTracking.tag_uid == tag,
                     CanTracking.device_id == str(device.id),
                 )
             )
@@ -531,22 +560,22 @@ async def receive_inventory_snapshot(
 
         if can:
             can.slot_id = slot.slot_id
-            can.weight_current_g = slot.weight_g
+            can.weight_current_g = weight
             can.last_seen_at = datetime.utcnow()
             if slot.status == "occupied":
                 can.status = "in_stock"
             elif slot.status == "in_use":
                 can.status = "in_use"
-            if slot.product_id and not can.product_id:
-                can.product_id = slot.product_id
+            if prod_id and not can.product_id:
+                can.product_id = prod_id
         else:
             can = CanTracking(
-                tag_uid=slot.tag_uid,
+                tag_uid=tag,
                 device_id=str(device.id),
-                product_id=slot.product_id,
+                product_id=prod_id,
                 slot_id=slot.slot_id,
-                weight_current_g=slot.weight_g,
-                weight_full_g=slot.weight_g,
+                weight_current_g=weight,
+                weight_full_g=weight,
                 status="in_stock" if slot.status == "occupied" else slot.status,
                 first_seen_at=datetime.utcnow(),
                 last_seen_at=datetime.utcnow(),
