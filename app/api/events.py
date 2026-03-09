@@ -181,17 +181,21 @@ async def device_heartbeat(
     if heartbeat.software_version:
         device.software_version = heartbeat.software_version
 
-    # Auto-detect update completion via heartbeat version match
-    if (device.pending_update_version
-            and heartbeat.software_version
-            and heartbeat.software_version == device.pending_update_version
-            and device.update_status not in ("completed", None)):
-        device.update_status = "completed"
-        device.update_completed_at = datetime.utcnow()
-        device.pending_update_version = None
-        device.pending_update_branch = None
-        device.update_error = None
-        logger.info(f"Device {device_id} auto-confirmed update to v{heartbeat.software_version}")
+    # Auto-clear stale/completed updates via heartbeat
+    if device.pending_update_version and heartbeat.software_version:
+        if device.update_status not in ("completed", None):
+            # Device already at or past the target version → mark completed
+            if heartbeat.software_version >= device.pending_update_version:
+                device.update_status = "completed"
+                device.update_completed_at = datetime.utcnow()
+                device.pending_update_version = None
+                device.pending_update_branch = None
+                device.update_error = None
+                logger.info(f"Device {device_id} update confirmed: v{heartbeat.software_version}")
+        elif device.update_status == "completed":
+            # Already completed — clean up leftover fields
+            device.pending_update_version = None
+            device.pending_update_branch = None
 
     # Store extended monitoring data
     if heartbeat.driver_status is not None:

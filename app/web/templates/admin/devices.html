@@ -10,8 +10,33 @@
 {% endblock %}
 
 {% block content %}
-<!-- Auto-refresh every 30 seconds -->
-<meta http-equiv="refresh" content="30">
+<!-- Smart auto-refresh: preserves expanded detail panels -->
+<script>
+setInterval(function() {
+    // Save which detail panels are open
+    var openPanels = [];
+    document.querySelectorAll('[id^="detail_"]').forEach(function(el) {
+        if (el.style.display !== 'none') openPanels.push(el.id);
+    });
+    if (openPanels.length > 0) {
+        sessionStorage.setItem('openPanels', JSON.stringify(openPanels));
+    } else {
+        sessionStorage.removeItem('openPanels');
+    }
+    location.reload();
+}, 30000);
+
+// Restore open panels after reload
+window.addEventListener('DOMContentLoaded', function() {
+    var saved = sessionStorage.getItem('openPanels');
+    if (saved) {
+        JSON.parse(saved).forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = 'block';
+        });
+    }
+});
+</script>
 
 <!-- Register Device Form (hidden by default) -->
 <div id="addDevicePanel" class="panel" style="display: none;">
