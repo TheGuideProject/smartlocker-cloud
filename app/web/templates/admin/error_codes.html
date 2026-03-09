@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% set active = "error_codes" %}
+{% block title %}Error Codes - SmartLocker{% endblock %}
+{% block page_title %}Error Code Reference{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card"><div class="label">Total Codes</div><div class="value blue">{{ total_codes }}</div></div>
+    <div class="stat-card"><div class="label">Critical</div><div class="value red">{{ error_codes|selectattr('severity', 'equalto', 'critical')|list|length }}</div></div>
+    <div class="stat-card"><div class="label">Warning</div><div class="value orange">{{ error_codes|selectattr('severity', 'equalto', 'warning')|list|length }}</div></div>
+    <div class="stat-card"><div class="label">Info</div><div class="value green">{{ error_codes|selectattr('severity', 'equalto', 'info')|list|length }}</div></div>
+</div>
+
+<!-- Search bar -->
+<div class="panel" style="padding: 12px 16px;">
+    <input type="text" id="searchInput" placeholder="Search error codes... (e.g. E001, RFID, temperature)"
+           style="width:100%; padding:10px 14px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:8px; font-size:15px;"
+           oninput="filterCodes()">
+</div>
+
+<!-- Error codes by category -->
+{% for category, codes in categories.items() %}
+<div class="panel error-category" id="cat-{{ category|lower }}">
+    <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>
+            {% if category == "Sensor" %}&#x1F50C;{% elif category == "System" %}&#x1F4BB;{% elif category == "Software" %}&#x2699;{% elif category == "Inventory" %}&#x1F4E6;{% elif category == "Mixing" %}&#x1F3A8;{% endif %}
+            {{ category }} Errors
+        </span>
+        <span class="type-badge base_paint">{{ codes|length }} codes</span>
+    </div>
+
+    {% for ec in codes %}
+    <div class="error-code-card" data-code="{{ ec.code }}" data-title="{{ ec.title }}" data-search="{{ ec.code }} {{ ec.title }} {{ ec.description }} {{ ec.category }}">
+        <div style="display:flex; align-items:flex-start; gap:12px; padding:12px 0; border-bottom:1px solid var(--border);">
+            <div style="min-width:60px;">
+                <span style="font-family:monospace; font-size:16px; font-weight:700;
+                    color:{% if ec.severity == 'critical' %}var(--accent-red){% elif ec.severity == 'warning' %}var(--accent-orange){% else %}var(--accent-green){% endif %};">
+                    {{ ec.code }}
+                </span>
+            </div>
+            <div style="flex:1;">
+                <div style="font-weight:600; color:var(--text-primary); margin-bottom:4px;">{{ ec.title }}</div>
+                <div style="color:var(--text-muted); font-size:13px; margin-bottom:6px;">{{ ec.description }}</div>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <span class="type-badge" style="background:{% if ec.severity == 'critical' %}rgba(237,69,82,0.15){% elif ec.severity == 'warning' %}rgba(251,166,64,0.15){% else %}rgba(52,199,89,0.15){% endif %};
+                        color:{% if ec.severity == 'critical' %}#ed4552{% elif ec.severity == 'warning' %}#fba640{% else %}#34c759{% endif %}; font-size:11px;">
+                        {{ ec.severity|upper }}
+                    </span>
+                </div>
+            </div>
+            <div style="min-width:24px; cursor:pointer;" onclick="toggleResolution(this)">
+                <span style="color:var(--text-muted); font-size:18px;">&#x25B6;</span>
+            </div>
+        </div>
+        <div class="resolution-steps" style="display:none; padding:10px 0 10px 72px; color:var(--text-muted); font-size:13px; white-space:pre-line; border-bottom:1px solid var(--border);">
+            <strong style="color:var(--accent-green);">Resolution Steps:</strong><br>
+            {{ ec.resolution }}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+<script>
+function filterCodes() {
+    const query = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('.error-code-card').forEach(card => {
+        const search = card.dataset.search.toLowerCase();
+        card.style.display = search.includes(query) ? '' : 'none';
+    });
+    // Hide empty categories
+    document.querySelectorAll('.error-category').forEach(cat => {
+        const visible = cat.querySelectorAll('.error-code-card[style=""], .error-code-card:not([style])').length;
+        cat.style.display = visible > 0 || !query ? '' : 'none';
+    });
+}
+
+function toggleResolution(el) {
+    const card = el.closest('.error-code-card');
+    const res = card.querySelector('.resolution-steps');
+    if (res.style.display === 'none') {
+        res.style.display = '';
+        el.querySelector('span').textContent = '\u25BC';
+    } else {
+        res.style.display = 'none';
+        el.querySelector('span').textContent = '\u25B6';
+    }
+}
+</script>
+{% endblock %}

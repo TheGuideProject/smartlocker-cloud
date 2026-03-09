@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% set active = "support" %}
+{% block title %}Support Requests - SmartLocker{% endblock %}
+{% block page_title %}Support Requests{% endblock %}
+
+{% block content %}
+<!-- Success/error messages -->
+{% if request.query_params.get('resolved') %}
+<div class="panel" style="border-left: 3px solid var(--accent-green); margin-bottom: 15px;">
+    <span style="color: var(--accent-green); font-weight: 600;">Support request resolved successfully.</span>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') == 'not_found' %}
+<div class="panel" style="border-left: 3px solid var(--accent-red); margin-bottom: 15px;">
+    <span style="color: var(--accent-red); font-weight: 600;">Support request not found.</span>
+</div>
+{% endif %}
+
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card"><div class="label">Total Requests</div><div class="value blue">{{ stats.total }}</div></div>
+    <div class="stat-card"><div class="label">Open</div><div class="value {% if stats.open > 0 %}red{% else %}green{% endif %}">{{ stats.open }}</div></div>
+    <div class="stat-card"><div class="label">Resolved</div><div class="value green">{{ stats.resolved }}</div></div>
+</div>
+
+<!-- Requests table -->
+<div class="panel">
+    <div class="panel-title">All Support Requests</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Device</th>
+                <th>Error Code</th>
+                <th>Severity</th>
+                <th>Details</th>
+                <th>Requested By</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for sr in support_requests %}
+        <tr>
+            <td style="white-space: nowrap; font-size: 12px;">{{ sr.created_at.strftime('%Y-%m-%d %H:%M') if sr.created_at else '-' }}</td>
+            <td>
+                <strong>{{ sr.device.name or sr.device_id if sr.device else sr.device_id }}</strong>
+            </td>
+            <td>
+                <a href="/admin/error-codes#{{ sr.error_code }}" style="color:var(--accent-blue); text-decoration:none; font-family:monospace; font-weight:600;">
+                    {{ sr.error_code }}
+                </a>
+                <br><small style="color:var(--text-muted);">{{ sr.error_title or '' }}</small>
+            </td>
+            <td>
+                <span class="type-badge" style="background:{% if sr.severity == 'critical' %}rgba(237,69,82,0.15){% elif sr.severity == 'warning' %}rgba(251,166,64,0.15){% else %}rgba(52,199,89,0.15){% endif %};
+                    color:{% if sr.severity == 'critical' %}#ed4552{% elif sr.severity == 'warning' %}#fba640{% else %}#34c759{% endif %};">
+                    {{ sr.severity|upper if sr.severity else '-' }}
+                </span>
+            </td>
+            <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; color:var(--text-muted);">{{ sr.details or '-' }}</td>
+            <td>{{ sr.user_name or 'Crew' }}</td>
+            <td>
+                {% if sr.status == 'open' %}
+                <span style="color:var(--accent-red); font-weight:600;">&#x25CF; Open</span>
+                {% elif sr.status == 'in_progress' %}
+                <span style="color:var(--accent-orange); font-weight:600;">&#x25CF; In Progress</span>
+                {% elif sr.status == 'resolved' %}
+                <span style="color:var(--accent-green);">&#x2713; Resolved</span>
+                {% else %}
+                <span style="color:var(--text-muted);">{{ sr.status_label }}</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if sr.is_open %}
+                <button onclick="showResolve({{ sr.id }}, '{{ sr.error_code }}', '{{ sr.error_title|default("", true)|e }}', '{{ (sr.device.name or sr.device_id if sr.device else sr.device_id)|e }}')"
+                        class="btn btn-primary" style="font-size:12px; padding:4px 10px;">Resolve</button>
+                {% elif sr.resolution_notes %}
+                <button class="btn btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="toggleNotes('notes_{{ sr.id }}')">Notes</button>
+                {% else %}
+                <span style="color:var(--text-muted);">-</span>
+                {% endif %}
+            </td>
+        </tr>
+        <!-- Resolution notes (hidden) -->
+        {% if sr.resolution_notes %}
+        <tr id="notes_{{ sr.id }}" style="display: none;">
+            <td colspan="8" style="background: var(--bg-input, var(--bg-hover)); padding: 12px 20px;">
+                <strong>Resolution:</strong> {{ sr.resolution_notes }}
+                <br><span style="color: var(--text-muted); font-size: 12px;">Resolved by {{ sr.resolved_by or 'admin' }} on {{ sr.resolved_at.strftime('%Y-%m-%d %H:%M') if sr.resolved_at else '-' }}</span>
+            </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+
+        {% if not support_requests %}
+        <tr><td colspan="8" style="color:var(--text-muted); text-align:center; padding:30px;">
+            No support requests yet. When crew members request PPG support from a device, requests will appear here.
+        </td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Resolve Modal -->
+<div id="resolveModal" style="display: none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; max-width: 450px; width: 90%;">
+        <h3 style="margin: 0 0 12px; color: var(--text-primary);">Resolve Support Request</h3>
+        <p id="resolveInfo" style="color:var(--text-muted); margin-bottom:16px;"></p>
+        <form id="resolveForm" method="post">
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 13px;">Resolution Notes</label>
+                <textarea name="resolution_notes" rows="3"
+                          style="width:100%; padding:8px; background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border); border-radius:6px; font-size: 13px; resize: vertical;"
+                          placeholder="What was done to resolve this issue..."></textarea>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button type="button" onclick="hideResolve()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Mark Resolved</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showResolve(requestId, errorCode, errorTitle, deviceName) {
+    var modal = document.getElementById('resolveModal');
+    var form = document.getElementById('resolveForm');
+    var info = document.getElementById('resolveInfo');
+    form.action = '/admin/support/' + requestId + '/resolve';
+    info.innerHTML = '<strong>' + errorCode + '</strong> - ' + errorTitle + '<br>Device: ' + deviceName;
+    modal.style.display = 'flex';
+}
+
+function hideResolve() {
+    document.getElementById('resolveModal').style.display = 'none';
+}
+
+function toggleNotes(id) {
+    var el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+
+// Close modal on background click
+document.getElementById('resolveModal').addEventListener('click', function(e) {
+    if (e.target === this) hideResolve();
+});
+</script>
+{% endblock %}

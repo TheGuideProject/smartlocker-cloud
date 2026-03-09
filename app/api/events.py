@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel
 from sqlalchemy import select, text, and_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from app.database import get_db
 from app.models.device import LockerDevice
 from app.models.event import DeviceEvent
 from app.models.health_log import SensorHealthLog
+from app.models.support_request import SupportRequest
 from app.services.event_processor import process_inventory_events
 
 logger = logging.getLogger("smartlocker.events")
@@ -242,6 +243,40 @@ async def report_update_status(
 
     await db.commit()
     return {"status": "ok"}
+
+
+# ---- Support Request from Edge ----
+
+@router.post("/{device_id}/support-request")
+async def create_support_request(device_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Receive a support request from an edge device."""
+    # Validate device exists
+    result = await db.execute(
+        select(LockerDevice).where(LockerDevice.device_id == device_id)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail=f"Device {device_id} not registered")
+
+    body = await request.json()
+
+    support_req = SupportRequest(
+        device_id=device_id,
+        alarm_id=body.get("alarm_id", ""),
+        error_code=body.get("error_code", "UNKNOWN"),
+        error_title=body.get("error_title", ""),
+        severity=body.get("severity", "warning"),
+        details=body.get("details", ""),
+        user_name=body.get("user_name", ""),
+        status="open",
+    )
+    db.add(support_req)
+    await db.commit()
+    await db.refresh(support_req)
+
+    logger.info(f"Support request from {device_id}: {support_req.error_code} - {support_req.error_title}")
+
+    return {"status": "ok", "request_id": support_req.id}
 
 
 # ---- Health Log Ingestion ----

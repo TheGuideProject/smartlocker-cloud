@@ -6,7 +6,7 @@ import json
 import asyncio
 import logging
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -26,6 +26,7 @@ from app.models.pairing import PairingCode
 from app.models.maintenance import MaintenanceChart
 from app.models.can_tracking import CanTracking
 from app.models.inventory import InventoryAdjustment
+from app.models.support_request import SupportRequest
 from app.api.events import _aggregate_sensor_issues
 
 logger = logging.getLogger("smartlocker.admin")
@@ -111,6 +112,12 @@ async def admin_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     )
     offline_devices = offline_devices_result.scalars().all()
 
+    # Support request count
+    support_result = await db.execute(
+        select(func.count(SupportRequest.id)).where(SupportRequest.status.in_(["open", "in_progress"]))
+    )
+    open_support_count = support_result.scalar() or 0
+
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
         "products_count": products_count,
@@ -120,6 +127,7 @@ async def admin_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
         "companies_count": companies_count,
         "recent_errors": recent_errors,
         "offline_devices": offline_devices,
+        "open_support_count": open_support_count,
     })
 
 
@@ -1673,6 +1681,204 @@ async def confirm_inventory_import(
         url=f"/admin/inventory?imported={created}",
         status_code=303,
     )
+
+
+# ---- Error Code Guide ----
+
+@router.get("/error-codes")
+async def admin_error_codes(request: Request):
+    """Error code reference guide."""
+    # Define all error codes (matching edge error_codes.py)
+    error_codes = [
+        # Sensor Errors
+        {"code": "E001", "title": "RFID Reader Disconnected", "severity": "critical", "category": "Sensor",
+         "description": "RFID reader is not responding to commands. Cannot detect paint cans.",
+         "resolution": "1. Check USB connection to RFID reader\n2. Try unplugging and reconnecting\n3. Restart the SmartLocker device\n4. If persistent, contact PPG support"},
+        {"code": "E002", "title": "RFID Read Error", "severity": "warning", "category": "Sensor",
+         "description": "RFID reader experiencing intermittent read failures.",
+         "resolution": "1. Clean the RFID reader surface\n2. Check antenna connection\n3. Ensure no metal interference near reader"},
+        {"code": "E003", "title": "Multiple RFID Tags Detected", "severity": "warning", "category": "Sensor",
+         "description": "Multiple RFID tags detected on a single slot.",
+         "resolution": "1. Remove extra paint cans from the slot\n2. Ensure only one can per slot"},
+        {"code": "E004", "title": "Weight Sensor Disconnected", "severity": "critical", "category": "Sensor",
+         "description": "Weight sensor (HX711/Arduino) not responding. Cannot measure paint quantities.",
+         "resolution": "1. Check serial/USB connection to Arduino\n2. Verify Arduino power LED is on\n3. Restart device\n4. If persistent, check HX711 wiring"},
+        {"code": "E005", "title": "Weight Out of Range", "severity": "warning", "category": "Sensor",
+         "description": "Weight reading is outside the valid measurement range.",
+         "resolution": "1. Recalibrate weight sensor\n2. Check load cell connections\n3. Ensure shelf is level"},
+        {"code": "E006", "title": "Weight Drift", "severity": "warning", "category": "Sensor",
+         "description": "Weight readings are drifting over time without physical changes.",
+         "resolution": "1. Recalibrate the sensor\n2. Check for temperature effects\n3. Inspect load cell for damage"},
+        {"code": "E007", "title": "Weight Overload", "severity": "warning", "category": "Sensor",
+         "description": "Weight exceeds the maximum capacity of the shelf.",
+         "resolution": "1. Remove excess weight from shelf\n2. Check maximum capacity rating"},
+        {"code": "E008", "title": "LED Driver Error", "severity": "warning", "category": "Sensor",
+         "description": "LED strip communication failure. Guide lights not working.",
+         "resolution": "1. Check LED strip wiring\n2. Verify data pin connection\n3. Check power supply"},
+        {"code": "E009", "title": "Buzzer Error", "severity": "info", "category": "Sensor",
+         "description": "Buzzer not responding. Audio alerts disabled.",
+         "resolution": "1. Check buzzer connection\n2. Verify GPIO pin assignment"},
+        {"code": "E010", "title": "Sensor Init Failed", "severity": "critical", "category": "Sensor",
+         "description": "One or more sensors failed to initialize at boot.",
+         "resolution": "1. Restart the device\n2. Check all sensor connections\n3. Review device logs for specific failure"},
+        # System Errors
+        {"code": "E020", "title": "CPU Over Temperature", "severity": "critical", "category": "System",
+         "description": "CPU temperature above 80C. Risk of thermal shutdown.",
+         "resolution": "1. Check cooling fan is running\n2. Improve ventilation around device\n3. Move device away from heat sources\n4. Consider adding heatsink"},
+        {"code": "E021", "title": "CPU High Temperature", "severity": "warning", "category": "System",
+         "description": "CPU temperature above 70C. Performance may be affected.",
+         "resolution": "1. Improve ventilation\n2. Check fan operation\n3. Clean dust from vents"},
+        {"code": "E022", "title": "CPU Throttling", "severity": "warning", "category": "System",
+         "description": "CPU frequency is being reduced due to thermal or power constraints.",
+         "resolution": "1. Improve cooling\n2. Check power supply voltage\n3. Reduce ambient temperature"},
+        {"code": "E023", "title": "RAM Critical", "severity": "critical", "category": "System",
+         "description": "RAM usage above 90%. System may become unresponsive.",
+         "resolution": "1. Restart the device immediately\n2. Check for memory leaks in logs\n3. Contact support if recurring"},
+        {"code": "E024", "title": "RAM High", "severity": "warning", "category": "System",
+         "description": "RAM usage above 80%. Monitor for further increase.",
+         "resolution": "1. Monitor usage trend\n2. Consider restarting during next maintenance window"},
+        {"code": "E025", "title": "Disk Full", "severity": "critical", "category": "System",
+         "description": "SD card storage above 95%. Device cannot save data.",
+         "resolution": "1. Contact support for remote log cleanup\n2. Clear old event logs\n3. Consider larger SD card"},
+        {"code": "E026", "title": "Disk High Usage", "severity": "warning", "category": "System",
+         "description": "SD card storage above 85%.",
+         "resolution": "1. Schedule maintenance for data cleanup\n2. Enable auto-cleanup of old logs"},
+        {"code": "E027", "title": "SD Card Error", "severity": "critical", "category": "System",
+         "description": "SD card I/O errors detected. Risk of data loss.",
+         "resolution": "1. URGENT: Replace SD card as soon as possible\n2. Back up data if accessible\n3. Contact PPG support"},
+        {"code": "E028", "title": "SD Card Read-Only", "severity": "critical", "category": "System",
+         "description": "SD card mounted as read-only. Cannot save any data.",
+         "resolution": "1. Replace SD card immediately\n2. Power cycle the device\n3. Contact PPG support"},
+        {"code": "E029", "title": "System Clock Error", "severity": "warning", "category": "System",
+         "description": "System clock not synchronized. Timestamps may be inaccurate.",
+         "resolution": "1. Check network connectivity for NTP sync\n2. Verify NTP server configuration"},
+        {"code": "E030", "title": "Power Unstable", "severity": "warning", "category": "System",
+         "description": "Voltage fluctuations detected on power supply.",
+         "resolution": "1. Check power supply connection\n2. Use a regulated power supply\n3. Check for loose connections"},
+        # Software Errors
+        {"code": "E040", "title": "Database Error", "severity": "critical", "category": "Software",
+         "description": "SQLite database corrupted or locked. Cannot save events.",
+         "resolution": "1. Restart the device\n2. If persistent, database may need recovery\n3. Contact PPG support"},
+        {"code": "E041", "title": "Database Full", "severity": "warning", "category": "Software",
+         "description": "Database file has grown too large.",
+         "resolution": "1. Trigger cloud sync to clear synced events\n2. Enable auto-cleanup\n3. Contact support"},
+        {"code": "E042", "title": "Cloud Sync Failed", "severity": "warning", "category": "Software",
+         "description": "Cloud synchronization failed repeatedly.",
+         "resolution": "1. Check network/WiFi connection\n2. Verify cloud URL is accessible\n3. Check API key validity"},
+        {"code": "E043", "title": "Sync Queue Full", "severity": "warning", "category": "Software",
+         "description": "Too many events waiting to sync. Local storage filling up.",
+         "resolution": "1. Check network connectivity\n2. Force sync from settings\n3. Contact support if network is OK"},
+        {"code": "E044", "title": "OTA Update Failed", "severity": "warning", "category": "Software",
+         "description": "Firmware update failed to install.",
+         "resolution": "1. Retry update from cloud dashboard\n2. Check device has internet access\n3. Contact PPG support"},
+        {"code": "E045", "title": "Config Corrupt", "severity": "critical", "category": "Software",
+         "description": "Configuration file is corrupted.",
+         "resolution": "1. Restart the device (auto-recovery)\n2. Re-pair device if needed\n3. Contact PPG support"},
+        {"code": "E046", "title": "Memory Leak", "severity": "warning", "category": "Software",
+         "description": "Process memory growing abnormally over time.",
+         "resolution": "1. Restart the device\n2. Report to PPG support with timing details"},
+        {"code": "E047", "title": "Watchdog Timeout", "severity": "critical", "category": "Software",
+         "description": "Main process not responding. Auto-restart triggered.",
+         "resolution": "1. Device should auto-restart\n2. If recurring, check system logs\n3. Contact PPG support"},
+        # Inventory Errors
+        {"code": "E060", "title": "Unauthorized Removal", "severity": "critical", "category": "Inventory",
+         "description": "Paint can removed from locker without an active mixing session.",
+         "resolution": "1. Investigate immediately - potential unauthorized access\n2. Check security camera footage\n3. Return can to locker\n4. Report incident to supervisor"},
+        {"code": "E061", "title": "Wrong Slot Return", "severity": "warning", "category": "Inventory",
+         "description": "Paint can returned to incorrect slot position.",
+         "resolution": "1. Follow LED guide to correct slot\n2. Place can in the illuminated slot"},
+        {"code": "E062", "title": "Missing Can", "severity": "warning", "category": "Inventory",
+         "description": "Paint can not returned within the expected timeframe.",
+         "resolution": "1. Locate the missing can\n2. Return it to the SmartLocker\n3. If consumed, log in system"},
+        {"code": "E063", "title": "Unknown RFID Tag", "severity": "info", "category": "Inventory",
+         "description": "Unregistered RFID tag detected on slot.",
+         "resolution": "1. Register the tag in the system\n2. Assign it to the correct product"},
+        {"code": "E064", "title": "Weight Mismatch", "severity": "warning", "category": "Inventory",
+         "description": "Can weight doesn't match expected value for this product.",
+         "resolution": "1. Verify can contents\n2. Check if correct product was placed\n3. Recalibrate if needed"},
+        {"code": "E065", "title": "Stock Critical", "severity": "critical", "category": "Inventory",
+         "description": "Product stock is critically low (below 10%).",
+         "resolution": "1. Order replacement immediately\n2. Check pending purchase orders\n3. Notify supply chain"},
+        {"code": "E066", "title": "Stock Low", "severity": "warning", "category": "Inventory",
+         "description": "Product stock below reorder threshold (below 25%).",
+         "resolution": "1. Plan reorder within next supply window\n2. Check consumption rate\n3. Adjust reorder points if needed"},
+        # Mixing Errors
+        {"code": "E080", "title": "Mix Out of Spec", "severity": "warning", "category": "Mixing",
+         "description": "Mixing ratio is outside the specified tolerance range.",
+         "resolution": "1. Adjust by adding more base or hardener\n2. Accept with override reason if within acceptable range\n3. Discard if too far out of spec"},
+        {"code": "E081", "title": "Pot Life Expired", "severity": "critical", "category": "Mixing",
+         "description": "Mixed paint has exceeded its pot life. DO NOT USE.",
+         "resolution": "1. DO NOT USE this mixed paint\n2. Dispose of properly following MSDS guidelines\n3. Prepare a fresh batch"},
+        {"code": "E082", "title": "Pot Life Warning", "severity": "info", "category": "Mixing",
+         "description": "Mixed paint approaching pot life expiry (75%+ elapsed).",
+         "resolution": "1. Use the mixed paint soon\n2. Plan application timing\n3. Do not mix more than needed"},
+        {"code": "E083", "title": "Mix Aborted", "severity": "info", "category": "Mixing",
+         "description": "Mixing session was manually aborted.",
+         "resolution": "1. Review reason for abort\n2. Return cans to locker\n3. Start new session if needed"},
+    ]
+
+    # Group by category
+    categories = {}
+    for ec in error_codes:
+        cat = ec["category"]
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(ec)
+
+    return templates.TemplateResponse("admin/error_codes.html", {
+        "request": request,
+        "error_codes": error_codes,
+        "categories": categories,
+        "total_codes": len(error_codes),
+    })
+
+
+# ---- Support Requests ----
+
+@router.get("/support")
+async def admin_support_requests(request: Request, db: AsyncSession = Depends(get_db)):
+    """Support request management page."""
+    # Get all support requests with device info
+    result = await db.execute(
+        select(SupportRequest)
+        .options(selectinload(SupportRequest.device))
+        .order_by(SupportRequest.created_at.desc())
+        .limit(100)
+    )
+    requests_list = result.scalars().all()
+
+    # Get stats
+    total_result = await db.execute(select(func.count(SupportRequest.id)))
+    total = total_result.scalar() or 0
+
+    open_result = await db.execute(
+        select(func.count(SupportRequest.id)).where(SupportRequest.status.in_(["open", "in_progress"]))
+    )
+    open_count = open_result.scalar() or 0
+
+    return templates.TemplateResponse("admin/support_requests.html", {
+        "request": request,
+        "support_requests": requests_list,
+        "stats": {"total": total, "open": open_count, "resolved": total - open_count},
+    })
+
+
+@router.post("/support/{request_id}/resolve")
+async def admin_resolve_support(request_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+    """Resolve a support request."""
+    result = await db.execute(select(SupportRequest).where(SupportRequest.id == request_id))
+    sr = result.scalar_one_or_none()
+    if not sr:
+        return RedirectResponse("/admin/support?error=not_found", status_code=303)
+
+    form = await request.form()
+    sr.status = "resolved"
+    sr.resolution_notes = form.get("resolution_notes", "")
+    sr.resolved_by = "admin"
+    sr.resolved_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return RedirectResponse("/admin/support?resolved=1", status_code=303)
 
 
 def _check_sensor_health(health_data: dict) -> list:

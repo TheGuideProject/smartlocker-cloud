@@ -26,6 +26,10 @@
         <div class="label">Companies</div>
         <div class="value green">{{ companies_count }}</div>
     </div>
+    <div class="stat-card">
+        <div class="label">Open Support</div>
+        <div class="value" style="color: {% if open_support_count > 0 %}#ed4552{% else %}var(--success){% endif %};">{{ open_support_count }}</div>
+    </div>
 </div>
 
 <!-- Offline Devices Alert -->
@@ -56,6 +60,14 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
+{% endif %}
+
+<!-- Open Support Requests Alert -->
+{% if open_support_count and open_support_count > 0 %}
+<div class="panel" style="border-left: 4px solid var(--accent-orange);">
+    <div class="panel-title" style="color: var(--accent-orange);">&#x1F4DE; Open Support Requests ({{ open_support_count }})</div>
+    <p style="color: var(--text-muted);">There are {{ open_support_count }} open support request(s) from devices. <a href="/admin/support" style="color: var(--accent-blue);">View all &#x2192;</a></p>
 </div>
 {% endif %}
 

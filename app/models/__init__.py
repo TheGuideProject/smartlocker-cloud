@@ -12,6 +12,7 @@ from app.models.can_tracking import CanTracking
 from app.models.mixing import MixingSessionCloud
 from app.models.pairing import PairingCode
 from app.models.health_log import SensorHealthLog
+from app.models.support_request import SupportRequest
 
 __all__ = [
     "User", "Company", "Fleet", "Vessel", "LockerDevice",
@@ -20,4 +21,5 @@ __all__ = [
     "DeviceEvent", "InventorySnapshot", "ConsumptionRecord", "InventoryAdjustment",
     "CanTracking",
     "MixingSessionCloud", "PairingCode", "SensorHealthLog",
+    "SupportRequest",
 ]
