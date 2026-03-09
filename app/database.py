@@ -144,6 +144,82 @@ async def _migrate_add_columns():
         except Exception as e:
             logger.debug(f"  sensor_health_logs table check: {e}")
 
+        # Create can_tracking table if not exists
+        try:
+            result = await conn.execute(text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_name = 'can_tracking'"
+            ))
+            if not result.scalar_one_or_none():
+                await conn.execute(text("""
+                    CREATE TABLE can_tracking (
+                        id VARCHAR(36) PRIMARY KEY,
+                        tag_uid VARCHAR(100) NOT NULL,
+                        lot_number VARCHAR(100),
+                        product_id VARCHAR(36) REFERENCES products(id),
+                        device_id VARCHAR(36) REFERENCES locker_devices(id),
+                        status VARCHAR(30) DEFAULT 'in_stock',
+                        slot_id VARCHAR(50),
+                        weight_full_g FLOAT,
+                        weight_current_g FLOAT,
+                        weight_tare_g FLOAT,
+                        can_size_ml INTEGER,
+                        first_seen_at TIMESTAMP,
+                        last_seen_at TIMESTAMP,
+                        placed_at TIMESTAMP,
+                        removed_at TIMESTAMP,
+                        total_consumed_g FLOAT DEFAULT 0,
+                        times_used INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT now(),
+                        updated_at TIMESTAMP DEFAULT now()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX idx_can_tracking_tag ON can_tracking(tag_uid)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX idx_can_tracking_device ON can_tracking(device_id)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX idx_can_tracking_status ON can_tracking(status)"
+                ))
+                logger.info("  Created can_tracking table")
+        except Exception as e:
+            logger.debug(f"  can_tracking table check: {e}")
+
+        # Create inventory_adjustments table if not exists
+        try:
+            result = await conn.execute(text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_name = 'inventory_adjustments'"
+            ))
+            if not result.scalar_one_or_none():
+                await conn.execute(text("""
+                    CREATE TABLE inventory_adjustments (
+                        id VARCHAR(36) PRIMARY KEY,
+                        device_id VARCHAR(36) REFERENCES locker_devices(id),
+                        product_id VARCHAR(36) NOT NULL REFERENCES products(id),
+                        adjustment_type VARCHAR(30) NOT NULL,
+                        quantity_cans INTEGER DEFAULT 0,
+                        quantity_liters FLOAT DEFAULT 0,
+                        weight_g FLOAT DEFAULT 0,
+                        lot_number VARCHAR(100),
+                        notes TEXT,
+                        source_document VARCHAR(255),
+                        created_by VARCHAR(100) DEFAULT 'system',
+                        created_at TIMESTAMP DEFAULT now()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX idx_inv_adj_device ON inventory_adjustments(device_id)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX idx_inv_adj_product ON inventory_adjustments(product_id)"
+                ))
+                logger.info("  Created inventory_adjustments table")
+        except Exception as e:
+            logger.debug(f"  inventory_adjustments table check: {e}")
+
         # Add device monitoring columns if missing
         monitoring_columns = {
             "driver_status": "JSONB",

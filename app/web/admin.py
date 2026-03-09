@@ -1,13 +1,15 @@
 """PPG Admin Portal - Web routes with Jinja2 templates."""
 
 import os
+import re
 import json
 import logging
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Request, Depends, Form, UploadFile, File
+from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_, desc
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +22,8 @@ from app.models.company import Company
 from app.models.fleet import Fleet, Vessel
 from app.models.pairing import PairingCode
 from app.models.maintenance import MaintenanceChart
+from app.models.can_tracking import CanTracking
+from app.models.inventory import InventoryAdjustment
 from app.api.events import _aggregate_sensor_issues
 
 logger = logging.getLogger("smartlocker.admin")
@@ -682,6 +686,508 @@ async def admin_change_device_password(
 
     device.pending_admin_password = new_password
     return RedirectResponse(url="/admin/devices", status_code=303)
+
+
+# ---- Inventory Monitoring ----
+
+@router.get("/inventory", response_class=HTMLResponse)
+async def admin_inventory(
+    request: Request,
+    device_filter: str = Query("", alias="device"),
+    product_filter: str = Query("", alias="product"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Inventory monitoring dashboard."""
+    # Get all devices with vessel info
+    devices_result = await db.execute(
+        select(LockerDevice)
+        .options(selectinload(LockerDevice.vessel))
+        .order_by(LockerDevice.name)
+    )
+    devices = devices_result.scalars().all()
+
+    # Get all products for filter dropdown
+    products_result = await db.execute(
+        select(Product).where(Product.is_active == True).order_by(Product.name)
+    )
+    products = products_result.scalars().all()
+
+    # Build inventory data per device
+    vessel_inventory = []
+    total_cans = 0
+    total_in_use = 0
+    total_liters = 0.0
+    low_stock_alerts = []
+
+    for device in devices:
+        # Get all can tracking records for this device
+        can_query = select(CanTracking).where(
+            CanTracking.device_id == device.id
+        )
+        if device_filter and device_filter != device.id:
+            continue
+
+        cans_result = await db.execute(can_query)
+        cans = cans_result.scalars().all()
+
+        if not cans and not device_filter:
+            continue  # Skip devices with no cans unless filtered
+
+        # Build product breakdown
+        product_breakdown = {}
+        device_cans_in_use = 0
+        for can in cans:
+            if product_filter and can.product_id != product_filter:
+                continue
+
+            product_name = "Unknown Product"
+            density = 1.0
+            if can.product_id:
+                for p in products:
+                    if p.id == can.product_id:
+                        product_name = p.name
+                        density = p.density_g_per_ml or 1.0
+                        break
+
+            if product_name not in product_breakdown:
+                product_breakdown[product_name] = {
+                    "product_id": can.product_id,
+                    "can_count": 0,
+                    "full_liters": 0.0,
+                    "current_liters": 0.0,
+                    "total_consumed_g": 0.0,
+                    "cans": [],
+                }
+
+            pb = product_breakdown[product_name]
+            pb["can_count"] += 1
+            pb["cans"].append(can)
+
+            if can.weight_full_g and density > 0:
+                pb["full_liters"] += (can.weight_full_g / density) / 1000.0
+            if can.weight_current_g and density > 0:
+                pb["current_liters"] += (can.weight_current_g / density) / 1000.0
+            pb["total_consumed_g"] += can.total_consumed_g or 0
+
+            if can.status == "in_use":
+                device_cans_in_use += 1
+
+            total_cans += 1
+            if can.status == "in_use":
+                total_in_use += 1
+
+        # Calculate used percentage for each product
+        for pname, pb in product_breakdown.items():
+            if pb["full_liters"] > 0:
+                pb["used_pct"] = round(
+                    ((pb["full_liters"] - pb["current_liters"]) / pb["full_liters"]) * 100,
+                    1,
+                )
+            else:
+                pb["used_pct"] = 0.0
+
+            total_liters += pb["current_liters"]
+
+            # Low stock alert: less than 20% remaining
+            if pb["used_pct"] > 80:
+                low_stock_alerts.append({
+                    "vessel": device.vessel.name if device.vessel else device.device_id,
+                    "product": pname,
+                    "remaining_pct": round(100 - pb["used_pct"], 1),
+                    "current_liters": round(pb["current_liters"], 1),
+                })
+
+        vessel_inventory.append({
+            "device": device,
+            "vessel_name": device.vessel.name if device.vessel else "Unassigned",
+            "is_online": device.is_online,
+            "last_seen_ago": device.last_seen_ago,
+            "product_breakdown": product_breakdown,
+            "total_cans": len(cans),
+            "cans_in_use": device_cans_in_use,
+            "cans": cans,
+        })
+
+    # Get recent inventory events
+    event_types = [
+        "can_placed", "can_removed", "can_returned",
+        "can_consumed", "unauthorized_removal",
+    ]
+    recent_events_result = await db.execute(
+        select(DeviceEvent)
+        .where(DeviceEvent.event_type.in_(event_types))
+        .order_by(DeviceEvent.timestamp.desc())
+        .limit(20)
+    )
+    recent_events = recent_events_result.scalars().all()
+
+    # Get recent adjustments
+    adjustments_result = await db.execute(
+        select(InventoryAdjustment)
+        .order_by(InventoryAdjustment.created_at.desc())
+        .limit(10)
+    )
+    adjustments = adjustments_result.scalars().all()
+
+    return templates.TemplateResponse("admin/inventory.html", {
+        "request": request,
+        "vessel_inventory": vessel_inventory,
+        "total_cans": total_cans,
+        "total_in_use": total_in_use,
+        "total_liters": round(total_liters, 1),
+        "low_stock_alerts": low_stock_alerts,
+        "recent_events": recent_events,
+        "adjustments": adjustments,
+        "products": products,
+        "devices": devices,
+        "device_filter": device_filter,
+        "product_filter": product_filter,
+        "active": "inventory",
+    })
+
+
+@router.post("/inventory/adjust")
+async def admin_adjust_inventory(
+    request: Request,
+    product_id: str = Form(...),
+    device_id: str = Form(""),
+    adjustment_type: str = Form(...),
+    quantity_cans: int = Form(0),
+    quantity_liters: float = Form(0.0),
+    lot_number: str = Form(""),
+    notes: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a manual inventory adjustment."""
+    # Calculate weight from liters using product density
+    weight_g = 0.0
+    if quantity_liters > 0:
+        product_result = await db.execute(
+            select(Product).where(Product.id == product_id)
+        )
+        product = product_result.scalar_one_or_none()
+        if product:
+            weight_g = quantity_liters * 1000 * (product.density_g_per_ml or 1.0)
+
+    adjustment = InventoryAdjustment(
+        device_id=device_id if device_id else None,
+        product_id=product_id,
+        adjustment_type=adjustment_type,
+        quantity_cans=quantity_cans,
+        quantity_liters=quantity_liters,
+        weight_g=weight_g,
+        lot_number=lot_number or None,
+        notes=notes or None,
+        created_by="admin",
+    )
+    db.add(adjustment)
+    return RedirectResponse(url="/admin/inventory", status_code=303)
+
+
+@router.post("/inventory/import-pdf", response_class=HTMLResponse)
+async def import_inventory_pdf(
+    request: Request,
+    pdf_file: UploadFile = File(...),
+    device_id: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Parse a purchase order PDF and show preview for confirmation."""
+    import fitz  # PyMuPDF
+
+    if not pdf_file.filename.lower().endswith(".pdf"):
+        return RedirectResponse(url="/admin/inventory?error=Only+PDF+files+accepted", status_code=303)
+
+    # Read PDF
+    pdf_bytes = await pdf_file.read()
+
+    # Save PDF
+    os.makedirs(os.path.join(settings.UPLOAD_DIR, "inventory"), exist_ok=True)
+    safe_name = pdf_file.filename.replace(" ", "_")
+    pdf_path = os.path.join(settings.UPLOAD_DIR, "inventory", safe_name)
+    with open(pdf_path, "wb") as f:
+        f.write(pdf_bytes)
+
+    # Extract text from PDF
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        full_text = ""
+        for page in doc:
+            full_text += page.get_text() + "\n"
+        doc.close()
+    except Exception as e:
+        logger.error(f"PDF parse error: {e}")
+        return RedirectResponse(
+            url="/admin/inventory?error=Error+parsing+PDF",
+            status_code=303,
+        )
+
+    # Get existing products for matching
+    products_result = await db.execute(
+        select(Product).where(Product.is_active == True).order_by(Product.name)
+    )
+    products = products_result.scalars().all()
+
+    # Try to match products in the PDF text
+    matched_items = []
+    for product in products:
+        # Search for product name in text (case-insensitive)
+        pattern = re.escape(product.name)
+        matches = re.finditer(pattern, full_text, re.IGNORECASE)
+
+        for match in matches:
+            # Look for quantities near the match (within 200 chars after)
+            context = full_text[match.start():match.start() + 200]
+
+            # Try to extract quantity (number followed by optional unit)
+            qty_patterns = [
+                r'(\d+)\s*(?:x|pcs|cans|units|tins)',
+                r'qty[:\s]*(\d+)',
+                r'quantity[:\s]*(\d+)',
+                r'(\d+)\s*(?:L|lt|liter|litre)',
+                r'(\d+)',
+            ]
+            quantity = 0
+            for qp in qty_patterns:
+                qty_match = re.search(qp, context[len(product.name):], re.IGNORECASE)
+                if qty_match:
+                    quantity = int(qty_match.group(1))
+                    if quantity > 0 and quantity < 10000:  # Sanity check
+                        break
+                    quantity = 0
+
+            # Extract lot number if present
+            lot_match = re.search(
+                r'(?:lot|batch|lotto)[:\s#]*([A-Z0-9\-]+)',
+                context,
+                re.IGNORECASE,
+            )
+            lot_number = lot_match.group(1) if lot_match else ""
+
+            # Only add if we haven't already matched this product
+            if not any(m["product_id"] == product.id for m in matched_items):
+                matched_items.append({
+                    "product_id": product.id,
+                    "product_name": product.name,
+                    "quantity": quantity if quantity > 0 else 1,
+                    "lot_number": lot_number,
+                    "context": context[:100].strip(),
+                })
+
+    # Get devices for dropdown
+    devices_result = await db.execute(
+        select(LockerDevice)
+        .options(selectinload(LockerDevice.vessel))
+        .order_by(LockerDevice.name)
+    )
+    devices = devices_result.scalars().all()
+
+    return templates.TemplateResponse("admin/inventory_import_preview.html", {
+        "request": request,
+        "matched_items": matched_items,
+        "pdf_filename": pdf_file.filename,
+        "pdf_path": pdf_path,
+        "full_text_preview": full_text[:2000],
+        "devices": devices,
+        "device_id": device_id,
+        "products": products,
+        "active": "inventory",
+    })
+
+
+@router.post("/inventory/import-confirm")
+async def confirm_inventory_import(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirm and save PDF import items as inventory adjustments."""
+    form = await request.form()
+
+    pdf_filename = form.get("pdf_filename", "")
+    device_id = form.get("device_id", "")
+
+    idx = 0
+    created = 0
+    while True:
+        product_id = form.get(f"item_{idx}_product_id")
+        if product_id is None:
+            break
+
+        include = form.get(f"item_{idx}_include")
+        if include != "on":
+            idx += 1
+            continue
+
+        quantity = int(form.get(f"item_{idx}_quantity", "1"))
+        lot_number = form.get(f"item_{idx}_lot_number", "")
+
+        adjustment = InventoryAdjustment(
+            device_id=device_id if device_id else None,
+            product_id=product_id,
+            adjustment_type="pdf_import",
+            quantity_cans=quantity,
+            lot_number=lot_number or None,
+            source_document=pdf_filename,
+            notes=f"Imported from PDF: {pdf_filename}",
+            created_by="admin",
+        )
+        db.add(adjustment)
+        created += 1
+        idx += 1
+
+    return RedirectResponse(
+        url=f"/admin/inventory?imported={created}",
+        status_code=303,
+    )
+
+
+@router.get("/inventory/analytics", response_class=HTMLResponse)
+async def inventory_analytics(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Consumption analytics and predictions."""
+    # Get all products
+    products_result = await db.execute(
+        select(Product).where(Product.is_active == True).order_by(Product.name)
+    )
+    products = products_result.scalars().all()
+
+    # Get all devices with vessel info
+    devices_result = await db.execute(
+        select(LockerDevice)
+        .options(selectinload(LockerDevice.vessel))
+        .order_by(LockerDevice.name)
+    )
+    devices = devices_result.scalars().all()
+
+    # 30-day cutoff for consumption analysis
+    cutoff_30d = datetime.utcnow() - timedelta(days=30)
+
+    # Get all can tracking data
+    cans_result = await db.execute(
+        select(CanTracking).where(CanTracking.total_consumed_g > 0)
+    )
+    all_cans = cans_result.scalars().all()
+
+    # Build product-level consumption data
+    product_consumption = {}
+    for can in all_cans:
+        product_name = "Unknown"
+        density = 1.0
+        for p in products:
+            if p.id == can.product_id:
+                product_name = p.name
+                density = p.density_g_per_ml or 1.0
+                break
+
+        if product_name not in product_consumption:
+            product_consumption[product_name] = {
+                "product_id": can.product_id,
+                "total_consumed_g": 0.0,
+                "total_consumed_liters": 0.0,
+                "can_count": 0,
+            }
+
+        pc = product_consumption[product_name]
+        pc["total_consumed_g"] += can.total_consumed_g
+        pc["total_consumed_liters"] += (can.total_consumed_g / density) / 1000.0
+        pc["can_count"] += 1
+
+    # Sort by consumption (top consumed first)
+    top_consumed = sorted(
+        product_consumption.items(),
+        key=lambda x: x[1]["total_consumed_liters"],
+        reverse=True,
+    )
+
+    # Per-device analytics (current stock + predictions)
+    device_analytics = []
+    reorder_suggestions = []
+
+    for device in devices:
+        device_cans_result = await db.execute(
+            select(CanTracking).where(
+                and_(
+                    CanTracking.device_id == device.id,
+                    CanTracking.status.in_(["in_stock", "in_use"]),
+                )
+            )
+        )
+        device_cans = device_cans_result.scalars().all()
+
+        if not device_cans:
+            continue
+
+        product_stock = {}
+        for can in device_cans:
+            product_name = "Unknown"
+            density = 1.0
+            for p in products:
+                if p.id == can.product_id:
+                    product_name = p.name
+                    density = p.density_g_per_ml or 1.0
+                    break
+
+            if product_name not in product_stock:
+                product_stock[product_name] = {
+                    "product_id": can.product_id,
+                    "current_liters": 0.0,
+                    "total_consumed_g": 0.0,
+                    "total_consumed_liters": 0.0,
+                    "can_count": 0,
+                    "times_used_total": 0,
+                    "density": density,
+                }
+
+            ps = product_stock[product_name]
+            ps["can_count"] += 1
+            ps["times_used_total"] += can.times_used or 0
+            ps["total_consumed_g"] += can.total_consumed_g or 0
+            ps["total_consumed_liters"] += (
+                (can.total_consumed_g or 0) / density
+            ) / 1000.0
+            if can.weight_current_g and density > 0:
+                ps["current_liters"] += (can.weight_current_g / density) / 1000.0
+
+        # Calculate daily consumption rate and predictions
+        for pname, ps in product_stock.items():
+            # Estimate daily rate from total consumption / days active
+            if ps["total_consumed_liters"] > 0 and ps["times_used_total"] > 0:
+                # Rough estimate: assume consumption happened over 30 days
+                daily_rate = ps["total_consumed_liters"] / 30.0
+                if daily_rate > 0 and ps["current_liters"] > 0:
+                    days_remaining = ps["current_liters"] / daily_rate
+                    ps["daily_rate_liters"] = round(daily_rate, 2)
+                    ps["days_remaining"] = round(days_remaining, 0)
+
+                    if days_remaining < 7:
+                        reorder_suggestions.append({
+                            "vessel": device.vessel.name if device.vessel else device.device_id,
+                            "product": pname,
+                            "days_remaining": round(days_remaining, 0),
+                            "current_liters": round(ps["current_liters"], 1),
+                            "daily_rate": round(daily_rate, 2),
+                        })
+                else:
+                    ps["daily_rate_liters"] = 0
+                    ps["days_remaining"] = None
+            else:
+                ps["daily_rate_liters"] = 0
+                ps["days_remaining"] = None
+
+        device_analytics.append({
+            "device": device,
+            "vessel_name": device.vessel.name if device.vessel else "Unassigned",
+            "product_stock": product_stock,
+        })
+
+    return templates.TemplateResponse("admin/inventory_analytics.html", {
+        "request": request,
+        "top_consumed": top_consumed,
+        "device_analytics": device_analytics,
+        "reorder_suggestions": reorder_suggestions,
+        "active": "inventory",
+    })
 
 
 def _check_sensor_health(health_data: dict) -> list:

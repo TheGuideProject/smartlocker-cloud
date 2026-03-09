@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% set active = "inventory" %}
+
+{% block title %}PDF Import Preview - SmartLocker{% endblock %}
+{% block page_title %}PDF Import Preview{% endblock %}
+
+{% block actions %}
+<a href="/admin/inventory" class="btn btn-secondary">Back to Inventory</a>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="border-left: 3px solid var(--accent-blue); margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <div class="panel-title" style="margin-bottom: 5px;">Parsed: {{ pdf_filename }}</div>
+            <p style="color: var(--text-muted); font-size: 13px;">
+                {{ matched_items|length }} product(s) found in the PDF. Review and adjust quantities before importing.
+            </p>
+        </div>
+    </div>
+</div>
+
+{% if matched_items %}
+<form action="/admin/inventory/import-confirm" method="post">
+    <input type="hidden" name="pdf_filename" value="{{ pdf_filename }}">
+    <input type="hidden" name="device_id" value="{{ device_id }}">
+
+    <div class="panel">
+        <div class="panel-title">Matched Products</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">Include</th>
+                    <th>Product</th>
+                    <th style="width: 100px;">Quantity</th>
+                    <th style="width: 150px;">Lot Number</th>
+                    <th>Context Found</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in matched_items %}
+                <tr>
+                    <td>
+                        <input type="checkbox" name="item_{{ loop.index0 }}_include" checked
+                               style="width: 18px; height: 18px; cursor: pointer;">
+                        <input type="hidden" name="item_{{ loop.index0 }}_product_id" value="{{ item.product_id }}">
+                    </td>
+                    <td>
+                        <strong>{{ item.product_name }}</strong>
+                    </td>
+                    <td>
+                        <input type="number" name="item_{{ loop.index0 }}_quantity" value="{{ item.quantity }}" min="1"
+                               style="width: 80px; padding: 5px 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 14px;">
+                    </td>
+                    <td>
+                        <input type="text" name="item_{{ loop.index0 }}_lot_number" value="{{ item.lot_number }}"
+                               placeholder="Lot #"
+                               style="width: 130px; padding: 5px 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 13px;">
+                    </td>
+                    <td style="font-size: 12px; color: var(--text-muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ item.context }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Assign to Device</label>
+                <select name="device_id" style="min-width: 200px;">
+                    <option value="">-- General Stock --</option>
+                    {% for d in devices %}
+                    <option value="{{ d.id }}" {% if device_id == d.id %}selected{% endif %}>
+                        {{ d.name or d.device_id }}{% if d.vessel %} ({{ d.vessel.name }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button type="submit" class="btn btn-success">Confirm Import</button>
+            <a href="/admin/inventory" class="btn btn-secondary">Cancel</a>
+        </div>
+    </div>
+</form>
+{% else %}
+<div class="panel" style="text-align: center; padding: 30px;">
+    <p style="color: var(--accent-orange); font-size: 15px; margin-bottom: 15px;">
+        No matching products found in the PDF.
+    </p>
+    <p style="color: var(--text-muted); font-size: 13px;">
+        The parser looks for product names that match your catalog. Make sure the products are added in
+        <a href="/admin/products" style="color: var(--accent-blue);">Products</a> first.
+    </p>
+</div>
+{% endif %}
+
+<!-- PDF Text Preview -->
+<div class="panel" style="margin-top: 20px;">
+    <div class="panel-title">Extracted PDF Text (preview)</div>
+    <pre style="background: var(--bg-input); padding: 15px; border-radius: 6px; font-size: 12px; color: var(--text-secondary); max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">{{ full_text_preview }}</pre>
+</div>
+{% endblock %}

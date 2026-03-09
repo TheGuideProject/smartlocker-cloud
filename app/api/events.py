@@ -1,5 +1,6 @@
 """Event Ingestion API - Receives batched events from edge devices."""
 
+import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -12,6 +13,9 @@ from app.database import get_db
 from app.models.device import LockerDevice
 from app.models.event import DeviceEvent
 from app.models.health_log import SensorHealthLog
+from app.services.event_processor import process_inventory_events
+
+logger = logging.getLogger("smartlocker.events")
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
@@ -93,6 +97,7 @@ async def ingest_events(
     received = 0
     duplicates = 0
     acked_ids = []
+    new_events = []  # Collect newly created events for inventory processing
 
     for event_in in batch.events:
         # Check for duplicate (device_id + event_uuid must be unique)
@@ -124,6 +129,7 @@ async def ingest_events(
             )
             db.add(event)
             await db.flush()
+            new_events.append(event)
             received += 1
             acked_ids.append(event_in.event_id)
         except Exception:
@@ -134,6 +140,14 @@ async def ingest_events(
     # Update device heartbeat
     device.last_heartbeat = datetime.utcnow()
     device.status = "online"
+
+    # Process new events into inventory state (CanTracking)
+    if new_events:
+        try:
+            await process_inventory_events(db, str(device.id), new_events)
+        except Exception as e:
+            logger.error(f"Error processing inventory events for device {device_id}: {e}")
+            # Don't fail the event ingestion if inventory processing fails
 
     return EventAck(
         received=received,
@@ -366,3 +380,87 @@ async def _aggregate_sensor_issues(
             })
 
     return aggregated
+
+
+# ---- Inventory Snapshot from Edge ----
+
+class SlotState(BaseModel):
+    slot_id: str
+    tag_uid: Optional[str] = None
+    product_id: Optional[str] = None
+    weight_g: Optional[float] = None
+    status: str = "empty"  # empty, occupied, in_use
+
+
+class InventorySnapshotIn(BaseModel):
+    slots: List[SlotState]
+
+
+@router.post("/{device_id}/inventory-snapshot")
+async def receive_inventory_snapshot(
+    device_id: str,
+    payload: InventorySnapshotIn,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Receive current slot state from edge device.
+
+    This is a full snapshot of the device's current inventory,
+    used for reconciliation and initial sync.
+    """
+    from app.models.can_tracking import CanTracking
+
+    result = await db.execute(
+        select(LockerDevice).where(LockerDevice.device_id == device_id)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail=f"Device {device_id} not registered")
+
+    updated = 0
+    for slot in payload.slots:
+        if not slot.tag_uid:
+            continue
+
+        # Find or create can tracking record
+        can_result = await db.execute(
+            select(CanTracking).where(
+                and_(
+                    CanTracking.tag_uid == slot.tag_uid,
+                    CanTracking.device_id == str(device.id),
+                )
+            )
+        )
+        can = can_result.scalar_one_or_none()
+
+        if can:
+            can.slot_id = slot.slot_id
+            can.weight_current_g = slot.weight_g
+            can.last_seen_at = datetime.utcnow()
+            if slot.status == "occupied":
+                can.status = "in_stock"
+            elif slot.status == "in_use":
+                can.status = "in_use"
+            if slot.product_id and not can.product_id:
+                can.product_id = slot.product_id
+        else:
+            can = CanTracking(
+                tag_uid=slot.tag_uid,
+                device_id=str(device.id),
+                product_id=slot.product_id,
+                slot_id=slot.slot_id,
+                weight_current_g=slot.weight_g,
+                weight_full_g=slot.weight_g,
+                status="in_stock" if slot.status == "occupied" else slot.status,
+                first_seen_at=datetime.utcnow(),
+                last_seen_at=datetime.utcnow(),
+                placed_at=datetime.utcnow(),
+            )
+            db.add(can)
+
+        updated += 1
+
+    device.last_heartbeat = datetime.utcnow()
+    device.status = "online"
+
+    return {"status": "ok", "slots_processed": updated}

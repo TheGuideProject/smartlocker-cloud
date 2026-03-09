@@ -1,8 +1,8 @@
-"""Inventory models - Stock snapshots and consumption tracking."""
+"""Inventory models - Stock snapshots, consumption tracking, and manual adjustments."""
 
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Float, Boolean, DateTime, ForeignKey, Integer
+from sqlalchemy import String, Float, Boolean, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -53,3 +53,38 @@ class ConsumptionRecord(Base):
 
     # Relationships
     product = relationship("Product")
+
+
+class InventoryAdjustment(Base):
+    """Manual inventory adjustments and PDF import records."""
+    __tablename__ = "inventory_adjustments"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    device_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("locker_devices.id"), nullable=True
+    )
+    product_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("products.id"), nullable=False
+    )
+
+    adjustment_type: Mapped[str] = mapped_column(
+        String(30), nullable=False
+    )  # manual_add, manual_remove, pdf_import, auto_consumed
+    quantity_cans: Mapped[int] = mapped_column(Integer, default=0)
+    quantity_liters: Mapped[float] = mapped_column(Float, default=0.0)
+    weight_g: Mapped[float] = mapped_column(Float, default=0.0)
+
+    lot_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_document: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )  # PDF filename
+
+    created_by: Mapped[str] = mapped_column(String(100), default="system")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    adj_product = relationship("Product")
+    adj_device = relationship("LockerDevice")
