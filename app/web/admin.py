@@ -166,7 +166,11 @@ async def admin_events(request: Request, db: AsyncSession = Depends(get_db)):
     })
 
 
-_GITHUB_VERSION_URL = (
+_GITHUB_API_URL = (
+    "https://api.github.com/repos/"
+    "TheGuideProject/smartlocker-edge/contents/config/VERSION"
+)
+_GITHUB_RAW_URL = (
     "https://raw.githubusercontent.com/"
     "TheGuideProject/smartlocker-edge/master/config/VERSION"
 )
@@ -175,12 +179,36 @@ _GITHUB_VERSION_URL = (
 def _get_latest_version_from_github() -> dict:
     """Fetch the latest version from the GitHub repo's config/VERSION file.
 
-    Uses urllib.request (stdlib) so we don't need httpx as a dependency.
+    Tries GitHub API with token first (works for private repos),
+    falls back to raw URL (works for public repos).
     Returns {"version": "x.y.z", "error": None} on success,
     or {"version": None, "error": "..."} on failure.
     """
+    import base64
+
+    github_token = os.environ.get("GITHUB_TOKEN", "")
+
+    # Method 1: GitHub API (works for private repos with token)
+    if github_token:
+        try:
+            req = urllib.request.Request(_GITHUB_API_URL)
+            req.add_header("Authorization", f"token {github_token}")
+            req.add_header("Accept", "application/vnd.github.v3+json")
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                import json as _json
+                data = _json.loads(resp.read().decode("utf-8"))
+                content = base64.b64decode(data.get("content", ""))
+                version = content.decode("utf-8").strip()
+                if version:
+                    return {"version": version, "error": None}
+        except Exception as exc:
+            logger.warning("GitHub API fetch failed: %s", exc)
+
+    # Method 2: Raw URL (works for public repos)
     try:
-        req = urllib.request.Request(_GITHUB_VERSION_URL)
+        req = urllib.request.Request(_GITHUB_RAW_URL)
+        if github_token:
+            req.add_header("Authorization", f"token {github_token}")
         with urllib.request.urlopen(req, timeout=5) as resp:
             version = resp.read().decode("utf-8").strip()
             if version:
