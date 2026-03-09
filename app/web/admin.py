@@ -3,7 +3,9 @@
 import os
 import re
 import json
+import asyncio
 import logging
+import urllib.request
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, Query
@@ -164,6 +166,31 @@ async def admin_events(request: Request, db: AsyncSession = Depends(get_db)):
     })
 
 
+_GITHUB_VERSION_URL = (
+    "https://raw.githubusercontent.com/"
+    "TheGuideProject/smartlocker-edge/master/config/VERSION"
+)
+
+
+def _get_latest_version_from_github() -> dict:
+    """Fetch the latest version from the GitHub repo's config/VERSION file.
+
+    Uses urllib.request (stdlib) so we don't need httpx as a dependency.
+    Returns {"version": "x.y.z", "error": None} on success,
+    or {"version": None, "error": "..."} on failure.
+    """
+    try:
+        req = urllib.request.Request(_GITHUB_VERSION_URL)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            version = resp.read().decode("utf-8").strip()
+            if version:
+                return {"version": version, "error": None}
+            return {"version": None, "error": "Empty VERSION file"}
+    except Exception as exc:
+        logger.warning("Failed to fetch latest version from GitHub: %s", exc)
+        return {"version": None, "error": str(exc)}
+
+
 @router.get("/devices", response_class=HTMLResponse)
 async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
     """Device monitoring dashboard."""
@@ -215,6 +242,10 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
                 'sensor': alert['sensor'],
             })
 
+    # Fetch latest version from GitHub (run in thread to avoid blocking)
+    latest = await asyncio.to_thread(_get_latest_version_from_github)
+    latest_version = latest.get("version")
+
     return templates.TemplateResponse("admin/devices.html", {
         "request": request,
         "devices": device_list,
@@ -222,6 +253,7 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
         "online_count": online_count,
         "total_count": len(device_list),
         "all_alerts": all_alerts,
+        "latest_version": latest_version,
     })
 
 
