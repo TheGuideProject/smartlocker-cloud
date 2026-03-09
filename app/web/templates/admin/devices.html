@@ -345,14 +345,11 @@ window.addEventListener('DOMContentLoaded', function() {
     {% endif %}
 
     <!-- Support Request indicator (per device) -->
-    {% if d.support_requests %}
-    {% set open_requests = d.support_requests|selectattr('is_open')|list %}
-    {% if open_requests %}
+    {% if d.open_support_count and d.open_support_count > 0 %}
     <div style="margin-top:8px; padding:6px 10px; background:rgba(251,166,64,0.1); border-radius:6px; border-left:3px solid var(--accent-orange);">
-        <span style="color:var(--accent-orange); font-weight:600; font-size:12px;">&#x1F4DE; {{ open_requests|length }} open support request(s)</span>
+        <span style="color:var(--accent-orange); font-weight:600; font-size:12px;">&#x1F4DE; {{ d.open_support_count }} open support request(s)</span>
         <a href="/admin/support" style="color:var(--accent-blue); font-size:12px; margin-left:8px;">View &#x2192;</a>
     </div>
-    {% endif %}
     {% endif %}
 
     <!-- Expandable Detail Section -->

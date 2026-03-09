@@ -112,11 +112,14 @@ async def admin_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     )
     offline_devices = offline_devices_result.scalars().all()
 
-    # Support request count
-    support_result = await db.execute(
-        select(func.count(SupportRequest.id)).where(SupportRequest.status.in_(["open", "in_progress"]))
-    )
-    open_support_count = support_result.scalar() or 0
+    # Support request count (safe if table doesn't exist yet)
+    try:
+        support_result = await db.execute(
+            select(func.count(SupportRequest.id)).where(SupportRequest.status.in_(["open", "in_progress"]))
+        )
+        open_support_count = support_result.scalar() or 0
+    except Exception:
+        open_support_count = 0
 
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
@@ -311,7 +314,10 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
     """Device monitoring dashboard."""
     result = await db.execute(
         select(LockerDevice)
-        .options(selectinload(LockerDevice.vessel))
+        .options(
+            selectinload(LockerDevice.vessel),
+            selectinload(LockerDevice.support_requests),
+        )
         .order_by(LockerDevice.last_heartbeat.desc().nullslast())
     )
     devices = result.scalars().all()
@@ -331,6 +337,9 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
         except Exception:
             health_summary = []
 
+        # Count open support requests (already eagerly loaded)
+        open_support = [sr for sr in d.support_requests if sr.status in ('open', 'in_progress')] if d.support_requests else []
+
         device_list.append({
             'device': d,
             'is_online': d.is_online,
@@ -342,6 +351,7 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
             'pending_update_version': d.pending_update_version,
             'update_error': d.update_error,
             'update_requested_at': d.update_requested_at,
+            'open_support_count': len(open_support),
         })
 
     online_count = sum(1 for d in device_list if d['is_online'])
