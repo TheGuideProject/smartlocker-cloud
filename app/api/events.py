@@ -156,6 +156,7 @@ async def ingest_events(
             logger.error(f"Error processing inventory events for device {device_id}: {e}")
             # Don't fail the event ingestion if inventory processing fails
 
+    await db.commit()
     return EventAck(
         received=received,
         duplicates=duplicates,
@@ -206,6 +207,7 @@ async def device_heartbeat(
     if heartbeat.system_info is not None:
         device.system_info = heartbeat.system_info
 
+    await db.commit()
     return {"status": "ok"}
 
 
@@ -334,6 +336,7 @@ async def receive_health_logs(
         except Exception:
             continue  # Skip individual failures
 
+    await db.commit()
     return {"received": received}
 
 
@@ -556,4 +559,5 @@ async def receive_inventory_snapshot(
     device.last_heartbeat = datetime.utcnow()
     device.status = "online"
 
+    await db.commit()
     return {"status": "ok", "slots_processed": updated}
