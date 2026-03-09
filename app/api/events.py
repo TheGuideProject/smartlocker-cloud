@@ -57,6 +57,12 @@ class HeartbeatIn(BaseModel):
     system_info: Optional[dict] = None     # {"uptime_seconds": ..., "events_pending_sync": ...}
 
 
+class UpdateStatusIn(BaseModel):
+    update_status: str
+    software_version: str = ""
+    error_message: str = ""
+
+
 # ---- Device Auth Helper ----
 
 async def verify_device_api_key(
@@ -175,6 +181,18 @@ async def device_heartbeat(
     if heartbeat.software_version:
         device.software_version = heartbeat.software_version
 
+    # Auto-detect update completion via heartbeat version match
+    if (device.pending_update_version
+            and heartbeat.software_version
+            and heartbeat.software_version == device.pending_update_version
+            and device.update_status not in ("completed", None)):
+        device.update_status = "completed"
+        device.update_completed_at = datetime.utcnow()
+        device.pending_update_version = None
+        device.pending_update_branch = None
+        device.update_error = None
+        logger.info(f"Device {device_id} auto-confirmed update to v{heartbeat.software_version}")
+
     # Store extended monitoring data
     if heartbeat.driver_status is not None:
         device.driver_status = heartbeat.driver_status
@@ -183,6 +201,42 @@ async def device_heartbeat(
     if heartbeat.system_info is not None:
         device.system_info = heartbeat.system_info
 
+    return {"status": "ok"}
+
+
+# ---- OTA Update Status ----
+
+@router.post("/{device_id}/update-status")
+async def report_update_status(
+    device_id: str,
+    payload: UpdateStatusIn,
+    db: AsyncSession = Depends(get_db),
+):
+    """Receive OTA update progress from edge device."""
+    result = await db.execute(
+        select(LockerDevice).where(LockerDevice.device_id == device_id)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    device.update_status = payload.update_status
+
+    if payload.update_status == "completed":
+        device.update_completed_at = datetime.utcnow()
+        device.pending_update_version = None
+        device.pending_update_branch = None
+        device.update_error = None
+        if payload.software_version:
+            device.software_version = payload.software_version
+        logger.info(f"Device {device_id} update COMPLETED: v{payload.software_version}")
+
+    elif payload.update_status == "failed":
+        device.update_error = payload.error_message[:500] if payload.error_message else "Unknown error"
+        device.update_completed_at = datetime.utcnow()
+        logger.warning(f"Device {device_id} update FAILED: {payload.error_message}")
+
+    await db.commit()
     return {"status": "ok"}
 
 

@@ -6,6 +6,7 @@
 
 {% block actions %}
 <button class="btn btn-primary" onclick="document.getElementById('addDevicePanel').style.display='block'">+ Register Device</button>
+<button class="btn btn-secondary" style="margin-left: 8px;" onclick="document.getElementById('fleetUpdatePanel').style.display=document.getElementById('fleetUpdatePanel').style.display==='none'?'block':'none'">Fleet Update</button>
 {% endblock %}
 
 {% block content %}
@@ -45,6 +46,33 @@
             <button type="button" class="btn btn-secondary" onclick="document.getElementById('addDevicePanel').style.display='none'">Cancel</button>
         </div>
     </form>
+</div>
+
+<!-- Fleet Update Panel -->
+<div id="fleetUpdatePanel" style="display:none; background: rgba(244,162,97,0.05); border: 1px solid rgba(244,162,97,0.2); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+    <h4 style="color: #f4a261; margin: 0 0 15px;">Fleet-Wide Software Update</h4>
+    <form action="/admin/devices/send-update-all" method="post" style="display: flex; gap: 10px; align-items: end;">
+        <div style="flex: 1;">
+            <label style="font-size: 12px; color: var(--text-muted, #888);">Target Version</label>
+            <input type="text" name="target_version" placeholder="e.g. 1.3.0" required
+                   style="width: 100%; padding: 8px; background: #1a1d24; border: 1px solid #333; color: #fff; border-radius: 4px;">
+        </div>
+        <div style="flex: 0.6;">
+            <label style="font-size: 12px; color: var(--text-muted, #888);">Branch</label>
+            <input type="text" name="branch" value="master"
+                   style="width: 100%; padding: 8px; background: #1a1d24; border: 1px solid #333; color: #fff; border-radius: 4px;">
+        </div>
+        <button type="submit" style="padding: 8px 20px; background: #f4a261; color: #111; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">
+            Send to All
+        </button>
+        <button type="button" onclick="document.getElementById('fleetUpdatePanel').style.display='none'"
+                style="padding: 8px 16px; background: #333; color: #999; border: none; border-radius: 4px; cursor: pointer;">
+            Cancel
+        </button>
+    </form>
+    <p style="color: #f4a261; font-size: 12px; margin: 10px 0 0;">
+        This will send an update command to ALL devices. They will update on their next sync cycle (~30 min).
+    </p>
 </div>
 
 <!-- Summary Stats -->
@@ -194,6 +222,13 @@
         <!-- Software Version -->
         <div style="font-size: 12px; color: var(--text-muted);">
             v{{ d.software_version or '?' }}
+            {% if item.update_status == 'pending' %}
+                <span style="color: #f4a261; font-size: 11px; margin-left: 4px;">&#x2192; v{{ item.pending_update_version }}</span>
+            {% elif item.update_status in ['downloading', 'applying'] %}
+                <span style="color: #5494da; font-size: 11px; margin-left: 4px;">&#x21BB; updating...</span>
+            {% elif item.update_status == 'failed' %}
+                <span style="color: #e63946; font-size: 11px; margin-left: 4px;">&#x2717; failed</span>
+            {% endif %}
         </div>
     </div>
 
@@ -373,6 +408,48 @@
                         <input type="text" name="new_password" placeholder="Enter new password" required style="font-size: 13px;">
                     </div>
                     <button type="submit" class="btn btn-secondary" style="padding: 9px 16px; font-size: 13px; height: fit-content;">Set Password</button>
+                </form>
+
+                <!-- Software Update -->
+                <div style="font-size: 14px; font-weight: 600; margin: 15px 0 8px; color: var(--text-secondary);">Software Update</div>
+                {% if item.update_status %}
+                <div style="margin-bottom: 10px;">
+                    <span style="font-size: 13px;">Status:
+                        {% if item.update_status == 'pending' %}
+                            <span style="color: #f4a261; font-weight: 600;">PENDING</span>
+                            <span style="color: var(--text-muted); font-size: 12px;">(waiting for device sync)</span>
+                        {% elif item.update_status == 'downloading' %}
+                            <span style="color: #5494da; font-weight: 600;">DOWNLOADING</span>
+                        {% elif item.update_status == 'applying' %}
+                            <span style="color: #5494da; font-weight: 600;">APPLYING</span>
+                        {% elif item.update_status == 'completed' %}
+                            <span style="color: var(--accent-green); font-weight: 600;">COMPLETED</span>
+                        {% elif item.update_status == 'failed' %}
+                            <span style="color: #e63946; font-weight: 600;">FAILED</span>
+                        {% else %}
+                            <span style="color: var(--text-muted);">{{ item.update_status }}</span>
+                        {% endif %}
+                    </span>
+                    {% if item.pending_update_version %}
+                        <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px;">Target: v{{ item.pending_update_version }}</span>
+                    {% endif %}
+                </div>
+                {% if item.update_error %}
+                <div style="background: rgba(230,57,70,0.1); border: 1px solid rgba(230,57,70,0.3); padding: 8px 12px; border-radius: 4px; margin-bottom: 10px;">
+                    <span style="color: #e63946; font-size: 12px;">Error: {{ item.update_error }}</span>
+                </div>
+                {% endif %}
+                {% endif %}
+                <form action="/admin/devices/{{ d.id }}/send-update" method="post" style="display: flex; gap: 10px; align-items: end;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label>Target Version</label>
+                        <input type="text" name="target_version" placeholder="e.g. 1.3.0" required style="font-size: 13px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; flex: 0.6;">
+                        <label>Branch</label>
+                        <input type="text" name="branch" value="master" style="font-size: 13px;">
+                    </div>
+                    <button type="submit" class="btn btn-secondary" style="padding: 9px 16px; font-size: 13px; height: fit-content; background: #f4a261; color: #111; border: none;">Send Update</button>
                 </form>
             </div>
         </div>

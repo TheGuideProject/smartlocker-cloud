@@ -8,6 +8,7 @@ Flow:
 5. Device stores API key locally, starts syncing events
 """
 
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -24,6 +25,8 @@ from app.models.fleet import Vessel, Fleet
 from app.models.company import Company
 from app.models.product import Product, MixingRecipe
 from app.models.maintenance import MaintenanceChart
+
+logger = logging.getLogger("smartlocker.pairing")
 
 router = APIRouter(prefix="/api/devices", tags=["pairing"])
 
@@ -307,5 +310,16 @@ async def get_device_config(
     if device.pending_admin_password:
         response["admin_password"] = device.pending_admin_password
         device.pending_admin_password = None  # Clear after sending
+
+    # Deliver pending OTA update command
+    if device.pending_update_version and device.update_status == "pending":
+        response["update"] = {
+            "version": device.pending_update_version,
+            "branch": device.pending_update_branch or "master",
+            "action": "update",
+        }
+        device.update_status = "downloading"
+        await db.commit()
+        logger.info(f"Update command delivered to {device.device_id}: v{device.pending_update_version}")
 
     return response

@@ -45,6 +45,26 @@ class LockerDevice(Base):
         String(255), nullable=True
     )  # One-time password push to device on next config sync
 
+    # ---- OTA Update Fields ----
+    pending_update_version: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )
+    pending_update_branch: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, default="master"
+    )
+    update_status: Mapped[str | None] = mapped_column(
+        String(30), nullable=True
+    )  # pending, downloading, applying, completed, failed
+    update_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+    update_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+    update_error: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
+
     # Relationships
     vessel = relationship("Vessel", back_populates="devices")
     events = relationship("DeviceEvent", back_populates="device")

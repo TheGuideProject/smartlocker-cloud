@@ -240,3 +240,21 @@ async def _migrate_add_columns():
                     logger.info(f"  Added locker_devices.{col_name} column")
             except Exception as e:
                 logger.debug(f"  Column {col_name} already exists or error: {e}")
+
+        # OTA update columns
+        ota_columns = {
+            "pending_update_version": "VARCHAR(50)",
+            "pending_update_branch": "VARCHAR(100)",
+            "update_status": "VARCHAR(30)",
+            "update_requested_at": "TIMESTAMP",
+            "update_completed_at": "TIMESTAMP",
+            "update_error": "VARCHAR(500)",
+        }
+        for col_name, col_type in ota_columns.items():
+            try:
+                await conn.execute(text(
+                    f"ALTER TABLE locker_devices ADD COLUMN {col_name} {col_type}"
+                ))
+                logger.info(f"  Added column: locker_devices.{col_name}")
+            except Exception:
+                pass  # Column already exists

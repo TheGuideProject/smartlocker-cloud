@@ -196,6 +196,10 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
             'sensor_alerts': sensor_alerts,
             'vessel_name': d.vessel.name if d.vessel else 'Unassigned',
             'health_summary': health_summary,
+            'update_status': d.update_status,
+            'pending_update_version': d.pending_update_version,
+            'update_error': d.update_error,
+            'update_requested_at': d.update_requested_at,
         })
 
     online_count = sum(1 for d in device_list if d['is_online'])
@@ -685,6 +689,62 @@ async def admin_change_device_password(
         return RedirectResponse(url="/admin/devices", status_code=303)
 
     device.pending_admin_password = new_password
+    return RedirectResponse(url="/admin/devices", status_code=303)
+
+
+@router.post("/devices/send-update-all")
+async def admin_send_update_all(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send OTA update to ALL devices."""
+    form = await request.form()
+    target_version = form.get("target_version", "").strip()
+    branch = form.get("branch", "master").strip() or "master"
+
+    if not target_version:
+        return RedirectResponse(url="/admin/devices", status_code=303)
+
+    result = await db.execute(select(LockerDevice))
+    devices = result.scalars().all()
+
+    for device in devices:
+        device.pending_update_version = target_version
+        device.pending_update_branch = branch
+        device.update_status = "pending"
+        device.update_requested_at = datetime.utcnow()
+        device.update_error = None
+
+    await db.commit()
+    return RedirectResponse(url="/admin/devices", status_code=303)
+
+
+@router.post("/devices/{device_id}/send-update")
+async def admin_send_update(
+    request: Request,
+    device_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send OTA update command to a specific device."""
+    form = await request.form()
+    target_version = form.get("target_version", "").strip()
+    branch = form.get("branch", "master").strip() or "master"
+
+    if not target_version:
+        return RedirectResponse(url="/admin/devices", status_code=303)
+
+    result = await db.execute(
+        select(LockerDevice).where(LockerDevice.id == device_id)
+    )
+    device = result.scalar_one_or_none()
+    if device:
+        device.pending_update_version = target_version
+        device.pending_update_branch = branch
+        device.update_status = "pending"
+        device.update_requested_at = datetime.utcnow()
+        device.update_error = None
+        await db.commit()
+
     return RedirectResponse(url="/admin/devices", status_code=303)
 
 
