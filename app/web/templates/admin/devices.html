@@ -276,6 +276,24 @@ window.addEventListener('DOMContentLoaded', function() {
             {% if d.system_info.db_size_mb is defined %}
                 <span title="Local DB size">DB: {{ d.system_info.db_size_mb }}MB</span>
             {% endif %}
+            {% if d.system_info.cpu_temp is defined and d.system_info.cpu_temp is not none %}
+                {% set ct = d.system_info.cpu_temp %}
+                <span title="CPU Temperature" style="color: {% if ct >= 80 %}var(--accent-red){% elif ct >= 70 %}var(--accent-orange){% else %}var(--accent-green){% endif %};">
+                    CPU: {{ ct }}°C
+                </span>
+            {% endif %}
+            {% if d.system_info.ram_pct is defined and d.system_info.ram_pct is not none %}
+                {% set rp = d.system_info.ram_pct %}
+                <span title="RAM Usage" style="color: {% if rp >= 90 %}var(--accent-red){% elif rp >= 80 %}var(--accent-orange){% else %}var(--text-secondary){% endif %};">
+                    RAM: {{ rp }}%
+                </span>
+            {% endif %}
+            {% if d.system_info.disk_pct is defined and d.system_info.disk_pct is not none %}
+                {% set dp = d.system_info.disk_pct %}
+                <span title="Disk Usage" style="color: {% if dp >= 95 %}var(--accent-red){% elif dp >= 85 %}var(--accent-orange){% else %}var(--text-secondary){% endif %};">
+                    Disk: {{ dp }}%
+                </span>
+            {% endif %}
         </div>
         {% endif %}
 
@@ -354,6 +372,145 @@ window.addEventListener('DOMContentLoaded', function() {
 
     <!-- Expandable Detail Section -->
     <div id="detail-{{ d.id }}" class="device-detail" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+
+        <!-- ═══════════ TELEMETRY SECTION ═══════════ -->
+        {% if d.system_info and (d.system_info.cpu_temp is defined or d.system_info.ram_pct is defined or d.system_info.disk_pct is defined) %}
+        <div style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--accent-green);">
+                    &#x1F4CA; Hardware Telemetry
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted);">
+                    Heartbeat: {{ item.last_seen_ago }} ago
+                    {% if not item.is_online %}
+                        <span style="color: var(--accent-orange); margin-left: 6px;">(offline — last known values)</span>
+                    {% else %}
+                        <span style="color: var(--accent-green); margin-left: 6px;">&#x25CF; live</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Gauge Cards Row -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
+                <!-- CPU Temperature -->
+                {% if d.system_info.cpu_temp is defined and d.system_info.cpu_temp is not none %}
+                {% set cpu_val = d.system_info.cpu_temp %}
+                {% set cpu_color = 'var(--accent-green)' if cpu_val < 70 else ('var(--accent-orange)' if cpu_val < 80 else 'var(--accent-red)') %}
+                {% set cpu_pct = [[(cpu_val / 100 * 100), 100] | min, 0] | max %}
+                <div style="background: var(--bg-input); border-radius: 8px; padding: 14px; text-align: center; position: relative; overflow: hidden;">
+                    <div style="position: absolute; bottom: 0; left: 0; width: {{ cpu_pct }}%; height: 3px; background: {{ cpu_color }}; border-radius: 0 2px 0 0;"></div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">CPU Temperature</div>
+                    <div style="font-size: 28px; font-weight: 700; color: {{ cpu_color }}; line-height: 1;">{{ cpu_val }}°C</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                        {% if cpu_val >= 80 %}CRITICAL (≥80°C)
+                        {% elif cpu_val >= 70 %}WARNING (≥70°C)
+                        {% else %}OK (<70°C){% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- RAM Usage -->
+                {% if d.system_info.ram_pct is defined and d.system_info.ram_pct is not none %}
+                {% set ram_val = d.system_info.ram_pct %}
+                {% set ram_color = 'var(--accent-green)' if ram_val < 80 else ('var(--accent-orange)' if ram_val < 90 else 'var(--accent-red)') %}
+                <div style="background: var(--bg-input); border-radius: 8px; padding: 14px; text-align: center; position: relative; overflow: hidden;">
+                    <div style="position: absolute; bottom: 0; left: 0; width: {{ ram_val }}%; height: 3px; background: {{ ram_color }}; border-radius: 0 2px 0 0;"></div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">RAM Usage</div>
+                    <div style="font-size: 28px; font-weight: 700; color: {{ ram_color }}; line-height: 1;">{{ ram_val }}%</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                        {% if ram_val >= 90 %}CRITICAL (≥90%)
+                        {% elif ram_val >= 80 %}WARNING (≥80%)
+                        {% else %}OK (<80%){% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Disk Usage -->
+                {% if d.system_info.disk_pct is defined and d.system_info.disk_pct is not none %}
+                {% set disk_val = d.system_info.disk_pct %}
+                {% set disk_color = 'var(--accent-green)' if disk_val < 85 else ('var(--accent-orange)' if disk_val < 95 else 'var(--accent-red)') %}
+                <div style="background: var(--bg-input); border-radius: 8px; padding: 14px; text-align: center; position: relative; overflow: hidden;">
+                    <div style="position: absolute; bottom: 0; left: 0; width: {{ disk_val }}%; height: 3px; background: {{ disk_color }}; border-radius: 0 2px 0 0;"></div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Disk Usage</div>
+                    <div style="font-size: 28px; font-weight: 700; color: {{ disk_color }}; line-height: 1;">{{ disk_val }}%</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                        {% if disk_val >= 95 %}CRITICAL (≥95%)
+                        {% elif disk_val >= 85 %}WARNING (≥85%)
+                        {% else %}OK (<85%){% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- System Status Indicators Row -->
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <!-- Clock Sync -->
+                {% if d.system_info.clock_sync is defined %}
+                <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--bg-input); padding: 6px 12px; border-radius: 6px; font-size: 12px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+                          background: {% if d.system_info.clock_sync %}var(--accent-green){% else %}var(--accent-red){% endif %};"></span>
+                    <span style="color: var(--text-secondary);">Clock:</span>
+                    <span style="color: {% if d.system_info.clock_sync %}var(--accent-green){% else %}var(--accent-red){% endif %}; font-weight: 600;">
+                        {% if d.system_info.clock_sync %}NTP Synced{% else %}Not Synced{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+
+                <!-- Power / Under-voltage -->
+                {% if d.system_info.under_voltage is defined %}
+                <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--bg-input); padding: 6px 12px; border-radius: 6px; font-size: 12px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+                          background: {% if d.system_info.under_voltage %}var(--accent-red){% else %}var(--accent-green){% endif %};"></span>
+                    <span style="color: var(--text-secondary);">Power:</span>
+                    <span style="color: {% if d.system_info.under_voltage %}var(--accent-red){% else %}var(--accent-green){% endif %}; font-weight: 600;">
+                        {% if d.system_info.under_voltage %}Under-voltage!{% else %}Stable{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+
+                <!-- SD Card -->
+                {% if d.system_info.sd_health is defined %}
+                <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--bg-input); padding: 6px 12px; border-radius: 6px; font-size: 12px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+                          background: {% if d.system_info.sd_health == 'ok' %}var(--accent-green){% else %}var(--accent-red){% endif %};"></span>
+                    <span style="color: var(--text-secondary);">SD Card:</span>
+                    <span style="color: {% if d.system_info.sd_health == 'ok' %}var(--accent-green){% else %}var(--accent-red){% endif %}; font-weight: 600;">
+                        {% if d.system_info.sd_health == 'ok' %}Healthy{% else %}{{ d.system_info.sd_health|upper }}{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+
+                <!-- CPU Throttling -->
+                {% if d.system_info.cpu_throttled is defined %}
+                <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--bg-input); padding: 6px 12px; border-radius: 6px; font-size: 12px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+                          background: {% if d.system_info.cpu_throttled %}var(--accent-orange){% else %}var(--accent-green){% endif %};"></span>
+                    <span style="color: var(--text-secondary);">Throttle:</span>
+                    <span style="color: {% if d.system_info.cpu_throttled %}var(--accent-orange){% else %}var(--accent-green){% endif %}; font-weight: 600;">
+                        {% if d.system_info.cpu_throttled %}Active{% else %}None{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+
+                <!-- Throttle bits raw (for debugging) -->
+                {% if d.system_info.throttle_bits is defined and d.system_info.throttle_bits > 0 %}
+                <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--bg-input); padding: 6px 12px; border-radius: 6px; font-size: 11px;">
+                    <span style="color: var(--text-muted);">Throttle bits:</span>
+                    <code style="color: var(--accent-orange);">0x{{ '%x' % d.system_info.throttle_bits }}</code>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% elif not item.is_online and d.system_info %}
+        <!-- Offline with no telemetry data -->
+        <div style="margin-bottom: 20px; padding: 12px 16px; background: rgba(244,162,97,0.06); border-radius: 8px; border-left: 3px solid var(--accent-orange);">
+            <div style="font-size: 13px; color: var(--accent-orange);">
+                &#x1F4CA; Hardware telemetry not available — device firmware may need update to v1.0.9+
+            </div>
+        </div>
+        {% endif %}
+        <!-- ═══════════ END TELEMETRY ═══════════ -->
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
             <!-- Full Sensor Health Details -->
             <div>
