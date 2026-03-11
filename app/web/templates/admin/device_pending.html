@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}Pending Items — {{ device.name or device.device_id }} — SmartLocker{% endblock %}
+
+{% block content %}
+<style>
+    .pending-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+    .pending-header h1 { font-size: 22px; color: var(--text-primary); margin: 0; }
+    .pending-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+    .pstat { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; text-align: center; min-width: 120px; }
+    .pstat .num { font-size: 28px; font-weight: 700; }
+    .pstat .lbl { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .section-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 24px 0 10px; display: flex; align-items: center; gap: 8px; }
+    .ptable { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .ptable th { text-align: left; padding: 10px 12px; background: var(--bg-card); color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+    .ptable td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-primary); vertical-align: top; }
+    .ptable tr:hover td { background: rgba(255,255,255,0.02); }
+    .status-pending { color: var(--accent-orange); font-weight: 600; }
+    .status-delivered { color: var(--accent-blue, #4080D9); font-weight: 600; }
+    .status-acked { color: var(--accent-green); }
+    .status-expired { color: var(--text-muted); }
+    .status-completed { color: var(--accent-green); font-weight: 600; }
+    .status-in_progress { color: var(--accent-orange); font-weight: 600; }
+    .status-cancelled { color: var(--text-muted); }
+    .cmd-type { background: var(--bg-input); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 12px; }
+    .evt-type { background: rgba(64, 128, 217, 0.15); color: var(--accent-blue, #4080D9); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+    .mix-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .empty-msg { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
+    .back-link { color: var(--accent-blue, #4080D9); text-decoration: none; font-size: 14px; }
+    .back-link:hover { text-decoration: underline; }
+    .payload-preview { max-width: 300px; font-family: monospace; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .edge-info { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+    .edge-info .icon { font-size: 24px; }
+    .panel-scroll { max-height: 500px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+</style>
+
+<!-- Header -->
+<div class="pending-header">
+    <div>
+        <a href="/admin/devices" class="back-link">← Back to Devices</a>
+        <h1>🔄 Pending Items — {{ device.name or device.device_id }}</h1>
+    </div>
+</div>
+
+<!-- Edge-reported pending info -->
+<div class="edge-info">
+    <div class="icon">📡</div>
+    <div>
+        <strong>Edge-Reported Pending Events:</strong>
+        {% if edge_pending is not none %}
+            <span style="font-size: 20px; font-weight: 700; color: {% if edge_pending > 0 %}var(--accent-orange){% else %}var(--accent-green){% endif %};">
+                {{ edge_pending }}
+            </span>
+            <span style="color: var(--text-muted); font-size: 13px; margin-left: 8px;">
+                (from device heartbeat — events waiting to sync from edge → cloud)
+            </span>
+        {% else %}
+            <span style="color: var(--text-muted);">No data available (device may not have sent heartbeat yet)</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="pending-stats">
+    <div class="pstat">
+        <div class="num" style="color: var(--accent-orange);">{{ pending_commands|length }}</div>
+        <div class="lbl">Pending Commands</div>
+    </div>
+    <div class="pstat">
+        <div class="num" style="color: var(--accent-blue, #4080D9);">{{ recent_events|length }}</div>
+        <div class="lbl">Recent Events (50)</div>
+    </div>
+    <div class="pstat">
+        <div class="num" style="color: var(--text-primary);">
+            {{ mixing_sessions|selectattr('status', 'equalto', 'in_progress')|list|length }}
+        </div>
+        <div class="lbl">Active Mix Sessions</div>
+    </div>
+    <div class="pstat">
+        <div class="num" style="color: var(--accent-green);">{{ completed_commands|length }}</div>
+        <div class="lbl">Completed Commands</div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 1: Pending Commands -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section-title">⏳ Pending Commands (Cloud → Edge)</div>
+<p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px;">Commands waiting to be delivered or acknowledged by the device.</p>
+
+{% if pending_commands %}
+<div class="panel-scroll">
+<table class="ptable">
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Type</th>
+            <th>Created</th>
+            <th>Delivered</th>
+            <th>Payload Preview</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cmd in pending_commands %}
+        <tr>
+            <td>
+                <span class="status-{{ cmd.status }}">{{ cmd.status|upper }}</span>
+            </td>
+            <td><span class="cmd-type">{{ cmd.command_type }}</span></td>
+            <td>{{ cmd.created_at.strftime('%Y-%m-%d %H:%M:%S') if cmd.created_at else '-' }}</td>
+            <td>{{ cmd.delivered_at.strftime('%Y-%m-%d %H:%M:%S') if cmd.delivered_at else '-' }}</td>
+            <td>
+                <div class="payload-preview" title="{{ cmd.payload|tojson if cmd.payload else '' }}">
+                    {% if cmd.payload %}
+                        {% if cmd.command_type == 'product_sync' %}
+                            {{ (cmd.payload.get('products', [])|length) }} products
+                        {% elif cmd.command_type == 'recipe_sync' %}
+                            {{ (cmd.payload.get('recipes', [])|length) }} recipes
+                        {% elif cmd.command_type == 'ota_update' %}
+                            v{{ cmd.payload.get('version', '?') }}
+                        {% elif cmd.command_type in ['enable_install_mode', 'disable_install_mode'] %}
+                            {{ cmd.command_type|replace('_', ' ')|title }}
+                        {% else %}
+                            {{ cmd.payload|tojson|truncate(60) }}
+                        {% endif %}
+                    {% else %}
+                        —
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-msg">✅ No pending commands — all clear!</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 2: Mixing Sessions -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section-title">🧪 Mixing Sessions</div>
+<p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px;">Recent mixing sessions received from device. In-progress sessions may be stuck pending.</p>
+
+{% if mixing_sessions %}
+<div class="panel-scroll">
+<table class="ptable">
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Session UUID</th>
+            <th>Job</th>
+            <th>User</th>
+            <th>Started</th>
+            <th>Completed</th>
+            <th>Base (g)</th>
+            <th>Hardener (g)</th>
+            <th>Ratio</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for m in mixing_sessions %}
+        <tr>
+            <td>
+                <span class="mix-badge status-{{ m.status }}"
+                      style="background: {% if m.status == 'completed' %}rgba(51,179,89,0.15){% elif m.status == 'in_progress' %}rgba(242,153,48,0.15){% else %}rgba(141,145,153,0.15){% endif %};">
+                    {{ m.status|replace('_', ' ')|upper }}
+                </span>
+            </td>
+            <td style="font-family: monospace; font-size: 11px;">{{ m.session_uuid[:12] }}…</td>
+            <td>{{ m.job_id or '-' }}</td>
+            <td>{{ m.user_name or '-' }}</td>
+            <td>{{ m.started_at.strftime('%Y-%m-%d %H:%M') if m.started_at else '-' }}</td>
+            <td>{{ m.completed_at.strftime('%Y-%m-%d %H:%M') if m.completed_at else '-' }}</td>
+            <td>{{ '%.1f'|format(m.base_weight_actual_g) if m.base_weight_actual_g else '-' }}</td>
+            <td>{{ '%.1f'|format(m.hardener_weight_actual_g) if m.hardener_weight_actual_g else '-' }}</td>
+            <td>
+                {% if m.ratio_achieved %}
+                    <span style="color: {% if m.ratio_in_spec %}var(--accent-green){% else %}var(--accent-red, #E64040){% endif %};">
+                        {{ '%.2f'|format(m.ratio_achieved) }}
+                    </span>
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-msg">No mixing sessions recorded for this device.</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 3: Recent Events -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section-title">📋 Recent Events (Edge → Cloud)</div>
+<p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px;">Last 50 events received from the device. These have already been synced successfully.</p>
+
+{% if recent_events %}
+<div class="panel-scroll">
+<table class="ptable">
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Event UUID</th>
+            <th>Timestamp</th>
+            <th>Received</th>
+            <th>Shelf/Slot</th>
+            <th>Tag</th>
+            <th>Data Preview</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for e in recent_events %}
+        <tr>
+            <td><span class="evt-type">{{ e.event_type }}</span></td>
+            <td style="font-family: monospace; font-size: 11px;">{{ e.event_uuid[:12] }}…</td>
+            <td>{{ e.timestamp.strftime('%Y-%m-%d %H:%M:%S') if e.timestamp else '-' }}</td>
+            <td>{{ e.received_at.strftime('%H:%M:%S') if e.received_at else '-' }}</td>
+            <td>{{ e.shelf_id or '' }}{% if e.slot_id %}/{{ e.slot_id }}{% endif %}</td>
+            <td style="font-family: monospace; font-size: 11px;">{{ e.tag_id[:12] + '…' if e.tag_id and e.tag_id|length > 12 else e.tag_id or '-' }}</td>
+            <td>
+                <div class="payload-preview" title="{{ e.data|tojson if e.data else '' }}">
+                    {{ e.data|tojson|truncate(60) if e.data else '-' }}
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-msg">No events received from this device yet.</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 4: Completed Commands (Reference) -->
+<!-- ═══════════════════════════════════════════════ -->
+<details style="margin-top: 20px;">
+    <summary style="cursor: pointer; font-size: 16px; font-weight: 600; color: var(--text-primary); padding: 8px 0;">
+        ✅ Recently Completed Commands ({{ completed_commands|length }})
+    </summary>
+
+    {% if completed_commands %}
+    <div class="panel-scroll" style="margin-top: 8px;">
+    <table class="ptable">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Type</th>
+                <th>Created</th>
+                <th>Delivered</th>
+                <th>Acked</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cmd in completed_commands %}
+            <tr>
+                <td><span class="status-{{ cmd.status }}">{{ cmd.status|upper }}</span></td>
+                <td><span class="cmd-type">{{ cmd.command_type }}</span></td>
+                <td>{{ cmd.created_at.strftime('%Y-%m-%d %H:%M:%S') if cmd.created_at else '-' }}</td>
+                <td>{{ cmd.delivered_at.strftime('%Y-%m-%d %H:%M:%S') if cmd.delivered_at else '-' }}</td>
+                <td>{{ cmd.acked_at.strftime('%Y-%m-%d %H:%M:%S') if cmd.acked_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty-msg">No completed commands.</div>
+    {% endif %}
+</details>
+
+{% endblock %}

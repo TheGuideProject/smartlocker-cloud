@@ -2048,6 +2048,84 @@ def _check_sensor_health(health_data: dict) -> list:
     return alerts
 
 
+# ---- Device Pending Items ----
+
+@router.get("/devices/{device_id}/pending", response_class=HTMLResponse)
+async def admin_device_pending(
+    request: Request,
+    device_id: str,
+    user=Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Show all pending/queued items for a specific device."""
+    from app.models.command import DeviceCommand
+    from app.models.mixing import MixingSessionCloud
+
+    # Get device
+    device = await db.get(LockerDevice, device_id)
+    if not device:
+        return RedirectResponse(url="/admin/devices", status_code=303)
+
+    # 1) Pending commands (pending or delivered but not acked)
+    cmd_result = await db.execute(
+        select(DeviceCommand)
+        .where(
+            DeviceCommand.device_id == device_id,
+            DeviceCommand.status.in_(["pending", "delivered"]),
+        )
+        .order_by(desc(DeviceCommand.created_at))
+        .limit(100)
+    )
+    pending_commands = cmd_result.scalars().all()
+
+    # 2) Recent events (last 50 received)
+    evt_result = await db.execute(
+        select(DeviceEvent)
+        .where(DeviceEvent.device_id == device_id)
+        .order_by(desc(DeviceEvent.received_at))
+        .limit(50)
+    )
+    recent_events = evt_result.scalars().all()
+
+    # 3) Mixing sessions — especially in_progress ones
+    mix_result = await db.execute(
+        select(MixingSessionCloud)
+        .where(MixingSessionCloud.device_id == device_id)
+        .order_by(desc(MixingSessionCloud.started_at))
+        .limit(50)
+    )
+    mixing_sessions = mix_result.scalars().all()
+
+    # 4) Recently completed commands (for reference)
+    done_cmd_result = await db.execute(
+        select(DeviceCommand)
+        .where(
+            DeviceCommand.device_id == device_id,
+            DeviceCommand.status.in_(["acked", "expired"]),
+        )
+        .order_by(desc(DeviceCommand.created_at))
+        .limit(30)
+    )
+    completed_commands = done_cmd_result.scalars().all()
+
+    # Edge-reported pending count from system_info
+    edge_pending = None
+    if device.system_info and "events_pending_sync" in (device.system_info or {}):
+        edge_pending = device.system_info["events_pending_sync"]
+
+    return templates.TemplateResponse("admin/device_pending.html", {
+        "request": request,
+        "user": user,
+        "device": device,
+        "pending_commands": pending_commands,
+        "completed_commands": completed_commands,
+        "recent_events": recent_events,
+        "mixing_sessions": mixing_sessions,
+        "edge_pending": edge_pending,
+        "active": "devices",
+    })
+
+
 # ---- System Guide & Changelog ----
 
 @router.get("/guide", response_class=HTMLResponse)
@@ -2092,3 +2170,4 @@ def _generate_ppg_code(name: str) -> str:
             break
 
     return f"{prefix}-{num}"
+

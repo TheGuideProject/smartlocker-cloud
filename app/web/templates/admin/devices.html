@@ -268,10 +268,10 @@ window.addEventListener('DOMContentLoaded', function() {
                 <span title="Uptime">Up: {{ uptime_h }}h</span>
             {% endif %}
             {% if d.system_info.events_pending_sync is defined %}
-                <span title="Events pending sync"
-                      style="{% if d.system_info.events_pending_sync > 0 %}color: var(--accent-orange);{% endif %}">
-                    Pending: {{ d.system_info.events_pending_sync }}
-                </span>
+                <a href="/admin/devices/{{ d.id }}/pending" title="View pending items"
+                   style="text-decoration: none; {% if d.system_info.events_pending_sync > 0 %}color: var(--accent-orange);{% else %}color: var(--text-secondary);{% endif %}">
+                    🔄 Pending: {{ d.system_info.events_pending_sync }}
+                </a>
             {% endif %}
             {% if d.system_info.db_size_mb is defined %}
                 <span title="Local DB size">DB: {{ d.system_info.db_size_mb }}MB</span>
@@ -601,7 +601,11 @@ window.addEventListener('DOMContentLoaded', function() {
                         </tr>
                         <tr>
                             <td style="color: var(--text-muted);">Pending Events</td>
-                            <td>{{ d.system_info.get('events_pending_sync', '-') }}</td>
+                            <td>
+                                <a href="/admin/devices/{{ d.id }}/pending" style="color: var(--accent-orange); text-decoration: none;">
+                                    {{ d.system_info.get('events_pending_sync', '-') }} — View Details →
+                                </a>
+                            </td>
                         </tr>
                         <tr>
                             <td style="color: var(--text-muted);">DB Size</td>

@@ -81,10 +81,8 @@ async def _create_commands_for_all_devices(
     db: AsyncSession, command_type: str, payload: dict
 ):
     """Create a DeviceCommand for every active device and push via WS if connected."""
-    # Get all active devices
-    result = await db.execute(
-        select(LockerDevice).where(LockerDevice.is_active == True)
-    )
+    # Get all paired devices (all devices should receive sync commands)
+    result = await db.execute(select(LockerDevice))
     devices = result.scalars().all()
 
     if not devices:
