@@ -144,10 +144,11 @@ async def admin_products(request: Request, user = Depends(require_admin_session)
     )
     products = result.scalars().all()
 
-    # Extract product->colors from all maintenance charts
+    # Build product_colors: prefer product.colors_json (DB), fallback to chart colors
     charts_result = await db.execute(select(MaintenanceChart))
     charts = charts_result.scalars().all()
     product_colors = {}  # {product_name: [{"name": "GREY 5284", "hex": "#8D9199"}, ...]}
+    # Fallback: maintenance chart colors
     for chart in charts:
         chart_colors = _extract_product_colors(chart.parsed_data)
         for pname, color_names in chart_colors.items():
@@ -158,6 +159,10 @@ async def admin_products(request: Request, user = Depends(require_admin_session)
                         'name': cn,
                         'hex': _color_name_to_hex(cn),
                     })
+    # Override: product-level DB colors take priority
+    for p in products:
+        if p.colors_json:
+            product_colors[p.name] = p.colors_json
 
     return templates.TemplateResponse("admin/products.html", {
         "request": request,
@@ -180,6 +185,17 @@ async def admin_add_product(
     db: AsyncSession = Depends(get_db),
 ):
     """Add a new product via form."""
+    # Parse color data from dynamic form fields
+    form_data = await request.form()
+    colors = []
+    i = 0
+    while f"color_hex_{i}" in form_data:
+        hex_val = form_data.get(f"color_hex_{i}", "").strip()
+        name_val = form_data.get(f"color_name_{i}", "").strip()
+        if hex_val:
+            colors.append({"name": name_val or hex_val, "hex": hex_val})
+        i += 1
+
     product = Product(
         ppg_code=ppg_code,
         name=name,
@@ -187,6 +203,7 @@ async def admin_add_product(
         density_g_per_ml=density_g_per_ml,
         pot_life_minutes=pot_life_minutes if pot_life_minutes else None,
         hazard_class=hazard_class or None,
+        colors_json=colors if colors else None,
     )
     db.add(product)
     await db.flush()
@@ -1262,7 +1279,7 @@ async def admin_inventory_vessel(
     )
     charts = chart_result.scalars().all()
 
-    # Extract product colors from all charts for this vessel
+    # Extract product colors: prefer product.colors_json, fallback to chart colors
     vessel_product_colors = {}
     for chart in charts:
         chart_colors = _extract_product_colors(chart.parsed_data)
@@ -1274,6 +1291,10 @@ async def admin_inventory_vessel(
                         'name': cn,
                         'hex': _color_name_to_hex(cn),
                     })
+    # Override: product-level DB colors take priority
+    for p in all_products:
+        if p.colors_json:
+            vessel_product_colors[p.name] = p.colors_json
 
     # Build product inventory summary
     product_summary = {}

@@ -23,6 +23,9 @@ class Product(Base):
     hazard_class: Mapped[str | None] = mapped_column(String(50), nullable=True)
     can_sizes_ml: Mapped[dict | None] = mapped_column(JSON, default=list)
     can_tare_weight_g: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    colors_json: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True, default=list
+    )  # [{"name": "Redbrown 6179", "hex": "#B5462A"}, ...]
     sds_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)

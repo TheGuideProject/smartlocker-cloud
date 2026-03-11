@@ -48,6 +48,12 @@
                 <input type="text" name="hazard_class" placeholder="e.g. Class 3">
             </div>
         </div>
+        <!-- Color picker for new product -->
+        <div style="margin-top: 10px;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">Product Colors</label>
+            <div id="colors-new" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;"></div>
+            <button type="button" onclick="addColor('new')" class="btn btn-secondary" style="font-size: 12px; padding: 4px 12px;">+ Add Color</button>
+        </div>
         <div style="display: flex; gap: 10px; margin-top: 10px;">
             <button type="submit" class="btn btn-success">Save Product</button>
             <button type="button" class="btn btn-secondary" onclick="document.getElementById('addProductPanel').style.display='none'">Cancel</button>
@@ -140,10 +146,26 @@
                             <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Hazard Class</label>
                             <input type="text" name="hazard_class" value="{{ product.hazard_class or '' }}">
                         </div>
-                        <div style="grid-column: span 2; display: flex; align-items: end; gap: 8px;">
-                            <button type="submit" class="btn-save">Save Changes</button>
-                            <button type="button" class="btn-cancel" onclick="toggleEditRow('product-edit-{{ product.id }}', 'product-row-{{ product.id }}')">Cancel</button>
+                        <div style="grid-column: span 2;"></div>
+                    </div>
+                    <!-- Color picker -->
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 6px;">Product Colors</label>
+                        <div id="colors-{{ product.id }}" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                            {% set db_colors = product.colors_json or [] %}
+                            {% for color in db_colors %}
+                            <div class="color-chip" style="display:flex; align-items:center; gap:4px; background:var(--bg-card); padding:4px 8px; border-radius:6px; border:1px solid var(--border);">
+                                <input type="color" name="color_hex_{{ loop.index0 }}" value="{{ color.hex }}" style="width:28px; height:28px; border:none; cursor:pointer; background:none; padding:0;">
+                                <input type="text" name="color_name_{{ loop.index0 }}" value="{{ color.name }}" placeholder="Color name" style="width:110px; padding:3px 6px; font-size:12px; background:var(--bg-dark); border:1px solid var(--border); border-radius:4px; color:var(--text-primary);">
+                                <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:16px; padding:0 4px;">×</button>
+                            </div>
+                            {% endfor %}
                         </div>
+                        <button type="button" onclick="addColor('{{ product.id }}')" style="background:var(--accent-blue); color:#fff; border:none; padding:4px 12px; border-radius:4px; font-size:12px; cursor:pointer;">+ Add Color</button>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="submit" class="btn-save">Save Changes</button>
+                        <button type="button" class="btn-cancel" onclick="toggleEditRow('product-edit-{{ product.id }}', 'product-row-{{ product.id }}')">Cancel</button>
                     </div>
                 </form>
             </td>
@@ -167,7 +189,6 @@ function toggleEditRow(editId, displayId) {
         editRow.classList.remove('visible');
         displayRow.style.display = '';
     } else {
-        // Close any other open edit rows first
         document.querySelectorAll('.edit-row.visible').forEach(function(row) {
             row.classList.remove('visible');
             var prevRow = row.previousElementSibling;
@@ -176,6 +197,19 @@ function toggleEditRow(editId, displayId) {
         editRow.classList.add('visible');
         displayRow.style.display = 'none';
     }
+}
+
+function addColor(productId) {
+    var container = document.getElementById('colors-' + productId);
+    var idx = container.children.length;
+    var chip = document.createElement('div');
+    chip.className = 'color-chip';
+    chip.style = 'display:flex; align-items:center; gap:4px; background:var(--bg-card); padding:4px 8px; border-radius:6px; border:1px solid var(--border);';
+    chip.innerHTML =
+        '<input type="color" name="color_hex_' + idx + '" value="#737880" style="width:28px; height:28px; border:none; cursor:pointer; background:none; padding:0;">' +
+        '<input type="text" name="color_name_' + idx + '" placeholder="Color name" style="width:110px; padding:3px 6px; font-size:12px; background:var(--bg-dark); border:1px solid var(--border); border-radius:4px; color:var(--text-primary);">' +
+        '<button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:16px; padding:0 4px;">\u00d7</button>';
+    container.appendChild(chip);
 }
 </script>
 {% endblock %}

@@ -14,7 +14,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func, case
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from app.models.fleet import Vessel, Fleet
 from app.models.company import Company
 from app.models.product import Product, MixingRecipe
 from app.models.maintenance import MaintenanceChart
+from app.models.inventory import InventoryAdjustment
 from app.api.events import verify_device_api_key
 
 logger = logging.getLogger("smartlocker.pairing")
@@ -168,6 +169,48 @@ async def pair_device(
     if chart and chart.parsed_data:
         chart_data = chart.parsed_data
 
+    # Build vessel inventory for initial sync
+    pair_vessel_inventory = []
+    vessel_devices_result = await db.execute(
+        select(LockerDevice.id).where(LockerDevice.vessel_id == vessel.id)
+    )
+    pair_vessel_device_ids = [row[0] for row in vessel_devices_result.all()]
+    if pair_vessel_device_ids:
+        products_by_id = {str(p.id): p for p in products}
+        adj_result = await db.execute(
+            select(
+                InventoryAdjustment.product_id,
+                func.sum(case(
+                    (InventoryAdjustment.adjustment_type.in_(["manual_add", "pdf_import"]),
+                     InventoryAdjustment.quantity_liters),
+                    else_=0,
+                )).label("total_added"),
+                func.sum(case(
+                    (InventoryAdjustment.adjustment_type == "manual_remove",
+                     InventoryAdjustment.quantity_liters),
+                    else_=0,
+                )).label("total_removed"),
+            )
+            .where(InventoryAdjustment.device_id.in_(pair_vessel_device_ids))
+            .group_by(InventoryAdjustment.product_id)
+        )
+        for row in adj_result.all():
+            pid = str(row[0]) if row[0] else None
+            total_added = row[1] or 0
+            total_removed = row[2] or 0
+            net_liters = max(0, total_added - total_removed)
+            p = products_by_id.get(pid)
+            if p and net_liters > 0:
+                pair_vessel_inventory.append({
+                    "product_id": pid,
+                    "product_name": p.name,
+                    "product_type": p.product_type,
+                    "current_liters": round(net_liters, 1),
+                    "initial_liters": round(total_added, 1),
+                    "density_g_per_ml": p.density_g_per_ml or 1.0,
+                    "colors_json": p.colors_json or [],
+                })
+
     # Build config payload
     config = {
         "products": [
@@ -181,6 +224,7 @@ async def pair_device(
                 "hazard_class": p.hazard_class,
                 "can_sizes_ml": p.can_sizes_ml,
                 "can_tare_weight_g": p.can_tare_weight_g,
+                "colors_json": p.colors_json or [],
             }
             for p in products
         ],
@@ -210,6 +254,10 @@ async def pair_device(
     # Include maintenance chart if available
     if chart_data:
         config["maintenance_chart"] = chart_data
+
+    # Include vessel inventory
+    if pair_vessel_inventory:
+        config["vessel_inventory"] = pair_vessel_inventory
 
     return PairResponse(
         success=True,
@@ -260,6 +308,57 @@ async def get_device_config(
         if chart and chart.parsed_data:
             chart_data = chart.parsed_data
 
+    # --- Build vessel inventory summary from InventoryAdjustments ---
+    vessel_inventory = []
+    if device.vessel_id:
+        # Get all device IDs for the same vessel
+        vessel_devices_result = await db.execute(
+            select(LockerDevice.id).where(LockerDevice.vessel_id == device.vessel_id)
+        )
+        vessel_device_ids = [row[0] for row in vessel_devices_result.all()]
+
+        if vessel_device_ids:
+            products_by_id = {str(p.id): p for p in products}
+
+            # Aggregate adjustments by product
+            adj_result = await db.execute(
+                select(
+                    InventoryAdjustment.product_id,
+                    func.sum(
+                        case(
+                            (InventoryAdjustment.adjustment_type.in_(["manual_add", "pdf_import"]),
+                             InventoryAdjustment.quantity_liters),
+                            else_=0,
+                        )
+                    ).label("total_added"),
+                    func.sum(
+                        case(
+                            (InventoryAdjustment.adjustment_type == "manual_remove",
+                             InventoryAdjustment.quantity_liters),
+                            else_=0,
+                        )
+                    ).label("total_removed"),
+                )
+                .where(InventoryAdjustment.device_id.in_(vessel_device_ids))
+                .group_by(InventoryAdjustment.product_id)
+            )
+            for row in adj_result.all():
+                pid = str(row[0]) if row[0] else None
+                total_added = row[1] or 0
+                total_removed = row[2] or 0
+                net_liters = max(0, total_added - total_removed)
+                p = products_by_id.get(pid)
+                if p and net_liters > 0:
+                    vessel_inventory.append({
+                        "product_id": pid,
+                        "product_name": p.name,
+                        "product_type": p.product_type,
+                        "current_liters": round(net_liters, 1),
+                        "initial_liters": round(total_added, 1),
+                        "density_g_per_ml": p.density_g_per_ml or 1.0,
+                        "colors_json": p.colors_json or [],
+                    })
+
     response = {
         "config_version": device.config_version,
         "slot_count": device.slot_count or 4,
@@ -274,6 +373,7 @@ async def get_device_config(
                 "hazard_class": p.hazard_class,
                 "can_sizes_ml": p.can_sizes_ml,
                 "can_tare_weight_g": p.can_tare_weight_g,
+                "colors_json": p.colors_json or [],
             }
             for p in products
         ],
@@ -301,6 +401,10 @@ async def get_device_config(
     # Include maintenance chart if available
     if chart_data:
         response["maintenance_chart"] = chart_data
+
+    # Include vessel inventory summary
+    if vessel_inventory:
+        response["vessel_inventory"] = vessel_inventory
 
     # If admin has set a new password for this device, include it (one-time delivery)
     if device.pending_admin_password:

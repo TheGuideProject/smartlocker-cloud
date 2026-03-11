@@ -43,6 +43,13 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass  # Column already exists
 
+    # Migration: add colors_json column to products if missing
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("ALTER TABLE products ADD COLUMN colors_json JSON"))
+    except Exception:
+        pass  # Column already exists
+
     # Create upload directory
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
@@ -53,7 +60,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    version="2.2.1",
+    version="2.3.0",
     lifespan=lifespan,
 )
 

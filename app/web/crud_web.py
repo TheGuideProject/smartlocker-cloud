@@ -7,7 +7,7 @@ All routes use POST-redirect-GET pattern (status_code=303).
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +32,7 @@ router = APIRouter(prefix="/admin", tags=["crud-web"])
 
 @router.post("/products/{product_id}/edit")
 async def product_edit(
+    request: Request,
     product_id: str,
     ppg_code: str = Form(...),
     name: str = Form(...),
@@ -61,6 +62,18 @@ async def product_edit(
         product.description = description.strip() if description else None
         product.sds_url = sds_url.strip() if sds_url else None
         product.updated_at = datetime.utcnow()
+
+        # Parse color data from dynamic form fields
+        form_data = await request.form()
+        colors = []
+        i = 0
+        while f"color_hex_{i}" in form_data:
+            hex_val = form_data.get(f"color_hex_{i}", "").strip()
+            name_val = form_data.get(f"color_name_{i}", "").strip()
+            if hex_val:
+                colors.append({"name": name_val or hex_val, "hex": hex_val})
+            i += 1
+        product.colors_json = colors if colors else None
 
         await db.flush()
         from app.services.command_service import create_product_sync_command
