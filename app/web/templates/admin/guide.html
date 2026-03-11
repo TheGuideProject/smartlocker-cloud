@@ -361,8 +361,25 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
     </p>
 
-    <!-- v2.3.5 -->
+    <!-- v2.3.6 -->
     <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v2.3.6</span> Mixing Consumption Auto-Subtraction</span>
+            <span class="version-date">2026-03-12</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Inventory Management</div>
+            <ul>
+                <li>Mixing sessions now auto-subtract consumed paint from vessel inventory</li>
+                <li>Creates <code>InventoryAdjustment</code> with type <code>mixing_consumption</code> for base, hardener, and thinner</li>
+                <li>Grams converted to litres using product density (<code>g &divide; density &divide; 1000 = L</code>)</li>
+                <li>Aggregation query updated to include <code>mixing_consumption</code> in stock calculation</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.3.5 -->
+    <details class="changelog-entry">
         <summary>
             <span><span class="version-tag">v2.3.5</span> Install Mode + Inventory Sync Fix</span>
             <span class="version-date">2026-03-11</span>
