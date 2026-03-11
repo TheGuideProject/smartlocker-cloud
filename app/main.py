@@ -16,6 +16,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, HTMLResponse
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.database import init_db, async_session
@@ -43,9 +44,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    version="0.1.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
+
+# Session middleware (cookie-based auth for web admin)
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
 # Static files (CSS, images)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -68,11 +72,19 @@ app.include_router(events_router)
 app.include_router(pairing_router)
 
 # Include web routers
+from app.web.auth_web import router as auth_web_router
 from app.web.admin import router as admin_router
 from app.web.dashboard import router as dashboard_router
+from app.web.users_web import router as users_web_router
+from app.web.mixing_web import router as mixing_web_router
+from app.web.crud_web import router as crud_web_router
 
+app.include_router(auth_web_router)   # Login/logout (must be before admin)
 app.include_router(admin_router)
 app.include_router(dashboard_router)
+app.include_router(users_web_router)
+app.include_router(mixing_web_router)
+app.include_router(crud_web_router)
 
 
 # ---- Error Handler (shows traceback in browser for debugging) ----

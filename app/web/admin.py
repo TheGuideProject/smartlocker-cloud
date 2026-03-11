@@ -28,6 +28,7 @@ from app.models.can_tracking import CanTracking
 from app.models.inventory import InventoryAdjustment
 from app.models.support_request import SupportRequest
 from app.api.events import _aggregate_sensor_issues
+from app.web.auth_web import require_admin_session
 
 logger = logging.getLogger("smartlocker.admin")
 
@@ -78,7 +79,7 @@ def _extract_product_colors(parsed_data: dict) -> dict:
 
 
 @router.get("/", response_class=HTMLResponse)
-async def admin_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_dashboard(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Admin dashboard overview."""
     # Get counts
     products_count = (await db.execute(select(func.count(Product.id)))).scalar() or 0
@@ -123,6 +124,7 @@ async def admin_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
 
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
+        "user": user,
         "products_count": products_count,
         "recipes_count": recipes_count,
         "devices_count": devices_count,
@@ -135,7 +137,7 @@ async def admin_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/products", response_class=HTMLResponse)
-async def admin_products(request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_products(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Product catalog management."""
     result = await db.execute(
         select(Product).where(Product.is_active == True).order_by(Product.name)
@@ -159,6 +161,7 @@ async def admin_products(request: Request, db: AsyncSession = Depends(get_db)):
 
     return templates.TemplateResponse("admin/products.html", {
         "request": request,
+        "user": user,
         "products": products,
         "product_colors": product_colors,
     })
@@ -167,6 +170,7 @@ async def admin_products(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/products/add")
 async def admin_add_product(
     request: Request,
+    user = Depends(require_admin_session),
     ppg_code: str = Form(...),
     name: str = Form(...),
     product_type: str = Form(...),
@@ -189,7 +193,7 @@ async def admin_add_product(
 
 
 @router.get("/recipes", response_class=HTMLResponse)
-async def admin_recipes(request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_recipes(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Recipe management."""
     result = await db.execute(
         select(MixingRecipe).where(MixingRecipe.is_active == True).order_by(MixingRecipe.name)
@@ -204,6 +208,7 @@ async def admin_recipes(request: Request, db: AsyncSession = Depends(get_db)):
 
     return templates.TemplateResponse("admin/recipes.html", {
         "request": request,
+        "user": user,
         "recipes": recipes,
         "products": products,
     })
@@ -212,6 +217,7 @@ async def admin_recipes(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/recipes/add")
 async def admin_add_recipe(
     request: Request,
+    user = Depends(require_admin_session),
     name: str = Form(...),
     base_product_id: str = Form(...),
     hardener_product_id: str = Form(...),
@@ -244,7 +250,7 @@ async def admin_add_recipe(
 
 
 @router.get("/events", response_class=HTMLResponse)
-async def admin_events(request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_events(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Event log viewer."""
     result = await db.execute(
         select(DeviceEvent).order_by(DeviceEvent.received_at.desc()).limit(100)
@@ -252,6 +258,7 @@ async def admin_events(request: Request, db: AsyncSession = Depends(get_db)):
     events = result.scalars().all()
     return templates.TemplateResponse("admin/events.html", {
         "request": request,
+        "user": user,
         "events": events,
     })
 
@@ -310,7 +317,7 @@ def _get_latest_version_from_github() -> dict:
 
 
 @router.get("/devices", response_class=HTMLResponse)
-async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_devices(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Device monitoring dashboard."""
     result = await db.execute(
         select(LockerDevice)
@@ -376,6 +383,7 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
 
     return templates.TemplateResponse("admin/devices.html", {
         "request": request,
+        "user": user,
         "devices": device_list,
         "vessels": vessels,
         "online_count": online_count,
@@ -388,6 +396,7 @@ async def admin_devices(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/devices/add")
 async def admin_add_device(
     request: Request,
+    user = Depends(require_admin_session),
     device_id: str = Form(...),
     vessel_id: str = Form(...),
     name: str = Form(""),
@@ -409,7 +418,7 @@ async def admin_add_device(
 # ---- Fleet Management (Company → Fleet → Vessel) ----
 
 @router.get("/fleet", response_class=HTMLResponse)
-async def admin_fleet(request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_fleet(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Fleet management: companies, fleets, vessels."""
     # Get companies with their fleets and vessels (eager load)
     companies_result = await db.execute(
@@ -423,6 +432,7 @@ async def admin_fleet(request: Request, db: AsyncSession = Depends(get_db)):
 
     return templates.TemplateResponse("admin/fleet.html", {
         "request": request,
+        "user": user,
         "companies": companies,
     })
 
@@ -430,6 +440,7 @@ async def admin_fleet(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/companies/add")
 async def admin_add_company(
     request: Request,
+    user = Depends(require_admin_session),
     name: str = Form(...),
     contact_email: str = Form(""),
     contact_phone: str = Form(""),
@@ -448,6 +459,7 @@ async def admin_add_company(
 @router.post("/fleets/add")
 async def admin_add_fleet(
     request: Request,
+    user = Depends(require_admin_session),
     company_id: str = Form(...),
     name: str = Form(...),
     region: str = Form(""),
@@ -466,6 +478,7 @@ async def admin_add_fleet(
 @router.post("/vessels/add")
 async def admin_add_vessel(
     request: Request,
+    user = Depends(require_admin_session),
     fleet_id: str = Form(...),
     name: str = Form(...),
     imo_number: str = Form(""),
@@ -486,7 +499,7 @@ async def admin_add_vessel(
 # ---- Pairing Code Management ----
 
 @router.get("/pairing", response_class=HTMLResponse)
-async def admin_pairing(request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_pairing(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Pairing code management page."""
     # Get all pairing codes with vessel info
     codes_result = await db.execute(
@@ -509,6 +522,7 @@ async def admin_pairing(request: Request, db: AsyncSession = Depends(get_db)):
 
     return templates.TemplateResponse("admin/pairing.html", {
         "request": request,
+        "user": user,
         "codes": codes,
         "vessels": vessels,
     })
@@ -517,6 +531,7 @@ async def admin_pairing(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/pairing/generate")
 async def admin_generate_pairing_code(
     request: Request,
+    user = Depends(require_admin_session),
     vessel_id: str = Form(...),
     device_name: str = Form(""),
     db: AsyncSession = Depends(get_db),
@@ -547,7 +562,7 @@ async def admin_generate_pairing_code(
 # ---- Maintenance Charts ----
 
 @router.get("/charts", response_class=HTMLResponse)
-async def admin_charts(request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_charts(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Maintenance chart management page."""
     # Get all charts
     charts_result = await db.execute(
@@ -565,6 +580,7 @@ async def admin_charts(request: Request, db: AsyncSession = Depends(get_db)):
 
     return templates.TemplateResponse("admin/charts.html", {
         "request": request,
+        "user": user,
         "charts": charts,
         "vessels": vessels,
         "active": "charts",
@@ -574,6 +590,7 @@ async def admin_charts(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/charts/upload", response_class=HTMLResponse)
 async def admin_upload_chart(
     request: Request,
+    user = Depends(require_admin_session),
     vessel_id: str = Form(""),
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -596,6 +613,7 @@ async def admin_upload_chart(
         charts = charts_result.scalars().all()
         return templates.TemplateResponse("admin/charts.html", {
             "request": request,
+            "user": user,
             "charts": charts,
             "vessels": vessels,
             "active": "charts",
@@ -629,6 +647,7 @@ async def admin_upload_chart(
         charts = charts_result.scalars().all()
         return templates.TemplateResponse("admin/charts.html", {
             "request": request,
+            "user": user,
             "charts": charts,
             "vessels": vessels,
             "active": "charts",
@@ -653,6 +672,7 @@ async def admin_upload_chart(
 
     return templates.TemplateResponse("admin/chart_preview.html", {
         "request": request,
+        "user": user,
         "parsed": parsed,
         "parsed_json": json.dumps(parsed),
         "pdf_path": pdf_path,
@@ -666,6 +686,7 @@ async def admin_upload_chart(
 @router.post("/charts/confirm", response_class=HTMLResponse)
 async def admin_confirm_chart(
     request: Request,
+    user = Depends(require_admin_session),
     db: AsyncSession = Depends(get_db),
 ):
     """Save the edited chart data + auto-create products."""
@@ -819,6 +840,7 @@ async def admin_confirm_chart(
 async def admin_chart_detail(
     chart_id: str,
     request: Request,
+    user = Depends(require_admin_session),
     db: AsyncSession = Depends(get_db),
 ):
     """View a saved chart with its data."""
@@ -828,6 +850,7 @@ async def admin_chart_detail(
 
     return templates.TemplateResponse("admin/chart_detail.html", {
         "request": request,
+        "user": user,
         "chart": chart,
         "active": "charts",
     })
@@ -837,6 +860,7 @@ async def admin_chart_detail(
 async def admin_change_device_password(
     device_id: str,
     request: Request,
+    user = Depends(require_admin_session),
     new_password: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -855,6 +879,7 @@ async def admin_change_device_password(
 @router.post("/devices/send-update-all")
 async def admin_send_update_all(
     request: Request,
+    user = Depends(require_admin_session),
     db: AsyncSession = Depends(get_db),
 ):
     """Send OTA update to ALL devices."""
@@ -883,6 +908,7 @@ async def admin_send_update_all(
 async def admin_send_update(
     request: Request,
     device_id: str,
+    user = Depends(require_admin_session),
     db: AsyncSession = Depends(get_db),
 ):
     """Send OTA update command to a specific device."""
@@ -913,6 +939,7 @@ async def admin_send_update(
 @router.get("/inventory", response_class=HTMLResponse)
 async def admin_inventory(
     request: Request,
+    user = Depends(require_admin_session),
     db: AsyncSession = Depends(get_db),
 ):
     """Inventory overview: Company -> Vessel navigation."""
@@ -1019,6 +1046,7 @@ async def admin_inventory(
 
     return templates.TemplateResponse("admin/inventory.html", {
         "request": request,
+        "user": user,
         "companies": company_list,
         "total_vessels": total_vessels,
         "total_liters": round(total_liters, 1),
@@ -1030,6 +1058,7 @@ async def admin_inventory(
 @router.get("/inventory/analytics", response_class=HTMLResponse)
 async def inventory_analytics(
     request: Request,
+    user = Depends(require_admin_session),
     db: AsyncSession = Depends(get_db),
 ):
     """Consumption analytics and predictions."""
@@ -1170,6 +1199,7 @@ async def inventory_analytics(
 
     return templates.TemplateResponse("admin/inventory_analytics.html", {
         "request": request,
+        "user": user,
         "top_consumed": top_consumed,
         "device_analytics": device_analytics,
         "reorder_suggestions": reorder_suggestions,
@@ -1181,6 +1211,7 @@ async def inventory_analytics(
 async def admin_inventory_vessel(
     vessel_id: str,
     request: Request,
+    user = Depends(require_admin_session),
     db: AsyncSession = Depends(get_db),
 ):
     """Detailed inventory for a specific vessel."""
@@ -1352,6 +1383,7 @@ async def admin_inventory_vessel(
 
     return templates.TemplateResponse("admin/inventory_vessel.html", {
         "request": request,
+        "user": user,
         "vessel": vessel,
         "total_liters": total_liters,
         "product_count": len(products_list),
@@ -1366,6 +1398,7 @@ async def admin_inventory_vessel(
 async def admin_adjust_vessel_inventory(
     vessel_id: str,
     request: Request,
+    user = Depends(require_admin_session),
     product_id: str = Form(...),
     adjustment_type: str = Form(...),
     quantity_liters: float = Form(0.0),
@@ -1408,6 +1441,7 @@ async def admin_adjust_vessel_inventory(
 async def admin_import_vessel_pdf(
     vessel_id: str,
     request: Request,
+    user = Depends(require_admin_session),
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1505,6 +1539,7 @@ async def admin_import_vessel_pdf(
 @router.post("/inventory/adjust")
 async def admin_adjust_inventory(
     request: Request,
+    user = Depends(require_admin_session),
     product_id: str = Form(...),
     device_id: str = Form(""),
     adjustment_type: str = Form(...),
@@ -1543,6 +1578,7 @@ async def admin_adjust_inventory(
 @router.post("/inventory/import-pdf", response_class=HTMLResponse)
 async def import_inventory_pdf(
     request: Request,
+    user = Depends(require_admin_session),
     pdf_file: UploadFile = File(...),
     device_id: str = Form(""),
     db: AsyncSession = Depends(get_db),
@@ -1639,6 +1675,7 @@ async def import_inventory_pdf(
 
     return templates.TemplateResponse("admin/inventory_import_preview.html", {
         "request": request,
+        "user": user,
         "matched_items": matched_items,
         "pdf_filename": pdf_file.filename,
         "pdf_path": pdf_path,
@@ -1653,6 +1690,7 @@ async def import_inventory_pdf(
 @router.post("/inventory/import-confirm")
 async def confirm_inventory_import(
     request: Request,
+    user = Depends(require_admin_session),
     db: AsyncSession = Depends(get_db),
 ):
     """Confirm and save PDF import items as inventory adjustments."""
@@ -1699,7 +1737,7 @@ async def confirm_inventory_import(
 # ---- Error Code Guide ----
 
 @router.get("/error-codes")
-async def admin_error_codes(request: Request):
+async def admin_error_codes(request: Request, user = Depends(require_admin_session)):
     """Error code reference guide."""
     # Define all error codes (matching edge error_codes.py)
     error_codes = [
@@ -1840,6 +1878,7 @@ async def admin_error_codes(request: Request):
 
     return templates.TemplateResponse("admin/error_codes.html", {
         "request": request,
+        "user": user,
         "error_codes": error_codes,
         "categories": categories,
         "total_codes": len(error_codes),
@@ -1849,7 +1888,7 @@ async def admin_error_codes(request: Request):
 # ---- Support Requests ----
 
 @router.get("/support")
-async def admin_support_requests(request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_support_requests(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Support request management page."""
     # Get all support requests with device info
     result = await db.execute(
@@ -1871,13 +1910,14 @@ async def admin_support_requests(request: Request, db: AsyncSession = Depends(ge
 
     return templates.TemplateResponse("admin/support_requests.html", {
         "request": request,
+        "user": user,
         "support_requests": requests_list,
         "stats": {"total": total, "open": open_count, "resolved": total - open_count},
     })
 
 
 @router.post("/support/{request_id}/resolve")
-async def admin_resolve_support(request_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def admin_resolve_support(request_id: int, request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Resolve a support request."""
     result = await db.execute(select(SupportRequest).where(SupportRequest.id == request_id))
     sr = result.scalar_one_or_none()

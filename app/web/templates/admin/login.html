@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SmartLocker Cloud</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { background: var(--bg-dark); display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .login-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 40px 36px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .login-logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .login-logo h1 {
+            color: var(--text-primary);
+            font-size: 24px;
+            margin: 0;
+        }
+        .login-logo .badge {
+            display: inline-block;
+            background: var(--accent-green);
+            color: #000;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        .login-logo p {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .login-field {
+            margin-bottom: 18px;
+        }
+        .login-field label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        .login-field input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 15px;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .login-field input:focus {
+            outline: none;
+            border-color: var(--accent-green);
+        }
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent-green);
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 8px;
+        }
+        .login-btn:hover { background: #25a89c; }
+        .login-error {
+            background: rgba(230,57,70,0.12);
+            color: var(--accent-red);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 18px;
+            border-left: 3px solid var(--accent-red);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-logo">
+            <h1>SmartLocker <span class="badge">Cloud</span></h1>
+            <p>Admin Portal Login</p>
+        </div>
+
+        {% if error %}
+        <div class="login-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/admin/login">
+            <div class="login-field">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="admin@ppg.com" required autofocus>
+            </div>
+            <div class="login-field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Password" required>
+            </div>
+            <button type="submit" class="login-btn">Sign In</button>
+        </form>
+    </div>
+</body>
+</html>

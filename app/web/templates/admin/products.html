@@ -67,11 +67,13 @@
             <th>Pot Life</th>
             <th>Hazard</th>
             <th>Created</th>
+            <th style="width: 120px;">Actions</th>
         </tr>
     </thead>
     <tbody>
         {% for product in products %}
-        <tr>
+        <!-- Display Row -->
+        <tr id="product-row-{{ product.id }}">
             <td><strong>{{ product.ppg_code }}</strong></td>
             <td>{{ product.name }}</td>
             <td><span class="type-badge {{ product.product_type }}">{{ product.product_type.replace('_', ' ').title() }}</span></td>
@@ -92,15 +94,88 @@
             <td>{{ product.pot_life_minutes ~ ' min' if product.pot_life_minutes else '-' }}</td>
             <td>{{ product.hazard_class or '-' }}</td>
             <td>{{ product.created_at.strftime('%Y-%m-%d') if product.created_at else '-' }}</td>
+            <td>
+                <div class="action-btns">
+                    <button class="btn-edit" onclick="toggleEditRow('product-edit-{{ product.id }}', 'product-row-{{ product.id }}')">Edit</button>
+                    <form action="/admin/products/{{ product.id }}/delete" method="post" style="display:inline;"
+                          onsubmit="return confirm('Deactivate product {{ product.ppg_code }}? It will be hidden but not permanently deleted.');">
+                        <button type="submit" class="btn-delete">Delete</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        <!-- Edit Row (hidden) -->
+        <tr id="product-edit-{{ product.id }}" class="edit-row">
+            <td colspan="9">
+                <form action="/admin/products/{{ product.id }}/edit" method="post">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px;">
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">PPG Code</label>
+                            <input type="text" name="ppg_code" value="{{ product.ppg_code }}" required>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Name</label>
+                            <input type="text" name="name" value="{{ product.name }}" required>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Type</label>
+                            <select name="product_type" required>
+                                <option value="base_paint" {{ 'selected' if product.product_type == 'base_paint' }}>Base Paint</option>
+                                <option value="hardener" {{ 'selected' if product.product_type == 'hardener' }}>Hardener</option>
+                                <option value="thinner" {{ 'selected' if product.product_type == 'thinner' }}>Thinner</option>
+                                <option value="primer" {{ 'selected' if product.product_type == 'primer' }}>Primer</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Density (g/ml)</label>
+                            <input type="number" name="density_g_per_ml" value="{{ product.density_g_per_ml }}" step="0.01" min="0.1" max="5.0">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px;">
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Pot Life (min)</label>
+                            <input type="number" name="pot_life_minutes" value="{{ product.pot_life_minutes or '' }}">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Hazard Class</label>
+                            <input type="text" name="hazard_class" value="{{ product.hazard_class or '' }}">
+                        </div>
+                        <div style="grid-column: span 2; display: flex; align-items: end; gap: 8px;">
+                            <button type="submit" class="btn-save">Save Changes</button>
+                            <button type="button" class="btn-cancel" onclick="toggleEditRow('product-edit-{{ product.id }}', 'product-row-{{ product.id }}')">Cancel</button>
+                        </div>
+                    </div>
+                </form>
+            </td>
         </tr>
         {% endfor %}
         {% if not products %}
         <tr>
-            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+            <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">
                 No products yet. Click "+ Add Product" to create one.
             </td>
         </tr>
         {% endif %}
     </tbody>
 </table>
+
+<script>
+function toggleEditRow(editId, displayId) {
+    var editRow = document.getElementById(editId);
+    var displayRow = document.getElementById(displayId);
+    if (editRow.classList.contains('visible')) {
+        editRow.classList.remove('visible');
+        displayRow.style.display = '';
+    } else {
+        // Close any other open edit rows first
+        document.querySelectorAll('.edit-row.visible').forEach(function(row) {
+            row.classList.remove('visible');
+            var prevRow = row.previousElementSibling;
+            if (prevRow) prevRow.style.display = '';
+        });
+        editRow.classList.add('visible');
+        displayRow.style.display = 'none';
+    }
+}
+</script>
 {% endblock %}

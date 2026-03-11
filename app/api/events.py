@@ -87,19 +87,13 @@ async def verify_device_api_key(
 async def ingest_events(
     device_id: str,
     batch: EventBatch,
+    device: LockerDevice = Depends(verify_device_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Receive a batch of events from an edge device.
     Uses INSERT ON CONFLICT DO NOTHING for UUID deduplication.
     """
-    # Find device
-    result = await db.execute(
-        select(LockerDevice).where(LockerDevice.device_id == device_id)
-    )
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail=f"Device {device_id} not registered")
 
     received = 0
     duplicates = 0
@@ -168,16 +162,10 @@ async def ingest_events(
 async def device_heartbeat(
     device_id: str,
     heartbeat: HeartbeatIn,
+    device: LockerDevice = Depends(verify_device_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """Update device status."""
-    result = await db.execute(
-        select(LockerDevice).where(LockerDevice.device_id == device_id)
-    )
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-
     device.last_heartbeat = datetime.utcnow()
     device.status = "online"
     if heartbeat.software_version:
@@ -217,16 +205,10 @@ async def device_heartbeat(
 async def report_update_status(
     device_id: str,
     payload: UpdateStatusIn,
+    device: LockerDevice = Depends(verify_device_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """Receive OTA update progress from edge device."""
-    result = await db.execute(
-        select(LockerDevice).where(LockerDevice.device_id == device_id)
-    )
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-
     device.update_status = payload.update_status
 
     if payload.update_status == "completed":
@@ -250,16 +232,13 @@ async def report_update_status(
 # ---- Support Request from Edge ----
 
 @router.post("/{device_id}/support-request")
-async def create_support_request(device_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+async def create_support_request(
+    device_id: str,
+    request: Request,
+    device: LockerDevice = Depends(verify_device_api_key),
+    db: AsyncSession = Depends(get_db),
+):
     """Receive a support request from an edge device."""
-    # Validate device exists
-    result = await db.execute(
-        select(LockerDevice).where(LockerDevice.device_id == device_id)
-    )
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail=f"Device {device_id} not registered")
-
     body = await request.json()
 
     support_req = SupportRequest(
@@ -300,19 +279,13 @@ class HealthLogBatch(BaseModel):
 async def receive_health_logs(
     device_id: str,
     batch: HealthLogBatch,
+    device: LockerDevice = Depends(verify_device_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Receive a batch of sensor health logs from an edge device.
     Called when edge device comes back online after offline period.
     """
-    result = await db.execute(
-        select(LockerDevice).where(LockerDevice.device_id == device_id)
-    )
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail=f"Device {device_id} not registered")
-
     received = 0
     for log in batch.logs:
         try:
@@ -346,6 +319,7 @@ async def receive_health_logs(
 async def get_health_summary(
     device_id: str,
     hours: int = 48,
+    device: LockerDevice = Depends(verify_device_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -356,13 +330,6 @@ async def get_health_summary(
       - If error: "FAILING for 2 days (576 errors since Mar 7)"
       - If ok: "Operating normally (since Mar 8 14:30)"
     """
-    result = await db.execute(
-        select(LockerDevice).where(LockerDevice.device_id == device_id)
-    )
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-
     summary = await _aggregate_sensor_issues(db, device.id, hours=hours)
     return {"device_id": device_id, "hours": hours, "sensors": summary}
 
@@ -521,6 +488,7 @@ class InventorySnapshotIn(BaseModel):
 async def receive_inventory_snapshot(
     device_id: str,
     payload: InventorySnapshotIn,
+    device: LockerDevice = Depends(verify_device_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -530,13 +498,6 @@ async def receive_inventory_snapshot(
     used for reconciliation and initial sync.
     """
     from app.models.can_tracking import CanTracking
-
-    result = await db.execute(
-        select(LockerDevice).where(LockerDevice.device_id == device_id)
-    )
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail=f"Device {device_id} not registered")
 
     updated = 0
     for slot in payload.slots:

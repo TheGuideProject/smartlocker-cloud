@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # Admin defaults
     ADMIN_EMAIL: str = "admin@ppg.com"
-    ADMIN_PASSWORD: str = "admin123"  # Change in production!
+    ADMIN_PASSWORD: str = "Smartlocker2026"
 
     class Config:
         env_file = ".env"

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% set active = "mixing" %}
+
+{% block title %}Mixing Sessions - SmartLocker{% endblock %}
+{% block page_title %}Mixing Sessions{% endblock %}
+
+{% block content %}
+<div class="panel" style="margin-bottom: 15px; padding: 12px 20px;">
+    <div style="display: flex; align-items: center; gap: 15px; color: var(--text-secondary); font-size: 13px;">
+        <span>Total sessions: <strong style="color: var(--text-primary);">{{ sessions|length }}</strong></span>
+        <span style="color: var(--text-muted);">|</span>
+        <span>Aggregated from edge device events via sync</span>
+    </div>
+</div>
+
+<div style="overflow-x: auto;">
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Session ID</th>
+            <th>Device</th>
+            <th>Recipe</th>
+            <th>User</th>
+            <th>Status</th>
+            <th>Base (target / actual)</th>
+            <th>Hardener (target / actual)</th>
+            <th>Ratio</th>
+            <th>In-Spec</th>
+            <th>Method</th>
+            <th>Started</th>
+            <th>Completed</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in sessions %}
+        <tr>
+            <td style="font-size: 12px;">
+                <code style="background: var(--bg-input); padding: 2px 6px; border-radius: 3px;">{{ s.session_uuid[:8] }}...</code>
+            </td>
+            <td>
+                {% if s.device %}
+                    {{ s.device.name or s.device.device_id }}
+                {% else %}
+                    <span style="color: var(--text-muted);">-</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if s.recipe %}
+                    {{ s.recipe.name }}
+                {% else %}
+                    <span style="color: var(--text-muted);">-</span>
+                {% endif %}
+            </td>
+            <td>{{ s.user_name or '-' }}</td>
+            <td>
+                {% if s.status == 'completed' %}
+                    <span class="status-badge" style="background: rgba(46,196,182,0.15); color: var(--accent-green);">completed</span>
+                {% elif s.status == 'in_progress' %}
+                    <span class="status-badge" style="background: rgba(95,168,211,0.15); color: var(--accent-blue);">in progress</span>
+                {% elif s.status == 'cancelled' %}
+                    <span class="status-badge" style="background: rgba(230,57,70,0.15); color: var(--accent-red);">cancelled</span>
+                {% else %}
+                    <span class="status-badge" style="background: rgba(85,102,119,0.15); color: var(--text-muted);">{{ s.status }}</span>
+                {% endif %}
+            </td>
+            <td style="white-space: nowrap;">
+                <span style="color: var(--text-muted);">{{ '%.1f'|format(s.base_weight_target_g) }}g</span>
+                /
+                <span style="color: var(--text-primary); font-weight: 600;">{{ '%.1f'|format(s.base_weight_actual_g) }}g</span>
+            </td>
+            <td style="white-space: nowrap;">
+                <span style="color: var(--text-muted);">{{ '%.1f'|format(s.hardener_weight_target_g) }}g</span>
+                /
+                <span style="color: var(--text-primary); font-weight: 600;">{{ '%.1f'|format(s.hardener_weight_actual_g) }}g</span>
+            </td>
+            <td>
+                {% if s.ratio_achieved %}
+                    <span style="font-weight: 600;">{{ '%.2f'|format(s.ratio_achieved) }}</span>
+                {% else %}
+                    <span style="color: var(--text-muted);">-</span>
+                {% endif %}
+            </td>
+            <td style="text-align: center;">
+                {% if s.ratio_in_spec %}
+                    <span style="color: var(--accent-green); font-weight: 700;">YES</span>
+                {% else %}
+                    <span style="color: var(--accent-red); font-weight: 700;">NO</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if s.application_method %}
+                    <span class="type-badge base_paint" style="font-size: 12px;">{{ s.application_method }}</span>
+                {% else %}
+                    <span style="color: var(--text-muted);">-</span>
+                {% endif %}
+            </td>
+            <td style="white-space: nowrap; font-size: 12px;">
+                {{ s.started_at.strftime('%Y-%m-%d %H:%M') if s.started_at else '-' }}
+            </td>
+            <td style="white-space: nowrap; font-size: 12px;">
+                {{ s.completed_at.strftime('%Y-%m-%d %H:%M') if s.completed_at else '-' }}
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not sessions %}
+        <tr>
+            <td colspan="12" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                No mixing sessions yet. Sessions are synced automatically from edge devices.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

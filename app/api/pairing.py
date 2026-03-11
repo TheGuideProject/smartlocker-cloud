@@ -25,6 +25,7 @@ from app.models.fleet import Vessel, Fleet
 from app.models.company import Company
 from app.models.product import Product, MixingRecipe
 from app.models.maintenance import MaintenanceChart
+from app.api.events import verify_device_api_key
 
 logger = logging.getLogger("smartlocker.pairing")
 
@@ -224,20 +225,13 @@ async def pair_device(
 @router.get("/{device_id}/config")
 async def get_device_config(
     device_id: str,
+    device: LockerDevice = Depends(verify_device_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Get latest config for a device (products, recipes, settings).
     Called periodically by edge devices to check for updates.
     """
-    # Find device by device_id
-    result = await db.execute(
-        select(LockerDevice).where(LockerDevice.device_id == device_id)
-    )
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-
     # Update heartbeat
     device.last_heartbeat = datetime.utcnow()
     device.status = "online"

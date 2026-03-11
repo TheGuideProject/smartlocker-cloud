@@ -106,11 +106,13 @@
             <th>Tolerance</th>
             <th>Pot Life</th>
             <th>Thinner (Spray)</th>
+            <th style="width: 120px;">Actions</th>
         </tr>
     </thead>
     <tbody>
         {% for recipe in recipes %}
-        <tr>
+        <!-- Display Row -->
+        <tr id="recipe-row-{{ recipe.id }}">
             <td><strong>{{ recipe.name }}</strong></td>
             <td>{{ recipe.base_product.ppg_code if recipe.base_product else '-' }}</td>
             <td>{{ recipe.hardener_product.ppg_code if recipe.hardener_product else '-' }}</td>
@@ -118,15 +120,124 @@
             <td>{{ recipe.tolerance_pct }}%</td>
             <td>{{ recipe.pot_life_minutes ~ ' min' if recipe.pot_life_minutes else '-' }}</td>
             <td>{{ recipe.thinner_pct_spray ~ '%' if recipe.thinner_pct_spray else '-' }}</td>
+            <td>
+                <div class="action-btns">
+                    <button class="btn-edit" onclick="toggleEditRow('recipe-edit-{{ recipe.id }}', 'recipe-row-{{ recipe.id }}')">Edit</button>
+                    <form action="/admin/recipes/{{ recipe.id }}/delete" method="post" style="display:inline;"
+                          onsubmit="return confirm('Delete recipe {{ recipe.name }}?');">
+                        <button type="submit" class="btn-delete">Delete</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        <!-- Edit Row (hidden) -->
+        <tr id="recipe-edit-{{ recipe.id }}" class="edit-row">
+            <td colspan="8">
+                <form action="/admin/recipes/{{ recipe.id }}/edit" method="post">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Recipe Name</label>
+                            <input type="text" name="name" value="{{ recipe.name }}" required>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Base Product</label>
+                            <select name="base_product_id" required>
+                                {% for p in products %}
+                                {% if p.product_type == 'base_paint' or p.product_type == 'primer' %}
+                                <option value="{{ p.id }}" {{ 'selected' if recipe.base_product_id == p.id }}>{{ p.ppg_code }} - {{ p.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Hardener</label>
+                            <select name="hardener_product_id" required>
+                                {% for p in products %}
+                                {% if p.product_type == 'hardener' %}
+                                <option value="{{ p.id }}" {{ 'selected' if recipe.hardener_product_id == p.id }}>{{ p.ppg_code }} - {{ p.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 10px;">
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Base Ratio</label>
+                            <input type="number" name="ratio_base" value="{{ recipe.ratio_base }}" step="0.1" min="0.1" required>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Hardener Ratio</label>
+                            <input type="number" name="ratio_hardener" value="{{ recipe.ratio_hardener }}" step="0.1" min="0.1" required>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Tolerance %</label>
+                            <input type="number" name="tolerance_pct" value="{{ recipe.tolerance_pct }}" step="0.5" min="1" max="20">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Thinner Brush %</label>
+                            <input type="number" name="thinner_pct_brush" value="{{ recipe.thinner_pct_brush }}" step="0.5" min="0" max="50">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Thinner Roller %</label>
+                            <input type="number" name="thinner_pct_roller" value="{{ recipe.thinner_pct_roller }}" step="0.5" min="0" max="50">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Thinner Spray %</label>
+                            <input type="number" name="thinner_pct_spray" value="{{ recipe.thinner_pct_spray }}" step="0.5" min="0" max="50">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Recommended Thinner</label>
+                            <select name="recommended_thinner_id">
+                                <option value="">-- None --</option>
+                                {% for p in products %}
+                                {% if p.product_type == 'thinner' %}
+                                <option value="{{ p.id }}" {{ 'selected' if recipe.recommended_thinner_id == p.id }}>{{ p.ppg_code }} - {{ p.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Pot Life (min)</label>
+                            <input type="number" name="pot_life_minutes" value="{{ recipe.pot_life_minutes or '' }}">
+                        </div>
+                        <div style="display: flex; align-items: end; gap: 8px;">
+                            <button type="submit" class="btn-save">Save Changes</button>
+                            <button type="button" class="btn-cancel" onclick="toggleEditRow('recipe-edit-{{ recipe.id }}', 'recipe-row-{{ recipe.id }}')">Cancel</button>
+                        </div>
+                    </div>
+                </form>
+            </td>
         </tr>
         {% endfor %}
         {% if not recipes %}
         <tr>
-            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
                 No recipes yet. Add products first, then create recipes.
             </td>
         </tr>
         {% endif %}
     </tbody>
 </table>
+
+<script>
+function toggleEditRow(editId, displayId) {
+    var editRow = document.getElementById(editId);
+    var displayRow = document.getElementById(displayId);
+    if (editRow.classList.contains('visible')) {
+        editRow.classList.remove('visible');
+        displayRow.style.display = '';
+    } else {
+        // Close any other open edit rows first
+        document.querySelectorAll('.edit-row.visible').forEach(function(row) {
+            row.classList.remove('visible');
+            var prevRow = row.previousElementSibling;
+            if (prevRow) prevRow.style.display = '';
+        });
+        editRow.classList.add('visible');
+        displayRow.style.display = 'none';
+    }
+}
+</script>
 {% endblock %}

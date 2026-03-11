@@ -214,6 +214,108 @@ body {
     margin: 25px 0 12px;
 }
 
+/* ---- CRUD Action Buttons ---- */
+.btn-edit {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--accent-blue);
+    background: transparent;
+    color: var(--accent-blue);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-edit:hover { background: rgba(95,168,211,0.15); }
+
+.btn-delete {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--accent-red);
+    background: transparent;
+    color: var(--accent-red);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-delete:hover { background: rgba(230,57,70,0.15); }
+
+.btn-save {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    background: var(--accent-green);
+    color: #000;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-save:hover { background: #27b3a3; }
+
+.btn-cancel {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-cancel:hover { background: rgba(255,255,255,0.05); }
+
+.edit-row { display: none; }
+.edit-row.visible { display: table-row; }
+.edit-row td {
+    padding: 10px 15px;
+    background: var(--bg-input);
+    border-top: 1px solid var(--accent-blue);
+}
+.edit-row input, .edit-row select {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+.edit-row input:focus, .edit-row select:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.confirm-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.confirm-overlay .confirm-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 25px;
+    max-width: 400px;
+    text-align: center;
+}
+
+.action-btns {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 768px) {
     body { flex-direction: column; }

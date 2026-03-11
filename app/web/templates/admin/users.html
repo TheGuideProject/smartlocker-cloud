@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% set active = "users" %}
+
+{% block title %}Users - SmartLocker{% endblock %}
+{% block page_title %}User Management{% endblock %}
+
+{% block actions %}
+<button class="btn btn-primary" onclick="document.getElementById('addUserPanel').style.display = document.getElementById('addUserPanel').style.display === 'none' ? 'block' : 'none'">+ Add User</button>
+{% endblock %}
+
+{% block content %}
+<!-- Success / Error Messages -->
+{% if success %}
+<div class="panel" style="border-left: 3px solid var(--accent-green); margin-bottom: 15px; padding: 12px 20px;">
+    <span style="color: var(--accent-green); font-weight: 600;">{{ success }}</span>
+</div>
+{% endif %}
+{% if error %}
+<div class="panel" style="border-left: 3px solid var(--accent-red); margin-bottom: 15px; padding: 12px 20px;">
+    <span style="color: var(--accent-red); font-weight: 600;">{{ error }}</span>
+</div>
+{% endif %}
+
+<!-- Add User Form (hidden by default) -->
+<div id="addUserPanel" class="panel" style="display: none;">
+    <div class="panel-title">Add New User</div>
+    <form action="/admin/users/add" method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" placeholder="user@example.com" required>
+            </div>
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" name="name" placeholder="John Doe" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="Min 6 characters" required minlength="6">
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select name="role" required>
+                    {% for r in roles %}
+                    <option value="{{ r.value }}">{{ r.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Company</label>
+                <select name="company_id">
+                    <option value="">-- No Company (PPG Staff) --</option>
+                    {% for company in companies %}
+                    <option value="{{ company.id }}">{{ company.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+                <!-- spacer -->
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button type="submit" class="btn btn-success">Create User</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('addUserPanel').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<!-- Users Table -->
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Company</th>
+            <th>Active</th>
+            <th>Last Login</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td><strong>{{ user.name }}</strong></td>
+            <td style="color: var(--text-secondary);">{{ user.email }}</td>
+            <td>
+                {% if user.role == 'ppg_admin' %}
+                <span class="type-badge" style="background: rgba(230,57,70,0.15); color: var(--accent-red);">PPG Admin</span>
+                {% elif user.role == 'ppg_support' %}
+                <span class="type-badge" style="background: rgba(244,162,97,0.15); color: var(--accent-orange);">PPG Support</span>
+                {% elif user.role == 'ship_owner' %}
+                <span class="type-badge" style="background: rgba(95,168,211,0.15); color: var(--accent-blue);">Ship Owner</span>
+                {% elif user.role == 'crew' %}
+                <span class="type-badge" style="background: rgba(46,196,182,0.15); color: var(--accent-green);">Crew</span>
+                {% else %}
+                <span class="type-badge" style="background: rgba(141,153,174,0.15); color: var(--text-muted);">{{ user.role }}</span>
+                {% endif %}
+            </td>
+            <td>{{ user.company.name if user.company else '-' }}</td>
+            <td>
+                {% if user.is_active %}
+                <span style="color: var(--accent-green); font-weight: 600;">&#x25CF; Active</span>
+                {% else %}
+                <span style="color: var(--text-muted); font-weight: 600;">&#x25CF; Inactive</span>
+                {% endif %}
+            </td>
+            <td style="color: var(--text-muted); font-size: 12px; white-space: nowrap;">
+                {{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}
+            </td>
+            <td style="white-space: nowrap;">
+                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;"
+                        onclick="toggleEditForm('{{ user.id }}')">Edit</button>
+                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;"
+                        onclick="togglePasswordForm('{{ user.id }}')">Password</button>
+                {% if user.id != current_user.id %}
+                <form action="/admin/users/{{ user.id }}/toggle-active" method="post" style="display: inline;"
+                      onsubmit="return confirm('{{ 'Deactivate' if user.is_active else 'Activate' }} user {{ user.name }}?')">
+                    <button type="submit" class="btn {{ 'btn-danger' if user.is_active else 'btn-success' }}"
+                            style="font-size: 11px; padding: 4px 10px;">
+                        {{ 'Deactivate' if user.is_active else 'Activate' }}
+                    </button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+
+        <!-- Inline Edit Form (hidden) -->
+        <tr id="edit-{{ user.id }}" style="display: none;">
+            <td colspan="7" style="background: var(--bg-input); padding: 15px 20px;">
+                <form action="/admin/users/{{ user.id }}/edit" method="post" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                    <div class="form-group" style="margin-bottom: 0; min-width: 160px; flex: 1;">
+                        <label>Name</label>
+                        <input type="text" name="name" value="{{ user.name }}" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; min-width: 140px;">
+                        <label>Role</label>
+                        <select name="role" required>
+                            {% for r in roles %}
+                            <option value="{{ r.value }}" {% if r.value == user.role %}selected{% endif %}>{{ r.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; min-width: 160px;">
+                        <label>Company</label>
+                        <select name="company_id">
+                            <option value="">-- None --</option>
+                            {% for company in companies %}
+                            <option value="{{ company.id }}" {% if user.company_id == company.id %}selected{% endif %}>{{ company.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="submit" class="btn btn-success" style="height: 36px; font-size: 12px;">Save</button>
+                        <button type="button" class="btn btn-secondary" style="height: 36px; font-size: 12px;" onclick="toggleEditForm('{{ user.id }}')">Cancel</button>
+                    </div>
+                </form>
+            </td>
+        </tr>
+
+        <!-- Inline Password Reset Form (hidden) -->
+        <tr id="password-{{ user.id }}" style="display: none;">
+            <td colspan="7" style="background: var(--bg-input); padding: 15px 20px;">
+                <form action="/admin/users/{{ user.id }}/reset-password" method="post" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                    <div class="form-group" style="margin-bottom: 0; min-width: 200px; flex: 1;">
+                        <label>New Password for <strong>{{ user.name }}</strong></label>
+                        <input type="password" name="new_password" placeholder="Enter new password" required minlength="6">
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="submit" class="btn btn-success" style="height: 36px; font-size: 12px;">Reset Password</button>
+                        <button type="button" class="btn btn-secondary" style="height: 36px; font-size: 12px;" onclick="togglePasswordForm('{{ user.id }}')">Cancel</button>
+                    </div>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+
+        {% if not users %}
+        <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                No users yet. Click "+ Add User" to create one.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<script>
+function toggleEditForm(userId) {
+    var editRow = document.getElementById('edit-' + userId);
+    var passwordRow = document.getElementById('password-' + userId);
+    // Close password form if open
+    if (passwordRow) passwordRow.style.display = 'none';
+    // Toggle edit form
+    editRow.style.display = editRow.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function togglePasswordForm(userId) {
+    var passwordRow = document.getElementById('password-' + userId);
+    var editRow = document.getElementById('edit-' + userId);
+    // Close edit form if open
+    if (editRow) editRow.style.display = 'none';
+    // Toggle password form
+    passwordRow.style.display = passwordRow.style.display === 'none' ? 'table-row' : 'none';
+}
+</script>
+{% endblock %}
