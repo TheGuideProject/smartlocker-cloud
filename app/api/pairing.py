@@ -403,9 +403,8 @@ async def get_device_config(
     if chart_data:
         response["maintenance_chart"] = chart_data
 
-    # Include vessel inventory summary
-    if vessel_inventory:
-        response["vessel_inventory"] = vessel_inventory
+    # Include vessel inventory summary (always send, even if empty, so edge clears stale data)
+    response["vessel_inventory"] = vessel_inventory
 
     # If admin has set a new password for this device, include it (one-time delivery)
     if device.pending_admin_password:
