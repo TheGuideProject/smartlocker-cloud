@@ -2048,6 +2048,18 @@ def _check_sensor_health(health_data: dict) -> list:
     return alerts
 
 
+# ---- System Guide & Changelog ----
+
+@router.get("/guide", response_class=HTMLResponse)
+async def admin_guide(request: Request, user=Depends(require_admin_session)):
+    """System Guide & Changelog."""
+    return templates.TemplateResponse("admin/guide.html", {
+        "request": request,
+        "user": user,
+        "active": "guide",
+    })
+
+
 def _generate_ppg_code(name: str) -> str:
     """Generate a short PPG code from a product name.
 

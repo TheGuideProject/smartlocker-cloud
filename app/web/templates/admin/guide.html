@@ -1,0 +1,561 @@
+{% extends "base.html" %}
+{% set active = "guide" %}
+
+{% block title %}System Guide - SmartLocker{% endblock %}
+{% block page_title %}System Guide & Changelog{% endblock %}
+
+{% block content %}
+<style>
+    .guide-section { margin-bottom: 30px; }
+    .guide-section h2 {
+        font-size: 20px; font-weight: 700; color: var(--accent-blue);
+        margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+    }
+    .guide-section h2 .section-icon { font-size: 24px; }
+    .guide-intro {
+        font-size: 15px; color: var(--text-secondary); line-height: 1.7;
+        margin-bottom: 10px;
+    }
+    /* Challenge cards */
+    .challenge-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 15px;
+    }
+    .challenge-card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 8px; padding: 18px;
+    }
+    .challenge-card .card-title {
+        font-size: 15px; font-weight: 700; color: var(--text-primary);
+        margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+    }
+    .challenge-card .card-title .card-icon { font-size: 20px; }
+    .challenge-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+    /* Tech grid */
+    .tech-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+    }
+    .tech-item {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 8px; padding: 16px; text-align: center;
+    }
+    .tech-item .tech-icon { font-size: 28px; margin-bottom: 8px; }
+    .tech-item .tech-name { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+    .tech-item .tech-desc { font-size: 12px; color: var(--text-muted); }
+    /* Changelog accordion */
+    .changelog-entry {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 8px; margin-bottom: 10px; overflow: hidden;
+    }
+    .changelog-entry summary {
+        padding: 14px 18px; cursor: pointer; font-size: 15px; font-weight: 600;
+        color: var(--text-primary); list-style: none; display: flex;
+        justify-content: space-between; align-items: center;
+        transition: background 0.15s;
+    }
+    .changelog-entry summary:hover { background: rgba(255,255,255,0.03); }
+    .changelog-entry summary::-webkit-details-marker { display: none; }
+    .changelog-entry summary::after {
+        content: '\25B6'; font-size: 11px; color: var(--text-muted);
+        transition: transform 0.2s;
+    }
+    .changelog-entry[open] summary::after { transform: rotate(90deg); }
+    .changelog-entry .version-tag {
+        background: rgba(95,168,211,0.15); color: var(--accent-blue);
+        padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 700;
+        margin-right: 10px;
+    }
+    .changelog-entry .version-date {
+        font-size: 12px; color: var(--text-muted); font-weight: 400; margin-left: auto; margin-right: 14px;
+    }
+    .changelog-body {
+        padding: 0 18px 16px; border-top: 1px solid var(--border);
+    }
+    .changelog-body .change-subtitle {
+        font-size: 13px; font-weight: 600; color: var(--accent-green);
+        margin: 12px 0 6px;
+    }
+    .changelog-body ul {
+        list-style: none; padding: 0;
+    }
+    .changelog-body ul li {
+        font-size: 13px; color: var(--text-secondary); padding: 4px 0 4px 18px;
+        position: relative; line-height: 1.5;
+    }
+    .changelog-body ul li::before {
+        content: '\2022'; color: var(--accent-blue); position: absolute; left: 4px;
+    }
+    /* Architecture diagram */
+    .arch-diagram {
+        background: var(--bg-dark); border: 1px solid var(--border);
+        border-radius: 8px; padding: 20px; font-family: 'Courier New', monospace;
+        font-size: 13px; line-height: 1.6; color: var(--accent-green);
+        overflow-x: auto; white-space: pre; margin: 14px 0;
+    }
+    /* Quick guide steps */
+    .steps-list { counter-reset: step-counter; list-style: none; padding: 0; }
+    .steps-list li {
+        counter-increment: step-counter; position: relative;
+        padding: 14px 14px 14px 52px; margin-bottom: 10px;
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 8px; font-size: 14px; color: var(--text-secondary);
+    }
+    .steps-list li::before {
+        content: counter(step-counter); position: absolute; left: 14px; top: 12px;
+        width: 28px; height: 28px; background: var(--accent-blue); color: #fff;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        font-size: 13px; font-weight: 700;
+    }
+    .steps-list li strong { color: var(--text-primary); }
+    /* Credits */
+    .credits-box {
+        text-align: center; padding: 30px 20px;
+        background: linear-gradient(135deg, rgba(95,168,211,0.08), rgba(46,196,182,0.08));
+        border: 1px solid var(--border); border-radius: 10px;
+    }
+    .credits-box h3 { font-size: 18px; color: var(--text-primary); margin-bottom: 8px; }
+    .credits-box p { font-size: 13px; color: var(--text-muted); line-height: 1.7; }
+    .credits-box .credits-stack {
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+        margin-top: 14px;
+    }
+    .credits-box .stack-tag {
+        background: var(--bg-card); border: 1px solid var(--border);
+        padding: 4px 12px; border-radius: 14px; font-size: 12px;
+        color: var(--text-secondary);
+    }
+</style>
+
+<!-- ====== HEADER STATS ====== -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="label">Cloud Version</div>
+        <div class="value blue">2.3.3</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Edge Version</div>
+        <div class="value green">2.3.4</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Hardware Components</div>
+        <div class="value orange">4</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">RFID + Weight + LED + Buzzer</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Uptime Target</div>
+        <div class="value green">99.9%</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Last Update</div>
+        <div class="value" style="font-size: 20px;">2026-03-11</div>
+    </div>
+</div>
+
+<!-- ====== ARCHITECTURE ====== -->
+<div class="guide-section">
+    <h2><span class="section-icon">&#9881;</span> How It Works &mdash; System Architecture</h2>
+    <div class="panel">
+        <p class="guide-intro">
+            SmartLocker is a two-tier IoT system designed for <strong>marine paint inventory management &amp; mixing assistance</strong>.
+            The edge device (Raspberry Pi 5) handles real-time sensor interaction, touchscreen UI, and local-first data persistence.
+            The cloud platform (FastAPI + PostgreSQL) provides centralised management, fleet-wide monitoring, and OTA update delivery.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0;">
+            <div class="challenge-card">
+                <div class="card-title"><span class="card-icon">&#128421;</span> Edge Device (Raspberry Pi 5)</div>
+                <p>
+                    Kivy touchscreen UI &bull; PN532 RFID reader (I2C) &bull; HX711 load cells via Arduino Nano bridge &bull;
+                    WS2812B LED strip for slot guidance &bull; PWM buzzer for audio alerts &bull;
+                    SQLite (WAL) for local-first persistence &bull; Runs 24/7 via systemd service
+                </p>
+            </div>
+            <div class="challenge-card">
+                <div class="card-title"><span class="card-icon">&#9729;</span> Cloud Platform (FastAPI)</div>
+                <p>
+                    Admin portal (Jinja2 + HTMX) &bull; Owner dashboard with fleet data &bull;
+                    REST API with JWT + API key auth &bull; PostgreSQL database &bull;
+                    Bidirectional sync (events, inventory, commands) &bull; OTA update engine &bull;
+                    Hosted on Railway
+                </p>
+            </div>
+        </div>
+
+        <div class="arch-diagram">
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;          &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;          EDGE DEVICE (RPi 5)          &#9474;          &#9474;         CLOUD PLATFORM              &#9474;
+&#9474;                                        &#9474;          &#9474;                                    &#9474;
+&#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;   &#9474;  &#9581;&#9472;&#9472;&#9583;  &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;
+&#9474;  &#9474; Kivy   &#9474;  &#9474; Sensors:     &#9474;   &#9474;  &#9474;    &#9474;  &#9474; FastAPI   &#9474;  &#9474; Admin   &#9474;  &#9474;
+&#9474;  &#9474; Touch  &#9474;  &#9474; RFID PN532   &#9474;   &#9474;  &#9474;HTTP&#9474;  &#9474; REST API  &#9474;  &#9474; Portal  &#9474;  &#9474;
+&#9474;  &#9474;   UI   &#9474;  &#9474; HX711 Weight &#9474;   &#9474;  &#9474; +  &#9474;  &#9474; (JWT +   &#9474;  &#9474; (Jinja2 &#9474;  &#9474;
+&#9474;  &#9474;        &#9474;  &#9474; WS2812B LED  &#9474;   &#9474;  &#9474; WS &#9474;  &#9474;  API Key) &#9474;  &#9474;  + HTMX) &#9474;  &#9474;
+&#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474; PWM Buzzer   &#9474;   &#9474;  &#9474;    &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;
+&#9474;       &#9474;      &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;   &#9474;  &#9580;&#9472;&#9472;&#9583;  &#9474;       &#9474;                  &#9474;
+&#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;   &#9474;          &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;
+&#9474;  &#9474; SQLite (WAL)  &#9474; Event  &#9474;   &#9474;  &#9581;&#9472;&#9472;&#9472;&#9583;  &#9474; PostgreSQL   &#9474; Owner  &#9474;  &#9474;
+&#9474;  &#9474; Local-first   &#9474;  Bus   &#9474;&#9472;&#9472;&#9472;&#9496;  &#9474;sync&#9474;  &#9474; Central DB   &#9474; Dash   &#9474;  &#9474;
+&#9474;  &#9474; persistence   &#9474;       &#9474;&#9472;&#9472;&#9472;&#9488;  &#9580;&#9472;&#9472;&#9472;&#9583;  &#9474; + OTA engine &#9474;        &#9474;  &#9474;
+&#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;   &#9474;          &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;          &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+
+Data Flow:  Edge &#9472;&#9472; events &#9472;&#9472;&#9658; Cloud (HTTP POST)  |  Cloud &#9472;&#9472; config/commands &#9472;&#9472;&#9658; Edge (heartbeat response)
+Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (every 60s)  |  Config poll (every 120s)</div>
+
+        <p class="guide-intro" style="margin-top: 10px;">
+            <strong>Security model:</strong> API key authentication for device-to-cloud, session cookies for web admin, JWT tokens for API consumers.
+            All device endpoints verify API keys via FastAPI <code>Depends()</code> injection.
+        </p>
+    </div>
+</div>
+
+<!-- ====== CHALLENGES & SOLUTIONS ====== -->
+<div class="guide-section">
+    <h2><span class="section-icon">&#128161;</span> Challenges &amp; Solutions &mdash; Technical Analysis</h2>
+    <div class="challenge-grid">
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#128268;</span> Offline-Tolerant Sync</div>
+            <p>
+                The edge device operates in marine environments where connectivity is unreliable.
+                All events are stored locally in SQLite first (event sourcing pattern), queued with
+                <code>synced=0</code>, and batch-uploaded when connectivity returns. UUID-based
+                deduplication ensures no data loss even if events are sent multiple times.
+            </p>
+        </div>
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#128640;</span> Fast OTA Updates</div>
+            <p>
+                Git-based OTA with automatic rollback on failure. Commands are delivered via
+                <strong>dual path</strong>: heartbeat response (~60s) for fast delivery + config
+                polling (~120s) as fallback. On the edge, <code>git pull</code> + service restart
+                with systemd ensures zero-downtime updates.
+            </p>
+        </div>
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#128737;</span> Crash Protection</div>
+            <p>
+                The edge runs as a systemd service with <code>Restart=always</code> and
+                <code>StartLimitBurst=10</code>. Health monitoring tracks CPU temperature,
+                RAM usage, disk space, and GPU throttling. Automatic alerts when thresholds
+                are exceeded. System recovers from crashes within seconds.
+            </p>
+        </div>
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#128736;</span> Event Deduplication</div>
+            <p>
+                Every event has a unique UUID generated at creation time. Cloud ingestion uses
+                idempotent processing &mdash; duplicate UUIDs are silently ignored. This prevents
+                data corruption when events are re-sent after connectivity drops.
+            </p>
+        </div>
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#9888;</span> Poison Pill Prevention</div>
+            <p>
+                A single corrupted event in the sync queue could block the entire pipeline
+                indefinitely. Solution: per-event error handling with <code>try/except</code>,
+                individual retry when batch fails, and automatic skipping of broken events
+                after max retries. The sync queue never gets stuck.
+            </p>
+        </div>
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#128200;</span> Real-Time Monitoring</div>
+            <p>
+                Heartbeat every 60 seconds carrying system telemetry: CPU temperature, RAM %,
+                disk usage, throttle status, pending sync count, and current software version.
+                Cloud dashboard displays real-time device health with alert thresholds.
+            </p>
+        </div>
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#127912;</span> Color Management</div>
+            <p>
+                Marine paints have complex color names (e.g., "Redbrown 6179", "Signal Red 3000").
+                A 4-step resolution algorithm matches colors: exact &rarr; strip numbers &rarr;
+                first word &rarr; substring match. Cloud provides an RGB hex picker that syncs
+                <code>colors_json</code> to edge devices, with a 30+ colour dictionary fallback.
+            </p>
+        </div>
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#128230;</span> Vessel Inventory Sync</div>
+            <p>
+                Cloud aggregates stock adjustments per vessel into a unified inventory. This
+                data syncs to edge via the config API endpoint. The edge merges cloud inventory
+                with live RFID physical data to provide a complete real-time stock picture
+                on the touchscreen.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- ====== TECHNOLOGIES ====== -->
+<div class="guide-section">
+    <h2><span class="section-icon">&#128295;</span> Tools &amp; Technologies</h2>
+    <div class="tech-grid">
+        <div class="tech-item">
+            <div class="tech-icon">&#128013;</div>
+            <div class="tech-name">Python 3.11</div>
+            <div class="tech-desc">Core language for both edge &amp; cloud</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#9889;</div>
+            <div class="tech-name">FastAPI</div>
+            <div class="tech-desc">Async REST API + admin portal</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#128247;</div>
+            <div class="tech-name">Kivy</div>
+            <div class="tech-desc">Touchscreen UI framework (RPi)</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#128451;</div>
+            <div class="tech-name">SQLite + PostgreSQL</div>
+            <div class="tech-desc">Local-first + cloud centralised DB</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#129302;</div>
+            <div class="tech-name">Raspberry Pi 5</div>
+            <div class="tech-desc">Edge compute platform</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#128225;</div>
+            <div class="tech-name">PN532 RFID (I2C)</div>
+            <div class="tech-desc">NFC tag reader for paint cans</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#9878;</div>
+            <div class="tech-name">HX711 + Arduino Nano</div>
+            <div class="tech-desc">Weight sensing bridge</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#128161;</div>
+            <div class="tech-name">WS2812B LED Strip</div>
+            <div class="tech-desc">RGB slot guidance lights</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#128266;</div>
+            <div class="tech-name">PWM Buzzer</div>
+            <div class="tech-desc">Audio alerts &amp; feedback</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#128736;</div>
+            <div class="tech-name">systemd + Git OTA</div>
+            <div class="tech-desc">Service management &amp; remote updates</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#9729;</div>
+            <div class="tech-name">Railway</div>
+            <div class="tech-desc">Cloud hosting &amp; deployment</div>
+        </div>
+        <div class="tech-item">
+            <div class="tech-icon">&#128274;</div>
+            <div class="tech-name">JWT + API Key + Session</div>
+            <div class="tech-desc">Triple-layer authentication</div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== CHANGELOG ====== -->
+<div class="guide-section">
+    <h2><span class="section-icon">&#128220;</span> Changelog &mdash; Version History</h2>
+    <p class="guide-intro" style="margin-bottom: 16px;">
+        Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
+    </p>
+
+    <!-- v2.3.4 -->
+    <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v2.3.4</span> Fast OTA, Pending Counter Fix, Color Display Fix</span>
+            <span class="version-date">2026-03-11</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">OTA &amp; Command Delivery</div>
+            <ul>
+                <li>Commands now delivered via heartbeat response (~60s) for near-instant OTA when online</li>
+                <li>Force heartbeat after event sync to immediately update cloud pending counter</li>
+                <li><code>send_heartbeat()</code> returns <code>(success, data)</code> tuple to carry commands</li>
+            </ul>
+            <div class="change-subtitle">Color System</div>
+            <ul>
+                <li>Expanded marine paint colour dictionary to 20+ colours (redbrown, signal red, oxide red, navy, charcoal, etc.)</li>
+                <li>4-step colour name resolution: exact &rarr; strip numbers &rarr; first word &rarr; substring match</li>
+                <li>Cloud-side <code>colors_json</code> RGB picker syncs to edge devices</li>
+            </ul>
+            <div class="change-subtitle">Sync &amp; Reliability</div>
+            <ul>
+                <li>Cloud decrements <code>events_pending_sync</code> when events are received (no more stale counters)</li>
+                <li>Pending commands delivered through both heartbeat and config endpoint (dual path)</li>
+            </ul>
+            <div class="change-subtitle">Bug Fixes</div>
+            <ul>
+                <li>Fixed colour editing form index gap when deleting colours (JavaScript reindex on submit)</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.3.3 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v2.3.3</span> Event Sync Fix, Animation Fix</span>
+            <span class="version-date">2026-03-11</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Sync Robustness</div>
+            <ul>
+                <li>Robust per-event JSON conversion with <code>try/except</code> (poison pill prevention)</li>
+                <li>Individual event retry when batch upload fails &mdash; broken events are skipped, good events proceed</li>
+                <li>Safe timestamp conversion: string, float, and invalid formats handled gracefully</li>
+            </ul>
+            <div class="change-subtitle">UI Fix</div>
+            <ul>
+                <li>Inventory screen data fingerprint cache &mdash; UI only rebuilds when data changes</li>
+                <li>Refresh interval 1s &rarr; 2s to reduce unnecessary redraws</li>
+                <li>Eliminated continuous left-to-right colour animation glitch on Raspberry Pi</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.3.2 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v2.3.2</span> Command Delivery via HTTP</span>
+            <span class="version-date">2026-03-11</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Command Pipeline</div>
+            <ul>
+                <li>Pending commands included in config endpoint response</li>
+                <li>Edge processes commands received from HTTP config (not just WebSocket)</li>
+                <li><code>colors_json</code> included in WebSocket product sync payload</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.3.1 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v2.3.1</span> Color Display, Stock Management</span>
+            <span class="version-date">2026-03-11</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Color System</div>
+            <ul>
+                <li>Expanded <code>PAINT_COLOR_HEX</code> dictionary with 30+ marine colour names</li>
+                <li>Improved <code>_color_name_to_hex</code> with number stripping for compound names</li>
+            </ul>
+            <div class="change-subtitle">Inventory</div>
+            <ul>
+                <li>Stock deletion endpoints: per-product, per-adjustment, and clear-all</li>
+                <li><code>pot_life_minutes</code> validation fix (accept empty/null values)</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.3.0 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v2.3.0</span> Vessel Inventory Sync + RGB Color Picker</span>
+            <span class="version-date">2026-03-11</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Major Features</div>
+            <ul>
+                <li><code>colors_json</code> column added to Product model for per-product colour definitions</li>
+                <li>RGB colour picker in product add/edit forms on cloud admin</li>
+                <li>Vessel inventory aggregation in config API endpoint</li>
+                <li><code>vessel_stock</code> table created on edge SQLite</li>
+                <li>Inventory screen shows merged cloud stock + RFID physical data</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.0.0 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v2.0.0</span> Full System Launch</span>
+            <span class="version-date">2026-03-07</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Authentication &amp; Security</div>
+            <ul>
+                <li>Web admin login with session cookies (SessionMiddleware + itsdangerous)</li>
+                <li>API authentication: JWT tokens + X-API-Key for device endpoints</li>
+                <li>All 32 admin routes protected with <code>require_admin_session</code></li>
+            </ul>
+            <div class="change-subtitle">CRUD &amp; Management</div>
+            <ul>
+                <li>Complete CRUD for Products, Recipes, Companies, Fleets, Vessels, Devices</li>
+                <li>Inline edit/delete on all admin tables</li>
+                <li>User management with role-based badges (add, edit, toggle, reset password)</li>
+            </ul>
+            <div class="change-subtitle">Mixing System</div>
+            <ul>
+                <li>Mixing sessions with LED guidance (WS2812B slot-specific colours)</li>
+                <li>Sessions saved to edge SQLite, synced to cloud, viewable in admin</li>
+                <li>Recipe-based mixing with ratio validation</li>
+            </ul>
+            <div class="change-subtitle">Fleet &amp; Dashboard</div>
+            <ul>
+                <li>Owner dashboard with real fleet statistics and vessel cards</li>
+                <li>Device pairing with 6-digit code</li>
+                <li>Event stream with recent activity and support requests</li>
+            </ul>
+            <div class="change-subtitle">Hardware</div>
+            <ul>
+                <li>All 4 real hardware drivers implemented: RFID (PN532), Weight (HX711/Arduino), LED (WS2812B), Buzzer (PWM)</li>
+                <li>Graceful fallback to stubs on non-RPi platforms</li>
+            </ul>
+            <div class="change-subtitle">Reliability</div>
+            <ul>
+                <li>Periodic SQLite backup with rotation (every 6h, keep 5) + USB copy</li>
+                <li>System telemetry: CPU, RAM, disk, throttle status via heartbeat</li>
+                <li>Event sourcing with UUID-based deduplication</li>
+            </ul>
+        </div>
+    </details>
+</div>
+
+<!-- ====== QUICK GUIDE ====== -->
+<div class="guide-section">
+    <h2><span class="section-icon">&#128218;</span> Quick Guide &mdash; How to Use the System</h2>
+    <ol class="steps-list">
+        <li><strong>Initial Setup:</strong> Pair a new device using the 6-digit pairing code from the Pairing page. The device will automatically sync products, recipes, and inventory.</li>
+        <li><strong>Product Management:</strong> Add or edit products in the Products page. Assign colours using the RGB picker for visual identification on the edge touchscreen.</li>
+        <li><strong>Inventory Management:</strong> Add stock adjustments via the Inventory page. Stock levels sync to edge devices and display alongside RFID physical data.</li>
+        <li><strong>Mixing Operations:</strong> On the edge touchscreen, select a recipe and follow the LED-guided mixing process. Completed sessions sync to the cloud automatically.</li>
+        <li><strong>Maintenance Charts:</strong> Upload maintenance chart PDFs from the Charts page. These are referenced by vessel for scheduled paint application.</li>
+        <li><strong>Device Monitoring:</strong> Monitor device health from the Devices page. View CPU temperature, RAM, disk usage, and pending sync queue. Set up alerts for critical thresholds.</li>
+        <li><strong>OTA Updates:</strong> Push software updates from the Devices page. Updates are delivered via heartbeat (~60s delay when online). The device auto-restarts after update.</li>
+    </ol>
+</div>
+
+<!-- ====== CREDITS ====== -->
+<div class="guide-section">
+    <div class="credits-box">
+        <h3>Designed &amp; Engineered with Passion</h3>
+        <p>
+            SmartLocker represents the convergence of IoT hardware engineering, cloud platform design,
+            and real-world marine industry requirements. Every line of code, every sensor integration,
+            and every sync algorithm was built to solve real operational challenges
+            in paint inventory management aboard vessels.
+        </p>
+        <div class="credits-stack">
+            <span class="stack-tag">Python 3.11</span>
+            <span class="stack-tag">FastAPI</span>
+            <span class="stack-tag">Kivy</span>
+            <span class="stack-tag">PostgreSQL</span>
+            <span class="stack-tag">SQLite</span>
+            <span class="stack-tag">Raspberry Pi 5</span>
+            <span class="stack-tag">PN532 RFID</span>
+            <span class="stack-tag">HX711 Load Cells</span>
+            <span class="stack-tag">WS2812B LED</span>
+            <span class="stack-tag">Arduino Nano</span>
+            <span class="stack-tag">Railway</span>
+            <span class="stack-tag">systemd</span>
+            <span class="stack-tag">Git OTA</span>
+        </div>
+        <p style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">
+            Cloud v2.3.3 &bull; Edge v2.3.4 &bull; Last updated 2026-03-11
+        </p>
+    </div>
+</div>
+{% endblock %}
