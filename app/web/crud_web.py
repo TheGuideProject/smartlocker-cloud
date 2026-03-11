@@ -648,6 +648,64 @@ async def device_restart(
     return RedirectResponse(url="/admin/devices", status_code=303)
 
 
+@router.post("/devices/{device_id}/install-mode")
+async def device_install_mode(
+    device_id: str,
+    action: str = Form("enable"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle Install Mode (overclock sync to 5s) on a device. Auto-expires after 3 hours."""
+    try:
+        result = await db.execute(
+            select(LockerDevice).where(LockerDevice.id == device_id)
+        )
+        device = result.scalar_one_or_none()
+        if not device:
+            return RedirectResponse(
+                url="/admin/devices?error=Device+not+found", status_code=303
+            )
+
+        cmd_type = "enable_install_mode" if action == "enable" else "disable_install_mode"
+        payload = {"duration_hours": 3} if action == "enable" else {}
+
+        cmd = DeviceCommand(
+            device_id=device.id,
+            command_type=cmd_type,
+            payload=payload,
+            status="pending",
+        )
+        db.add(cmd)
+        await db.flush()
+
+        # Try to push via WebSocket if online
+        try:
+            from app.api.websocket import manager
+            if manager.is_connected(device.device_id):
+                sent = await manager.send_to_device(device.device_id, {
+                    "type": "command",
+                    "command_id": cmd.id,
+                    "command_type": cmd_type,
+                    "payload": payload,
+                })
+                if sent:
+                    cmd.status = "delivered"
+                    cmd.delivered_at = datetime.utcnow()
+        except ImportError:
+            pass
+
+        label = "Install Mode ON" if action == "enable" else "Install Mode OFF"
+        logger.info(f"[CMD] {label} sent to device {device.device_id}")
+
+    except Exception as e:
+        logger.error(f"Error sending install-mode to device {device_id}: {e}")
+        await db.rollback()
+        return RedirectResponse(
+            url=f"/admin/devices?error=Error+sending+command", status_code=303
+        )
+
+    return RedirectResponse(url="/admin/devices", status_code=303)
+
+
 @router.post("/devices/{device_id}/delete")
 async def device_delete(
     device_id: str,

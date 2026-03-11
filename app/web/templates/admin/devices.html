@@ -747,6 +747,28 @@ window.addEventListener('DOMContentLoaded', function() {
                         {% endif %}
                     </span>
                 </div>
+
+                <!-- Install Mode (Overclock Sync) -->
+                <div style="font-size: 14px; font-weight: 600; margin: 15px 0 8px; color: var(--text-secondary);">Install Mode</div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <form action="/admin/devices/{{ d.id }}/install-mode" method="post" style="display:inline; margin: 0;"
+                          onsubmit="return confirm('Enable Install Mode on {{ d.name or d.device_id }}?\n\nSync interval will drop from 120s to 5s for fast setup.\nAuto-disables after 3 hours.');">
+                        <input type="hidden" name="action" value="enable">
+                        <button type="submit" style="padding: 8px 18px; background: var(--accent-green); color: #000; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 13px;">
+                            &#9889; Install Mode ON
+                        </button>
+                    </form>
+                    <form action="/admin/devices/{{ d.id }}/install-mode" method="post" style="display:inline; margin: 0;"
+                          onsubmit="return confirm('Disable Install Mode on {{ d.name or d.device_id }}?\n\nSync interval will return to normal (120s).');">
+                        <input type="hidden" name="action" value="disable">
+                        <button type="submit" style="padding: 8px 18px; background: var(--border); color: var(--text-primary); border: none; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 13px;">
+                            Stop Install Mode
+                        </button>
+                    </form>
+                    <span style="font-size: 12px; color: var(--text-muted);">
+                        Sync every 5s instead of 120s. Auto-expires after 3 hours.
+                    </span>
+                </div>
             </div>
         </div>
     </div>
