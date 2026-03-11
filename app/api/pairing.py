@@ -26,6 +26,7 @@ from app.models.company import Company
 from app.models.product import Product, MixingRecipe
 from app.models.maintenance import MaintenanceChart
 from app.models.inventory import InventoryAdjustment
+from app.models.command import DeviceCommand
 from app.api.events import verify_device_api_key
 
 logger = logging.getLogger("smartlocker.pairing")
@@ -421,5 +422,32 @@ async def get_device_config(
         device.update_status = "downloading"
         await db.commit()
         logger.info(f"Update command delivered to {device.device_id}: v{device.pending_update_version}")
+
+    # Deliver pending commands (restart, reboot, force_sync, etc.) via HTTP polling
+    try:
+        pending_cmds_result = await db.execute(
+            select(DeviceCommand)
+            .where(
+                DeviceCommand.device_id == device.id,
+                DeviceCommand.status == "pending",
+            )
+            .order_by(DeviceCommand.created_at)
+            .limit(10)
+        )
+        pending_cmds = pending_cmds_result.scalars().all()
+        if pending_cmds:
+            response["pending_commands"] = []
+            for cmd in pending_cmds:
+                response["pending_commands"].append({
+                    "command_id": cmd.id,
+                    "command_type": cmd.command_type,
+                    "payload": cmd.payload or {},
+                })
+                cmd.status = "delivered"
+                cmd.delivered_at = datetime.utcnow()
+            await db.commit()
+            logger.info(f"Delivered {len(pending_cmds)} pending commands to {device.device_id} via HTTP config")
+    except Exception as e:
+        logger.warning(f"Error delivering pending commands: {e}")
 
     return response
