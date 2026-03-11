@@ -334,7 +334,7 @@ async def get_device_config(
                     ).label("total_added"),
                     func.sum(
                         case(
-                            (InventoryAdjustment.adjustment_type == "manual_remove",
+                            (InventoryAdjustment.adjustment_type.in_(["manual_remove", "mixing_consumption"]),
                              InventoryAdjustment.quantity_liters),
                             else_=0,
                         )

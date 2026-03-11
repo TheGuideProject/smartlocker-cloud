@@ -682,6 +682,65 @@ async def ingest_mixing_sessions(
             status=s.status,
         )
         db.add(session_record)
+        await db.flush()  # Get session_record.id
+
+        # --- Create InventoryAdjustments for mixing consumption ---
+        if s.status == "completed" and recipe_id_fk:
+            try:
+                from app.models.product import MixingRecipe, Product
+                from app.models.inventory import InventoryAdjustment
+
+                recipe_obj = await db.get(MixingRecipe, recipe_id_fk)
+                if recipe_obj:
+                    # Base paint consumption (grams → liters using density)
+                    if s.base_weight_actual_g and s.base_weight_actual_g > 0:
+                        base_product = await db.get(Product, recipe_obj.base_product_id)
+                        base_density = (base_product.density_g_per_ml if base_product else 1.0) or 1.0
+                        base_liters = (s.base_weight_actual_g / base_density) / 1000  # g → ml → L
+                        db.add(InventoryAdjustment(
+                            device_id=device.id,
+                            product_id=recipe_obj.base_product_id,
+                            adjustment_type="mixing_consumption",
+                            quantity_liters=round(base_liters, 3),
+                            weight_g=s.base_weight_actual_g,
+                            notes=f"Mixing session {s.session_id[:8]}",
+                            created_by="auto_mix",
+                        ))
+
+                    # Hardener consumption
+                    if s.hardener_weight_actual_g and s.hardener_weight_actual_g > 0:
+                        hardener_product = await db.get(Product, recipe_obj.hardener_product_id)
+                        hard_density = (hardener_product.density_g_per_ml if hardener_product else 1.0) or 1.0
+                        hard_liters = (s.hardener_weight_actual_g / hard_density) / 1000
+                        db.add(InventoryAdjustment(
+                            device_id=device.id,
+                            product_id=recipe_obj.hardener_product_id,
+                            adjustment_type="mixing_consumption",
+                            quantity_liters=round(hard_liters, 3),
+                            weight_g=s.hardener_weight_actual_g,
+                            notes=f"Mixing session {s.session_id[:8]}",
+                            created_by="auto_mix",
+                        ))
+
+                    # Thinner consumption (if used and recipe has recommended thinner)
+                    if s.thinner_weight_g and s.thinner_weight_g > 0 and recipe_obj.recommended_thinner_id:
+                        thinner_product = await db.get(Product, recipe_obj.recommended_thinner_id)
+                        thin_density = (thinner_product.density_g_per_ml if thinner_product else 1.0) or 1.0
+                        thin_liters = (s.thinner_weight_g / thin_density) / 1000
+                        db.add(InventoryAdjustment(
+                            device_id=device.id,
+                            product_id=recipe_obj.recommended_thinner_id,
+                            adjustment_type="mixing_consumption",
+                            quantity_liters=round(thin_liters, 3),
+                            weight_g=s.thinner_weight_g,
+                            notes=f"Mixing session {s.session_id[:8]}",
+                            created_by="auto_mix",
+                        ))
+
+                    logger.info(f"Created consumption adjustments for mixing session {s.session_id[:8]}")
+            except Exception as e:
+                logger.warning(f"Failed to create consumption adjustments for session {s.session_id}: {e}")
+
         received += 1
         acked_ids.append(s.session_id)
 
