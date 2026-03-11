@@ -142,6 +142,16 @@ async def ingest_events(
     device.last_heartbeat = datetime.utcnow()
     device.status = "online"
 
+    # Update pending counter in system_info (so cloud dashboard reflects sync immediately)
+    if received > 0 and device.system_info:
+        try:
+            si = dict(device.system_info)
+            old_pending = si.get("events_pending_sync", 0)
+            si["events_pending_sync"] = max(0, old_pending - received - duplicates)
+            device.system_info = si
+        except Exception:
+            pass  # Non-critical
+
     # Process new events into inventory state (CanTracking)
     if new_events:
         try:
@@ -195,8 +205,40 @@ async def device_heartbeat(
     if heartbeat.system_info is not None:
         device.system_info = heartbeat.system_info
 
+    # Deliver pending commands via heartbeat response (faster than config polling)
+    # This makes OTA/restart/reboot commands arrive within ~60s instead of ~120s
+    pending_commands = []
+    try:
+        from app.models.command import DeviceCommand
+        pending_cmds_result = await db.execute(
+            select(DeviceCommand)
+            .where(
+                DeviceCommand.device_id == device.id,
+                DeviceCommand.status == "pending",
+            )
+            .order_by(DeviceCommand.created_at)
+            .limit(10)
+        )
+        pending_cmds = pending_cmds_result.scalars().all()
+        if pending_cmds:
+            for cmd in pending_cmds:
+                pending_commands.append({
+                    "command_id": cmd.id,
+                    "command_type": cmd.command_type,
+                    "payload": cmd.payload or {},
+                })
+                cmd.status = "delivered"
+                cmd.delivered_at = datetime.utcnow()
+            logger.info(f"Delivered {len(pending_cmds)} commands via heartbeat to {device_id}")
+    except Exception as e:
+        logger.warning(f"Error delivering commands via heartbeat: {e}")
+
     await db.commit()
-    return {"status": "ok"}
+
+    response = {"status": "ok"}
+    if pending_commands:
+        response["pending_commands"] = pending_commands
+    return response
 
 
 # ---- OTA Update Status ----

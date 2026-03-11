@@ -211,5 +211,20 @@ function addColor(productId) {
         '<button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:16px; padding:0 4px;">\u00d7</button>';
     container.appendChild(chip);
 }
+
+// Reindex color fields before form submit (fix: deleting a color leaves gaps in indices)
+document.addEventListener('submit', function(e) {
+    var form = e.target;
+    var colorContainers = form.querySelectorAll('[id^="colors-"]');
+    colorContainers.forEach(function(container) {
+        var chips = container.querySelectorAll('.color-chip');
+        chips.forEach(function(chip, i) {
+            var hexInput = chip.querySelector('input[type="color"]');
+            var nameInput = chip.querySelector('input[type="text"]');
+            if (hexInput) hexInput.name = 'color_hex_' + i;
+            if (nameInput) nameInput.name = 'color_name_' + i;
+        });
+    });
+});
 </script>
 {% endblock %}
