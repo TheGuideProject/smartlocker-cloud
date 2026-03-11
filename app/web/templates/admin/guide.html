@@ -135,7 +135,7 @@
     </div>
     <div class="stat-card">
         <div class="label">Edge Version</div>
-        <div class="value green">2.3.4</div>
+        <div class="value green">2.3.5</div>
     </div>
     <div class="stat-card">
         <div class="label">Hardware Components</div>
@@ -361,8 +361,30 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
     </p>
 
-    <!-- v2.3.4 -->
+    <!-- v2.3.5 -->
     <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v2.3.5</span> Install Mode + Inventory Sync Fix</span>
+            <span class="version-date">2026-03-11</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Install Mode (Overclock Sync)</div>
+            <ul>
+                <li>New "Install Mode ON/OFF" buttons on Devices page for fast setup</li>
+                <li>Config sync drops from 120s to 5s when Install Mode is active</li>
+                <li>Auto-expires after 3 hours, can be manually stopped at any time</li>
+                <li>Command delivered via heartbeat (~60s) or config polling</li>
+            </ul>
+            <div class="change-subtitle">Bug Fixes</div>
+            <ul>
+                <li>Fixed vessel inventory not clearing on edge after stock deletion on cloud</li>
+                <li>Root cause: empty <code>vessel_inventory</code> list was falsy, key omitted from config response</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.3.4 -->
+    <details class="changelog-entry">
         <summary>
             <span><span class="version-tag">v2.3.4</span> Fast OTA, Pending Counter Fix, Color Display Fix</span>
             <span class="version-date">2026-03-11</span>
@@ -806,7 +828,7 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
             <span class="stack-tag">Git OTA</span>
         </div>
         <p style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">
-            Cloud v2.3.3 &bull; Edge v2.3.4 &bull; Last updated 2026-03-11
+            Cloud v2.3.3 &bull; Edge v2.3.5 &bull; Last updated 2026-03-11
         </p>
     </div>
 </div>
