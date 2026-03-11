@@ -271,25 +271,40 @@ body {
 }
 .btn-cancel:hover { background: rgba(255,255,255,0.05); }
 
-.edit-row { display: none; }
-.edit-row.visible { display: table-row; }
-.edit-row td {
-    padding: 10px 15px;
-    background: var(--bg-input);
-    border-top: 1px solid var(--accent-blue);
+/* ---- Inline Edit Rows (hidden by default) ---- */
+.data-table .edit-row,
+.edit-row {
+    display: none !important;
 }
-.edit-row input, .edit-row select {
+
+.data-table .edit-row.visible,
+.edit-row.visible {
+    display: table-row !important;
+}
+
+.edit-row td {
+    padding: 12px 15px;
+    background: var(--bg-input);
+    border-top: 2px solid var(--accent-blue);
+}
+
+.edit-row input,
+.edit-row select {
     width: 100%;
-    padding: 6px 8px;
-    background: var(--bg-dark);
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    padding: 8px 10px;
+    background: #0a1420;
+    border: 1px solid #3a5068;
+    border-radius: 6px;
     color: var(--text-primary);
     font-size: 13px;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
-.edit-row input:focus, .edit-row select:focus {
+
+.edit-row input:focus,
+.edit-row select:focus {
     outline: none;
     border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(95, 168, 211, 0.25);
 }
 
 .confirm-overlay {

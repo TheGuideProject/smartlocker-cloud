@@ -528,6 +528,38 @@ async def device_edit(
     return RedirectResponse(url="/admin/devices", status_code=303)
 
 
+@router.post("/devices/{device_id}/edit-slots")
+async def device_edit_slots(
+    device_id: str,
+    slot_count: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a device's slot count."""
+    try:
+        result = await db.execute(
+            select(LockerDevice).where(LockerDevice.id == device_id)
+        )
+        device = result.scalar_one_or_none()
+        if not device:
+            return RedirectResponse(
+                url="/admin/devices?error=Device+not+found", status_code=303
+            )
+
+        device.slot_count = max(1, min(60, slot_count))
+        device.config_version = (device.config_version or 0) + 1
+        await db.flush()
+        logger.info(f"Device {device.device_id}: slot_count={device.slot_count}")
+
+    except Exception as e:
+        logger.error(f"Error updating slot count for device {device_id}: {e}")
+        await db.rollback()
+        return RedirectResponse(
+            url="/admin/devices?error=Error+updating+slot+count", status_code=303
+        )
+
+    return RedirectResponse(url="/admin/devices", status_code=303)
+
+
 @router.post("/devices/{device_id}/delete")
 async def device_delete(
     device_id: str,

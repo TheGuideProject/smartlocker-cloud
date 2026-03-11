@@ -34,6 +34,15 @@ async def lifespan(app: FastAPI):
     await init_db()
     await _seed_admin_user()
 
+    # Migration: add slot_count column if missing
+    try:
+        from app.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(text("ALTER TABLE locker_devices ADD COLUMN slot_count INTEGER DEFAULT 4"))
+    except Exception:
+        pass  # Column already exists
+
     # Create upload directory
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
@@ -44,7 +53,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    version="2.1.0",
+    version="2.2.0",
     lifespan=lifespan,
 )
 

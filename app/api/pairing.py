@@ -202,6 +202,7 @@ async def pair_device(
             for r in recipes
         ],
         "config_version": 1,
+        "slot_count": device.slot_count or 4,
         "sync_interval_seconds": 300,  # Sync every 5 minutes
         "heartbeat_interval_seconds": 60,
     }
@@ -261,6 +262,7 @@ async def get_device_config(
 
     response = {
         "config_version": device.config_version,
+        "slot_count": device.slot_count or 4,
         "products": [
             {
                 "id": str(p.id),

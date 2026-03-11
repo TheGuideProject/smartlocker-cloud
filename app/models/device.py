@@ -24,6 +24,7 @@ class LockerDevice(Base):
     name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     software_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     config_version: Mapped[int] = mapped_column(Integer, default=1)
+    slot_count: Mapped[int] = mapped_column(Integer, default=4)
     last_heartbeat: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), default="offline"
