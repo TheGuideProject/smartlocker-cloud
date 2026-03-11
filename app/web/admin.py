@@ -189,6 +189,9 @@ async def admin_add_product(
         hazard_class=hazard_class or None,
     )
     db.add(product)
+    await db.flush()
+    from app.services.command_service import create_product_sync_command
+    await create_product_sync_command(db)
     return RedirectResponse(url="/admin/products", status_code=303)
 
 
@@ -246,6 +249,9 @@ async def admin_add_recipe(
         pot_life_minutes=pot_life_minutes if pot_life_minutes else None,
     )
     db.add(recipe)
+    await db.flush()
+    from app.services.command_service import create_recipe_sync_command
+    await create_recipe_sync_command(db)
     return RedirectResponse(url="/admin/recipes", status_code=303)
 
 

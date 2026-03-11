@@ -551,3 +551,98 @@ async def receive_inventory_snapshot(
 
     await db.commit()
     return {"status": "ok", "slots_processed": updated}
+
+
+# ---- Mixing Sessions Sync ----
+
+class MixingSessionIn(BaseModel):
+    session_id: str
+    recipe_id: str = ""
+    job_id: str = ""
+    user_name: str = ""
+    started_at: float = 0
+    completed_at: float = 0
+    base_product_id: str = ""
+    base_tag_id: str = ""
+    base_weight_target_g: float = 0
+    base_weight_actual_g: float = 0
+    hardener_product_id: str = ""
+    hardener_tag_id: str = ""
+    hardener_weight_target_g: float = 0
+    hardener_weight_actual_g: float = 0
+    thinner_product_id: str = ""
+    thinner_weight_g: float = 0
+    ratio_achieved: float = 0
+    ratio_in_spec: bool = False
+    override_reason: str = ""
+    application_method: str = "brush"
+    pot_life_started_at: float = 0
+    pot_life_expires_at: float = 0
+    status: str = "completed"
+    confirmation: str = "confirmed"
+
+class MixingSessionBatch(BaseModel):
+    sessions: List[MixingSessionIn]
+
+@router.post("/{device_id}/mixing-sessions")
+async def ingest_mixing_sessions(
+    device_id: str,
+    batch: MixingSessionBatch,
+    device: LockerDevice = Depends(verify_device_api_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Receive mixing sessions from edge device."""
+    from app.models.mixing import MixingSessionCloud
+
+    received = 0
+    acked_ids = []
+
+    for s in batch.sessions:
+        # Deduplicate by session_uuid
+        existing = await db.execute(
+            select(MixingSessionCloud).where(
+                MixingSessionCloud.session_uuid == s.session_id
+            )
+        )
+        if existing.scalar_one_or_none():
+            acked_ids.append(s.session_id)  # Already exists, still ack
+            continue
+
+        # Find recipe by recipe_id string (could be name or UUID)
+        recipe_id_fk = None
+        if s.recipe_id:
+            from app.models.product import MixingRecipe
+            recipe_result = await db.execute(
+                select(MixingRecipe).where(
+                    (MixingRecipe.id == s.recipe_id) | (MixingRecipe.name == s.recipe_id)
+                )
+            )
+            recipe = recipe_result.scalar_one_or_none()
+            if recipe:
+                recipe_id_fk = recipe.id
+
+        session_record = MixingSessionCloud(
+            device_id=device.id,
+            session_uuid=s.session_id,
+            recipe_id=recipe_id_fk,
+            job_id=s.job_id,
+            user_name=s.user_name,
+            started_at=datetime.utcfromtimestamp(s.started_at) if s.started_at else None,
+            completed_at=datetime.utcfromtimestamp(s.completed_at) if s.completed_at else None,
+            base_weight_target_g=s.base_weight_target_g,
+            base_weight_actual_g=s.base_weight_actual_g,
+            hardener_weight_target_g=s.hardener_weight_target_g,
+            hardener_weight_actual_g=s.hardener_weight_actual_g,
+            thinner_weight_g=s.thinner_weight_g,
+            ratio_achieved=s.ratio_achieved,
+            ratio_in_spec=s.ratio_in_spec,
+            application_method=s.application_method,
+            status=s.status,
+        )
+        db.add(session_record)
+        received += 1
+        acked_ids.append(s.session_id)
+
+    await db.commit()
+
+    return {"received": received, "session_ids": acked_ids}

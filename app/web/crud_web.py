@@ -62,6 +62,8 @@ async def product_edit(
         product.updated_at = datetime.utcnow()
 
         await db.flush()
+        from app.services.command_service import create_product_sync_command
+        await create_product_sync_command(db)
         logger.info(f"Product updated: {product_id} ({name})")
 
     except Exception as e:
@@ -95,6 +97,8 @@ async def product_delete(
         product.is_active = False
         product.updated_at = datetime.utcnow()
         await db.flush()
+        from app.services.command_service import create_product_sync_command
+        await create_product_sync_command(db)
         logger.info(f"Product soft-deleted: {product_id} ({product.name})")
 
     except Exception as e:
@@ -153,6 +157,8 @@ async def recipe_edit(
         recipe.pot_life_minutes = pot_life_minutes
 
         await db.flush()
+        from app.services.command_service import create_recipe_sync_command
+        await create_recipe_sync_command(db)
         logger.info(f"Recipe updated: {recipe_id} ({name})")
 
     except Exception as e:
@@ -206,6 +212,9 @@ async def recipe_delete(
             await db.delete(recipe)
             await db.flush()
             logger.info(f"Recipe hard-deleted: {recipe_id} ({recipe.name})")
+
+        from app.services.command_service import create_recipe_sync_command
+        await create_recipe_sync_command(db)
 
     except Exception as e:
         logger.error(f"Error deleting recipe {recipe_id}: {e}")

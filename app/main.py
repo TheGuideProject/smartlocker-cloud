@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
@@ -64,12 +64,14 @@ from app.api.auth import router as auth_router
 from app.api.products import router as products_router, recipe_router
 from app.api.events import router as events_router
 from app.api.pairing import router as pairing_router
+from app.api.websocket import router as ws_router
 
 app.include_router(auth_router)
 app.include_router(products_router)
 app.include_router(recipe_router)
 app.include_router(events_router)
 app.include_router(pairing_router)
+app.include_router(ws_router)
 
 # Include web routers
 from app.web.auth_web import router as auth_web_router
