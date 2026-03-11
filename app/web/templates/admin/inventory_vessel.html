@@ -40,10 +40,18 @@
 
 <!-- Product inventory table -->
 <div class="panel">
-    <div class="panel-title">Products On Board</div>
+    <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+        Products On Board
+        {% if products %}
+        <form action="/admin/inventory/{{ vessel.id }}/clear-all" method="post" style="display:inline;"
+              onsubmit="return confirm('Reset ALL stock to 0? This will delete all inventory adjustments for this vessel.');">
+            <button type="submit" class="btn btn-secondary" style="font-size:11px; padding:4px 10px; background:var(--accent-red); color:#fff; border:none;">Reset All Stock</button>
+        </form>
+        {% endif %}
+    </div>
     <table class="data-table">
         <thead>
-            <tr><th>Product</th><th>Type</th><th>Colors</th><th>Liters</th><th>Status</th></tr>
+            <tr><th>Product</th><th>Type</th><th>Colors</th><th>Liters</th><th>Status</th><th style="width:80px;">Actions</th></tr>
         </thead>
         <tbody>
         {% for item in products %}
@@ -66,10 +74,18 @@
                 {% if item.low_stock %}<span style="color:var(--danger);">Low</span>
                 {% else %}<span style="color:var(--success);">OK</span>{% endif %}
             </td>
+            <td>
+                {% if item.product_id %}
+                <form action="/admin/inventory/{{ vessel.id }}/delete-stock/{{ item.product_id }}" method="post" style="display:inline;"
+                      onsubmit="return confirm('Delete all stock for {{ item.name }}? This resets it to 0 L.');">
+                    <button type="submit" class="btn-delete" style="font-size:11px; padding:3px 8px;">Delete</button>
+                </form>
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
         {% if not products %}
-        <tr><td colspan="5" style="color:var(--text-muted); text-align:center; padding: 20px;">No products on board yet. Use "Add Stock" or "Import PDF Order" to add inventory.</td></tr>
+        <tr><td colspan="6" style="color:var(--text-muted); text-align:center; padding: 20px;">No products on board yet. Use "Add Stock" or "Import PDF Order" to add inventory.</td></tr>
         {% endif %}
         </tbody>
     </table>
@@ -79,7 +95,7 @@
 <div class="panel">
     <div class="panel-title">Recent Changes</div>
     <table class="data-table">
-        <thead><tr><th>Date</th><th>Type</th><th>Product</th><th>Liters</th><th>Source</th></tr></thead>
+        <thead><tr><th>Date</th><th>Type</th><th>Product</th><th>Liters</th><th>Source</th><th style="width:70px;"></th></tr></thead>
         <tbody>
         {% for adj in adjustments %}
         <tr>
@@ -88,9 +104,15 @@
             <td>{{ adj.product_name or '-' }}</td>
             <td>{{ adj.quantity_liters or '-' }} L</td>
             <td>{{ adj.source_document or adj.notes or '-' }}</td>
+            <td>
+                <form action="/admin/inventory/{{ vessel.id }}/delete-adjustment/{{ adj.id }}" method="post" style="display:inline;"
+                      onsubmit="return confirm('Delete this entry?');">
+                    <button type="submit" class="btn-delete" style="font-size:11px; padding:2px 8px;">&#x2715;</button>
+                </form>
+            </td>
         </tr>
         {% endfor %}
-        {% if not adjustments %}<tr><td colspan="5" style="color:var(--text-muted); text-align:center;">No adjustments yet</td></tr>{% endif %}
+        {% if not adjustments %}<tr><td colspan="6" style="color:var(--text-muted); text-align:center;">No adjustments yet</td></tr>{% endif %}
         </tbody>
     </table>
 </div>

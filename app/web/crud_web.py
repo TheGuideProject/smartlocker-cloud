@@ -20,6 +20,8 @@ from app.models.device import LockerDevice
 from app.models.command import DeviceCommand
 from app.models.event import DeviceEvent
 from app.models.mixing import MixingSessionCloud
+from app.models.inventory import InventoryAdjustment
+from app.web.auth_web import require_admin_session
 
 logger = logging.getLogger("smartlocker.crud")
 
@@ -38,13 +40,18 @@ async def product_edit(
     name: str = Form(...),
     product_type: str = Form(...),
     density_g_per_ml: float = Form(1.0),
-    pot_life_minutes: int | None = Form(None),
+    pot_life_minutes: str = Form(""),
     hazard_class: str | None = Form(None),
     description: str | None = Form(None),
     sds_url: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a product's fields."""
+    # Parse optional int fields (HTML sends "" for empty fields)
+    pot_life_int = None
+    if pot_life_minutes and pot_life_minutes.strip().isdigit():
+        pot_life_int = int(pot_life_minutes.strip())
+
     try:
         result = await db.execute(select(Product).where(Product.id == product_id))
         product = result.scalar_one_or_none()
@@ -57,7 +64,7 @@ async def product_edit(
         product.name = name.strip()
         product.product_type = product_type.strip()
         product.density_g_per_ml = density_g_per_ml
-        product.pot_life_minutes = pot_life_minutes
+        product.pot_life_minutes = pot_life_int
         product.hazard_class = hazard_class.strip() if hazard_class else None
         product.description = description.strip() if description else None
         product.sds_url = sds_url.strip() if sds_url else None
@@ -697,3 +704,123 @@ async def device_delete(
         )
 
     return RedirectResponse(url="/admin/devices", status_code=303)
+
+
+# =============================================================================
+# INVENTORY - Delete Stock & Adjustments
+# =============================================================================
+
+@router.post("/inventory/{vessel_id}/delete-stock/{product_id}")
+async def inventory_delete_stock(
+    vessel_id: str,
+    product_id: str,
+    user=Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete ALL inventory adjustments for a product on a vessel (resets stock to 0)."""
+    try:
+        # Get device IDs for this vessel
+        devices_result = await db.execute(
+            select(LockerDevice.id).where(LockerDevice.vessel_id == vessel_id)
+        )
+        device_ids = [row[0] for row in devices_result.fetchall()]
+
+        if device_ids:
+            adj_result = await db.execute(
+                select(InventoryAdjustment).where(
+                    InventoryAdjustment.device_id.in_(device_ids),
+                    InventoryAdjustment.product_id == product_id,
+                )
+            )
+            adjustments = adj_result.scalars().all()
+            for adj in adjustments:
+                await db.delete(adj)
+            await db.flush()
+            logger.info(
+                f"Stock cleared: {len(adjustments)} adjustments deleted for "
+                f"product {product_id} on vessel {vessel_id}"
+            )
+
+    except Exception as e:
+        logger.error(f"Error deleting stock for product {product_id}: {e}")
+        await db.rollback()
+        return RedirectResponse(
+            url=f"/admin/inventory/{vessel_id}?error=Error+deleting+stock",
+            status_code=303,
+        )
+
+    return RedirectResponse(url=f"/admin/inventory/{vessel_id}", status_code=303)
+
+
+@router.post("/inventory/{vessel_id}/delete-adjustment/{adjustment_id}")
+async def inventory_delete_adjustment(
+    vessel_id: str,
+    adjustment_id: str,
+    user=Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a single inventory adjustment entry."""
+    try:
+        result = await db.execute(
+            select(InventoryAdjustment).where(
+                InventoryAdjustment.id == adjustment_id
+            )
+        )
+        adj = result.scalar_one_or_none()
+        if not adj:
+            return RedirectResponse(
+                url=f"/admin/inventory/{vessel_id}?error=Adjustment+not+found",
+                status_code=303,
+            )
+
+        await db.delete(adj)
+        await db.flush()
+        logger.info(f"Adjustment deleted: {adjustment_id} on vessel {vessel_id}")
+
+    except Exception as e:
+        logger.error(f"Error deleting adjustment {adjustment_id}: {e}")
+        await db.rollback()
+        return RedirectResponse(
+            url=f"/admin/inventory/{vessel_id}?error=Error+deleting+adjustment",
+            status_code=303,
+        )
+
+    return RedirectResponse(url=f"/admin/inventory/{vessel_id}", status_code=303)
+
+
+@router.post("/inventory/{vessel_id}/clear-all")
+async def inventory_clear_all(
+    vessel_id: str,
+    user=Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete ALL inventory adjustments for a vessel (full reset)."""
+    try:
+        devices_result = await db.execute(
+            select(LockerDevice.id).where(LockerDevice.vessel_id == vessel_id)
+        )
+        device_ids = [row[0] for row in devices_result.fetchall()]
+
+        if device_ids:
+            adj_result = await db.execute(
+                select(InventoryAdjustment).where(
+                    InventoryAdjustment.device_id.in_(device_ids)
+                )
+            )
+            adjustments = adj_result.scalars().all()
+            for adj in adjustments:
+                await db.delete(adj)
+            await db.flush()
+            logger.info(
+                f"All stock cleared: {len(adjustments)} adjustments on vessel {vessel_id}"
+            )
+
+    except Exception as e:
+        logger.error(f"Error clearing all stock on vessel {vessel_id}: {e}")
+        await db.rollback()
+        return RedirectResponse(
+            url=f"/admin/inventory/{vessel_id}?error=Error+clearing+stock",
+            status_code=303,
+        )
+
+    return RedirectResponse(url=f"/admin/inventory/{vessel_id}", status_code=303)

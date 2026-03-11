@@ -46,18 +46,53 @@ PAINT_COLOR_HEX = {
     'orange': '#F29930', 'pink': '#E67A94', 'maroon': '#8C2630',
     'copper': '#BF7A38', 'beige': '#D9C8A3', 'cream': '#EBE3C8',
     'silver': '#B8BCC6', 'aluminum': '#ADB3BD', 'aluminium': '#ADB3BD',
+    # Compound marine paint colors
+    'redbrown': '#B5462A', 'red brown': '#B5462A', 'reddish brown': '#B5462A',
+    'light grey': '#B0B5BD', 'light gray': '#B0B5BD',
+    'dark grey': '#5A5E66', 'dark gray': '#5A5E66',
+    'light blue': '#6BA3D9', 'light green': '#66CC85',
+    'rust': '#C45B28', 'rust red': '#C45B28', 'oxide red': '#B5462A',
+    'primer red': '#C8534D', 'signal red': '#E6333F',
+    'olive': '#808C3B', 'olive green': '#808C3B',
+    'navy': '#1F3366', 'navy blue': '#1F3366',
+    'tan': '#D9B982', 'sand': '#D9C896', 'buff': '#D9C28C',
+    'turquoise': '#40B5AD', 'teal': '#2D8C8C',
+    'purple': '#8040B3', 'violet': '#6A40B3',
+    'ivory': '#F5F0DC', 'off-white': '#F0EDE0', 'offwhite': '#F0EDE0',
+    'charcoal': '#3D4047', 'graphite': '#4A4E56',
+    'bronze': '#B08040', 'gold': '#D9A830',
 }
 
 
 def _color_name_to_hex(name: str) -> str:
-    """Resolve paint color name to hex. Tries exact, then first word."""
+    """Resolve paint color name to hex.
+
+    Tries: exact match → first word → substring match → default grey.
+    """
     if not name:
         return '#737880'
     key = name.strip().lower()
+    # Remove trailing numbers (e.g., "Redbrown 6179" → "redbrown")
+    words = key.split()
+    name_only = ' '.join(w for w in words if not w.isdigit())
+    if not name_only:
+        name_only = key
+
+    # 1. Exact match on full key
     if key in PAINT_COLOR_HEX:
         return PAINT_COLOR_HEX[key]
-    first = key.split()[0]
-    return PAINT_COLOR_HEX.get(first, '#737880')
+    # 2. Match without numbers
+    if name_only in PAINT_COLOR_HEX:
+        return PAINT_COLOR_HEX[name_only]
+    # 3. First word only
+    first = words[0]
+    if first in PAINT_COLOR_HEX:
+        return PAINT_COLOR_HEX[first]
+    # 4. Substring match: check if any known color is contained in the name
+    for color_key, hex_val in PAINT_COLOR_HEX.items():
+        if color_key in name_only or name_only in color_key:
+            return hex_val
+    return '#737880'
 
 
 def _extract_product_colors(parsed_data: dict) -> dict:
@@ -180,11 +215,16 @@ async def admin_add_product(
     name: str = Form(...),
     product_type: str = Form(...),
     density_g_per_ml: float = Form(1.0),
-    pot_life_minutes: int = Form(None),
+    pot_life_minutes: str = Form(""),
     hazard_class: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ):
     """Add a new product via form."""
+    # Parse optional int fields (HTML sends "" for empty fields)
+    pot_life_int = None
+    if pot_life_minutes and pot_life_minutes.strip().isdigit():
+        pot_life_int = int(pot_life_minutes.strip())
+
     # Parse color data from dynamic form fields
     form_data = await request.form()
     colors = []
@@ -201,7 +241,7 @@ async def admin_add_product(
         name=name,
         product_type=product_type,
         density_g_per_ml=density_g_per_ml,
-        pot_life_minutes=pot_life_minutes if pot_life_minutes else None,
+        pot_life_minutes=pot_life_int,
         hazard_class=hazard_class or None,
         colors_json=colors if colors else None,
     )
@@ -1296,6 +1336,9 @@ async def admin_inventory_vessel(
         if p.colors_json:
             vessel_product_colors[p.name] = p.colors_json
 
+    # Build product name→id lookup
+    product_name_to_id = {p.name: p.id for p in all_products}
+
     # Build product inventory summary
     product_summary = {}
     for can in cans:
@@ -1313,6 +1356,7 @@ async def admin_inventory_vessel(
         if pname not in product_summary:
             product_summary[pname] = {
                 "name": pname,
+                "product_id": product_name_to_id.get(pname, ""),
                 "product_type": product_type,
                 "product_type_label": product_type.replace("_", " ").title(),
                 "liters": 0.0,
@@ -1358,6 +1402,7 @@ async def admin_inventory_vessel(
                 else:
                     product_summary[p.name] = {
                         "name": p.name,
+                        "product_id": p.id,
                         "product_type": p.product_type,
                         "product_type_label": p.product_type.replace("_", " ").title(),
                         "liters": round(adj_liters, 1),
@@ -1397,6 +1442,7 @@ async def admin_inventory_vessel(
         for adj in adjustments_raw:
             p = products_by_id.get(adj.product_id)
             adjustments.append({
+                "id": adj.id,
                 "created_at": adj.created_at,
                 "adjustment_type": adj.adjustment_type,
                 "product_name": p.name if p else adj.product_id[:8],
