@@ -468,11 +468,69 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         </div>
     </details>
 
+    <!-- v2.2.1 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v2.2.1</span> Remote Restart/Reboot + Sync Fix</span>
+            <span class="version-date">2026-03-11</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Remote Commands</div>
+            <ul>
+                <li>Remote restart and reboot commands from cloud admin panel</li>
+                <li>CSS cache-busting with version query parameter</li>
+            </ul>
+            <div class="change-subtitle">Edge Fixes</div>
+            <ul>
+                <li>Fix sync engine not resuming after device reboot</li>
+                <li>Virtual keyboard working correctly under systemd service</li>
+                <li>Remote restart/reboot command handling on edge</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.2.0 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v2.2.0</span> Inventory Redesign + Configurable Slots</span>
+            <span class="version-date">2026-03-11</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Cloud</div>
+            <ul>
+                <li>Configurable slot count per device (no longer hardcoded)</li>
+                <li>Admin edit mode CSS fixes for inline editing</li>
+            </ul>
+            <div class="change-subtitle">Edge</div>
+            <ul>
+                <li>Inventory screen redesign with shelf map visualisation</li>
+                <li>Touch virtual keyboard for all input fields</li>
+                <li>Configurable slot count synced from cloud</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.1.0 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v2.1.0</span> Real-Time WebSocket Sync</span>
+            <span class="version-date">2026-03-11</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">WebSocket Integration</div>
+            <ul>
+                <li>Real-time WebSocket channel between edge and cloud</li>
+                <li>Command queue system for cloud-to-edge instructions (OTA, restart, reboot)</li>
+                <li>Live product and recipe sync without polling delay</li>
+            </ul>
+        </div>
+    </details>
+
     <!-- v2.0.0 -->
     <details class="changelog-entry">
         <summary>
             <span><span class="version-tag">v2.0.0</span> Full System Launch</span>
-            <span class="version-date">2026-03-07</span>
+            <span class="version-date">2026-03-09</span>
         </summary>
         <div class="changelog-body">
             <div class="change-subtitle">Authentication &amp; Security</div>
@@ -509,6 +567,200 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
                 <li>Periodic SQLite backup with rotation (every 6h, keep 5) + USB copy</li>
                 <li>System telemetry: CPU, RAM, disk, throttle status via heartbeat</li>
                 <li>Event sourcing with UUID-based deduplication</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.9 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.9</span> Hardware Telemetry</span>
+            <span class="version-date">2026-03-09</span>
+        </summary>
+        <div class="changelog-body">
+            <ul>
+                <li>Hardware telemetry data included in cloud heartbeat (CPU temp, RAM, disk, throttle)</li>
+                <li>Telemetry section added to device monitoring page on cloud admin</li>
+                <li>Fix device always showing offline: added missing <code>db.commit()</code> to API endpoints</li>
+                <li>Fix inventory snapshot field mismatch + <code>open_support_count</code> attribute error</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.8 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.8</span> System Health Page</span>
+            <span class="version-date">2026-03-09</span>
+        </summary>
+        <div class="changelog-body">
+            <ul>
+                <li>System Health screen on edge with real-time graphs</li>
+                <li>Complete system monitor: CPU, RAM, disk, temperature, network status</li>
+                <li>Fix MissingGreenlet: eagerly load <code>support_requests</code> in devices query</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.7 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.7</span> Alarm Simulation</span>
+            <span class="version-date">2026-03-09</span>
+        </summary>
+        <div class="changelog-body">
+            <ul>
+                <li>Alarm simulation buttons added to edge admin screen (password-protected)</li>
+                <li>Allows testing of alarm triggers and LED/buzzer feedback without real sensor events</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.6 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.6</span> Alarm System + Error Codes + Support Requests</span>
+            <span class="version-date">2026-03-09</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Cloud</div>
+            <ul>
+                <li>Error code reference guide page with all E-codes and resolutions</li>
+                <li>Support request system: devices can submit support tickets</li>
+                <li>Alarm dashboard integration: view device alarms from admin</li>
+                <li>Inventory redesign: litres only, removed can counts</li>
+                <li>Product colours in admin dashboard</li>
+            </ul>
+            <div class="change-subtitle">Edge</div>
+            <ul>
+                <li>Comprehensive alarm system with visual (LED) and audio (buzzer) alerts</li>
+                <li>Virtual keyboard for touchscreen input fields</li>
+                <li>OTA sync fix: <code>force_sync()</code> now triggers heartbeat to update cloud status</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.5 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.5</span> Inventory Redesign + Mixing Return Fix</span>
+            <span class="version-date">2026-03-09</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Cloud</div>
+            <ul>
+                <li>Cloud inventory system with can tracking, analytics, and PDF import</li>
+                <li>OTA update management from admin dashboard</li>
+                <li>Auto-detect latest version from GitHub for OTA updates</li>
+                <li>Fix: clear stale OTA status + preserve expanded panels on refresh</li>
+                <li>Support for private repo version detection</li>
+            </ul>
+            <div class="change-subtitle">Edge</div>
+            <ul>
+                <li>Inventory screen redesign with improved product display</li>
+                <li>Mixing session return-to-slot flow fix</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.4 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.4</span> Chart Viewer Redesign</span>
+            <span class="version-date">2026-03-09</span>
+        </summary>
+        <div class="changelog-body">
+            <ul>
+                <li>Maintenance chart viewer completely redesigned for readability</li>
+                <li>Improved PDF rendering and zoom controls on edge touchscreen</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.3 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.3</span> Modern Chart Viewer</span>
+            <span class="version-date">2026-03-09</span>
+        </summary>
+        <div class="changelog-body">
+            <ul>
+                <li>Modern chart viewer UI for maintenance schedules on edge</li>
+                <li>Safe <code>UpdateManager</code> import with <code>try/except</code> fallback</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.2 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.2</span> OTA Test + Sync Optimisation</span>
+            <span class="version-date">2026-03-09</span>
+        </summary>
+        <div class="changelog-body">
+            <ul>
+                <li>OTA update system validation (second test deployment)</li>
+                <li>Aggressive sync intervals optimised for spotty ship connectivity</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.1 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.1</span> OTA System + systemd Service</span>
+            <span class="version-date">2026-03-09</span>
+        </summary>
+        <div class="changelog-body">
+            <ul>
+                <li>Git-based OTA update system: pull latest code and restart service</li>
+                <li>systemd auto-start service for boot persistence</li>
+                <li>First OTA test deployment</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v1.0.0 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v1.0.0</span> Initial Release</span>
+            <span class="version-date">2026-03-08</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Cloud Platform</div>
+            <ul>
+                <li>FastAPI backend deployed on Railway</li>
+                <li>PostgreSQL database with auto-migration</li>
+                <li>Fleet management: companies, fleets, vessels</li>
+                <li>Device registration and 6-digit pairing system</li>
+                <li>Maintenance chart PDF upload with editable preview</li>
+                <li>Chart sync to edge devices via config endpoint</li>
+            </ul>
+            <div class="change-subtitle">Edge Device</div>
+            <ul>
+                <li>Kivy touchscreen UI with 4 main screens (Home, Inventory, Mixing, Settings)</li>
+                <li>Cloud sync engine with 6-digit pairing</li>
+                <li>Paint Now mixing wizard with step-by-step flow</li>
+                <li>Chart Viewer for maintenance schedules</li>
+                <li>Inventory screen with product names</li>
+                <li>Complete UI redesign (Maritime Tech 2026 theme)</li>
+            </ul>
+            <div class="change-subtitle">Sensors &amp; Hardware</div>
+            <ul>
+                <li>TEST mode with simulated sensors for development</li>
+                <li>HYBRID mode: mix real and fake sensors</li>
+                <li>Thinner weighing support</li>
+                <li>Active mix indicator on screen</li>
+                <li>Enhanced inventory events with product info + slot state sync</li>
+                <li>Offline sensor health logging (every 5 min) + batch upload</li>
+            </ul>
+            <div class="change-subtitle">Infrastructure</div>
+            <ul>
+                <li>SQLite local database with WAL mode and cross-thread access</li>
+                <li>Admin page with password protection on edge</li>
+                <li>Cloud monitoring integration</li>
+                <li>Device monitoring dashboard + sensor health tracking</li>
+                <li>Smart health log aggregation + batch receive endpoint</li>
             </ul>
         </div>
     </details>
