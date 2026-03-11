@@ -17,6 +17,7 @@ from app.models.product import Product, MixingRecipe
 from app.models.company import Company
 from app.models.fleet import Fleet, Vessel
 from app.models.device import LockerDevice
+from app.models.command import DeviceCommand
 from app.models.event import DeviceEvent
 from app.models.mixing import MixingSessionCloud
 
@@ -555,6 +556,73 @@ async def device_edit_slots(
         await db.rollback()
         return RedirectResponse(
             url="/admin/devices?error=Error+updating+slot+count", status_code=303
+        )
+
+    return RedirectResponse(url="/admin/devices", status_code=303)
+
+
+@router.post("/devices/{device_id}/restart")
+async def device_restart(
+    device_id: str,
+    action: str = Form("restart_app"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a restart_app or reboot_device command to a device via WebSocket/queue."""
+    try:
+        result = await db.execute(
+            select(LockerDevice).where(LockerDevice.id == device_id)
+        )
+        device = result.scalar_one_or_none()
+        if not device:
+            return RedirectResponse(
+                url="/admin/devices?error=Device+not+found", status_code=303
+            )
+
+        # Validate action
+        if action not in ("restart_app", "reboot_device"):
+            return RedirectResponse(
+                url="/admin/devices?error=Invalid+action", status_code=303
+            )
+
+        # Create command
+        cmd = DeviceCommand(
+            device_id=device.id,
+            command_type=action,
+            payload={},
+            status="pending",
+        )
+        db.add(cmd)
+        await db.flush()
+
+        # Try to push via WebSocket if online
+        try:
+            from app.api.websocket import manager
+            if manager.is_connected(device.device_id):
+                sent = await manager.send_to_device(device.device_id, {
+                    "type": "command",
+                    "command_id": cmd.id,
+                    "command_type": action,
+                    "payload": {},
+                })
+                if sent:
+                    cmd.status = "delivered"
+                    cmd.delivered_at = datetime.utcnow()
+                    logger.info(f"[CMD] {action} sent to {device.device_id} via WS")
+                else:
+                    logger.info(f"[CMD] {action} queued for {device.device_id} (WS send failed)")
+            else:
+                logger.info(f"[CMD] {action} queued for {device.device_id} (device offline)")
+        except ImportError:
+            logger.info(f"[CMD] {action} queued for {device.device_id} (WS not available)")
+
+        action_label = "Restart" if action == "restart_app" else "Reboot"
+        logger.info(f"{action_label} command sent to device {device.device_id}")
+
+    except Exception as e:
+        logger.error(f"Error sending {action} to device {device_id}: {e}")
+        await db.rollback()
+        return RedirectResponse(
+            url=f"/admin/devices?error=Error+sending+command", status_code=303
         )
 
     return RedirectResponse(url="/admin/devices", status_code=303)
