@@ -2,14 +2,16 @@
 
 import os
 import re
+import io
 import json
+import base64
 import asyncio
 import logging
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.orm import selectinload
@@ -2136,6 +2138,177 @@ async def admin_guide(request: Request, user=Depends(require_admin_session)):
         "user": user,
         "active": "guide",
     })
+
+
+# ---- Barcode Generator ----
+
+@router.get("/barcode-generator", response_class=HTMLResponse)
+async def admin_barcode_generator(request: Request, user=Depends(require_admin_session)):
+    """Barcode / QR-code label generator page."""
+    return templates.TemplateResponse("admin/barcode_generator.html", {
+        "request": request,
+        "user": user,
+        "active": "barcode",
+    })
+
+
+def _make_barcode_image(data: str, barcode_type: str) -> bytes:
+    """Generate a barcode or QR code and return PNG bytes."""
+    buf = io.BytesIO()
+    if barcode_type == "qr":
+        import qrcode
+        img = qrcode.make(data, box_size=8, border=2)
+        img.save(buf, format="PNG")
+    else:
+        import barcode as barcode_lib
+        from barcode.writer import ImageWriter
+        code128 = barcode_lib.get_barcode_class("code128")
+        bc = code128(data, writer=ImageWriter())
+        bc.write(buf, options={"module_width": 0.4, "module_height": 12, "font_size": 10, "text_distance": 5})
+    buf.seek(0)
+    return buf.read()
+
+
+@router.post("/barcode-generator/create", response_class=HTMLResponse)
+async def admin_barcode_create(
+    request: Request,
+    user=Depends(require_admin_session),
+    ppg_code: str = Form(...),
+    batch_start: str = Form(...),
+    batch_end: str = Form(""),
+    product_name: str = Form(...),
+    color: str = Form(...),
+    barcode_type: str = Form("code128"),
+):
+    """Generate barcode preview(s) and return HTML fragment."""
+    ppg_code = ppg_code.strip().upper()
+    product_name = product_name.strip().upper().replace(" ", "-")
+    color = color.strip().upper().replace(" ", "")
+    barcode_type = barcode_type.strip().lower()
+
+    batches: list[str] = []
+    batch_start = batch_start.strip()
+    batch_end = batch_end.strip()
+
+    if batch_end and batch_start.isdigit() and batch_end.isdigit():
+        start_n = int(batch_start)
+        end_n = int(batch_end)
+        if end_n < start_n:
+            start_n, end_n = end_n, start_n
+        # Cap at 50 to avoid abuse
+        end_n = min(end_n, start_n + 49)
+        width = max(len(batch_start), len(batch_end))
+        batches = [str(n).zfill(width) for n in range(start_n, end_n + 1)]
+    else:
+        batches = [batch_start]
+
+    previews: list[dict] = []
+    for batch in batches:
+        data_string = f"{ppg_code}/{batch}/{product_name}/{color}"
+        png_bytes = _make_barcode_image(data_string, barcode_type)
+        b64 = base64.b64encode(png_bytes).decode()
+        previews.append({
+            "data": data_string,
+            "image_b64": b64,
+            "batch": batch,
+        })
+
+    return templates.TemplateResponse("admin/_barcode_previews.html", {
+        "request": request,
+        "previews": previews,
+        "barcode_type": barcode_type,
+        "ppg_code": ppg_code,
+        "product_name": product_name,
+        "color": color,
+    })
+
+
+@router.post("/barcode-generator/pdf")
+async def admin_barcode_pdf(
+    request: Request,
+    user=Depends(require_admin_session),
+    ppg_code: str = Form(...),
+    batch_start: str = Form(...),
+    batch_end: str = Form(""),
+    product_name: str = Form(...),
+    color: str = Form(...),
+    barcode_type: str = Form("code128"),
+):
+    """Generate a PDF with printable barcode labels (10cm x 5cm each)."""
+    from reportlab.lib.pagesizes import mm
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas as rl_canvas
+
+    ppg_code = ppg_code.strip().upper()
+    product_name = product_name.strip().upper().replace(" ", "-")
+    color = color.strip().upper().replace(" ", "")
+    barcode_type = barcode_type.strip().lower()
+
+    batch_start = batch_start.strip()
+    batch_end = batch_end.strip()
+
+    batches: list[str] = []
+    if batch_end and batch_start.isdigit() and batch_end.isdigit():
+        start_n = int(batch_start)
+        end_n = int(batch_end)
+        if end_n < start_n:
+            start_n, end_n = end_n, start_n
+        end_n = min(end_n, start_n + 49)
+        width = max(len(batch_start), len(batch_end))
+        batches = [str(n).zfill(width) for n in range(start_n, end_n + 1)]
+    else:
+        batches = [batch_start]
+
+    label_w = 100 * mm
+    label_h = 50 * mm
+
+    pdf_buf = io.BytesIO()
+    c = rl_canvas.Canvas(pdf_buf, pagesize=(label_w, label_h))
+
+    for i, batch in enumerate(batches):
+        if i > 0:
+            c.showPage()
+
+        data_string = f"{ppg_code}/{batch}/{product_name}/{color}"
+        png_bytes = _make_barcode_image(data_string, barcode_type)
+        img_reader = ImageReader(io.BytesIO(png_bytes))
+
+        # Title
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(8 * mm, label_h - 8 * mm, "PPG SmartLocker Label")
+
+        # Barcode image - centered
+        img_w_pt = 60 * mm if barcode_type != "qr" else 28 * mm
+        img_h_pt = 20 * mm if barcode_type != "qr" else 28 * mm
+        img_x = (label_w - img_w_pt) / 2
+        img_y = label_h - 12 * mm - img_h_pt
+        c.drawImage(img_reader, img_x, img_y, width=img_w_pt, height=img_h_pt, preserveAspectRatio=True, mask='auto')
+
+        # Data string below barcode
+        c.setFont("Courier", 7)
+        c.drawCentredString(label_w / 2, img_y - 4 * mm, data_string)
+
+        # Info lines at bottom
+        c.setFont("Helvetica", 7)
+        bottom_y = 6 * mm
+        c.drawString(8 * mm, bottom_y + 5 * mm, f"PPG Code: {ppg_code}   Batch: {batch}")
+        c.drawString(8 * mm, bottom_y, f"Product: {product_name}   Color: {color}")
+
+        # Border
+        c.setStrokeColorRGB(0.6, 0.6, 0.6)
+        c.setLineWidth(0.5)
+        c.rect(2 * mm, 2 * mm, label_w - 4 * mm, label_h - 4 * mm)
+
+    c.save()
+    pdf_buf.seek(0)
+
+    filename = f"labels_{ppg_code}_{batches[0]}.pdf" if len(batches) == 1 else f"labels_{ppg_code}_{batches[0]}-{batches[-1]}.pdf"
+
+    return StreamingResponse(
+        pdf_buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 def _generate_ppg_code(name: str) -> str:

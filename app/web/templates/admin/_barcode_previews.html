@@ -1,0 +1,12 @@
+<p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+    Generated {{ previews|length }} label{{ 's' if previews|length > 1 else '' }}
+    &mdash; {{ 'QR Code' if barcode_type == 'qr' else 'Code 128' }}
+</p>
+<div class="bc-preview-grid">
+{% for p in previews %}
+    <div class="bc-preview-card">
+        <img src="data:image/png;base64,{{ p.image_b64 }}" alt="Barcode {{ p.batch }}">
+        <div class="bc-data">{{ p.data }}</div>
+    </div>
+{% endfor %}
+</div>
