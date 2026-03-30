@@ -361,8 +361,48 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
     </p>
 
-    <!-- v2.4.0 -->
+    <!-- v2.5.0 -->
     <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v2.5.0</span> Dual HX711 Scales + PaintNow-to-Mixing Auto-Flow + Cloud Sync Fix</span>
+            <span class="version-date">2026-03-31</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Dual HX711 Load Cell System</div>
+            <ul>
+                <li>Rewrote HX711 weight driver to use <code>lgpio</code> directly (RPi5 + Python 3.13 compatible)</li>
+                <li>Dual-channel support: shelf scale (GPIO 5/6) + mixing scale (GPIO 23/24)</li>
+                <li>Calibrated with 2kg reference weight: shelf scale=9.81, mixing scale=20.69 raw/gram</li>
+                <li>Auto-tare on startup, inverted mode for both channels</li>
+                <li>Standalone calibration script: <code>scripts/calibrate_test.py</code></li>
+            </ul>
+            <div class="change-subtitle">PaintNow to Mixing Auto-Flow</div>
+            <ul>
+                <li>PaintNow wizard now passes calculated quantities directly to mixing screen</li>
+                <li>Liters auto-converted to grams (density 1.3 kg/L) with hardener ratio from chart</li>
+                <li>Mixing screen skips recipe selection and amount entry when coming from PaintNow</li>
+                <li>Jumps straight to live weighing phase with pre-calculated targets</li>
+            </ul>
+            <div class="change-subtitle">Complete Mixing Screen (7-Page Wizard)</div>
+            <ul>
+                <li>Full mixing workflow: recipe select, live weighing, confirm, thinner, pot life, complete</li>
+                <li>Live weight display (48px) with color-coded zones: pouring, approaching, in-range, over</li>
+                <li>Progress bar tracks weight against target in real-time (300ms refresh)</li>
+                <li>Pot life countdown with color changes at 75% and expired states</li>
+                <li>Session summary with ratio check (IN SPEC / OUT OF SPEC)</li>
+            </ul>
+            <div class="change-subtitle">Infrastructure Fixes</div>
+            <ul>
+                <li>Fixed InventoryEngine short-circuit init bug: drivers now initialize independently</li>
+                <li>Added <code>device_commands</code> table migration for cloud PostgreSQL</li>
+                <li>Improved cloud event sync error logging (verbose traceback on 500 errors)</li>
+                <li>Desktop launcher icon configured for RPi auto-start</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.4.0 -->
+    <details class="changelog-entry">
         <summary>
             <span><span class="version-tag">v2.4.0</span> PN532 USB NFC + Tag Writer + UI Optimization</span>
             <span class="version-date">2026-03-30</span>

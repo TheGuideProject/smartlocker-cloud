@@ -95,77 +95,86 @@ async def ingest_events(
     Uses INSERT ON CONFLICT DO NOTHING for UUID deduplication.
     """
 
-    received = 0
-    duplicates = 0
-    acked_ids = []
-    new_events = []  # Collect newly created events for inventory processing
+    try:
+        received = 0
+        duplicates = 0
+        acked_ids = []
+        new_events = []  # Collect newly created events for inventory processing
 
-    for event_in in batch.events:
-        # Check for duplicate (device_id + event_uuid must be unique)
-        try:
-            existing = await db.execute(
-                select(DeviceEvent).where(
-                    DeviceEvent.device_id == str(device.id),
-                    DeviceEvent.event_uuid == event_in.event_id,
+        for event_in in batch.events:
+            # Check for duplicate (device_id + event_uuid must be unique)
+            try:
+                existing = await db.execute(
+                    select(DeviceEvent).where(
+                        DeviceEvent.device_id == str(device.id),
+                        DeviceEvent.event_uuid == event_in.event_id,
+                    )
                 )
-            )
-            if existing.scalar_one_or_none():
+                if existing.scalar_one_or_none():
+                    duplicates += 1
+                    acked_ids.append(event_in.event_id)
+                    continue
+
+                event = DeviceEvent(
+                    device_id=str(device.id),
+                    event_uuid=event_in.event_id,
+                    event_type=event_in.event_type,
+                    timestamp=datetime.utcfromtimestamp(event_in.timestamp),
+                    shelf_id=event_in.shelf_id or None,
+                    slot_id=event_in.slot_id or None,
+                    tag_id=event_in.tag_id or None,
+                    session_id=event_in.session_id or None,
+                    user_name=event_in.user_name or None,
+                    data=event_in.data,
+                    confirmation=event_in.confirmation,
+                    received_at=datetime.utcnow(),
+                )
+                db.add(event)
+                await db.flush()
+                new_events.append(event)
+                received += 1
+                acked_ids.append(event_in.event_id)
+            except Exception as e:
+                logger.error(f"Event insert error for {event_in.event_id}: {e}")
+                await db.rollback()
+                # Skip individual failures, continue with batch
                 duplicates += 1
                 acked_ids.append(event_in.event_id)
-                continue
 
-            event = DeviceEvent(
-                device_id=str(device.id),
-                event_uuid=event_in.event_id,
-                event_type=event_in.event_type,
-                timestamp=datetime.utcfromtimestamp(event_in.timestamp),
-                shelf_id=event_in.shelf_id or None,
-                slot_id=event_in.slot_id or None,
-                tag_id=event_in.tag_id or None,
-                session_id=event_in.session_id or None,
-                user_name=event_in.user_name or None,
-                data=event_in.data,
-                confirmation=event_in.confirmation,
-                received_at=datetime.utcnow(),
-            )
-            db.add(event)
-            await db.flush()
-            new_events.append(event)
-            received += 1
-            acked_ids.append(event_in.event_id)
-        except Exception:
-            # Skip individual failures, continue with batch
-            duplicates += 1
-            acked_ids.append(event_in.event_id)
+        # Update device heartbeat
+        device.last_heartbeat = datetime.utcnow()
+        device.status = "online"
 
-    # Update device heartbeat
-    device.last_heartbeat = datetime.utcnow()
-    device.status = "online"
+        # Update pending counter in system_info (so cloud dashboard reflects sync immediately)
+        if received > 0 and device.system_info:
+            try:
+                si = dict(device.system_info)
+                old_pending = si.get("events_pending_sync", 0)
+                si["events_pending_sync"] = max(0, old_pending - received - duplicates)
+                device.system_info = si
+            except Exception:
+                pass  # Non-critical
 
-    # Update pending counter in system_info (so cloud dashboard reflects sync immediately)
-    if received > 0 and device.system_info:
-        try:
-            si = dict(device.system_info)
-            old_pending = si.get("events_pending_sync", 0)
-            si["events_pending_sync"] = max(0, old_pending - received - duplicates)
-            device.system_info = si
-        except Exception:
-            pass  # Non-critical
+        # Process new events into inventory state (CanTracking)
+        if new_events:
+            try:
+                await process_inventory_events(db, str(device.id), new_events)
+            except Exception as e:
+                logger.error(f"Error processing inventory events for device {device_id}: {e}")
+                # Don't fail the event ingestion if inventory processing fails
 
-    # Process new events into inventory state (CanTracking)
-    if new_events:
-        try:
-            await process_inventory_events(db, str(device.id), new_events)
-        except Exception as e:
-            logger.error(f"Error processing inventory events for device {device_id}: {e}")
-            # Don't fail the event ingestion if inventory processing fails
-
-    await db.commit()
-    return EventAck(
-        received=received,
-        duplicates=duplicates,
-        event_ids=acked_ids,
-    )
+        await db.commit()
+        return EventAck(
+            received=received,
+            duplicates=duplicates,
+            event_ids=acked_ids,
+        )
+    except Exception as e:
+        logger.error(f"EVENTS ENDPOINT ERROR for {device_id}: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)[:200])
 
 
 @router.post("/{device_id}/heartbeat")
@@ -176,6 +185,17 @@ async def device_heartbeat(
     db: AsyncSession = Depends(get_db),
 ):
     """Update device status."""
+    try:
+        return await _process_heartbeat(device_id, heartbeat, device, db)
+    except Exception as e:
+        logger.error(f"HEARTBEAT ERROR for {device_id}: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)[:200])
+
+
+async def _process_heartbeat(device_id, heartbeat, device, db):
     device.last_heartbeat = datetime.utcnow()
     device.status = "online"
     if heartbeat.software_version:
@@ -328,31 +348,39 @@ async def receive_health_logs(
     Receive a batch of sensor health logs from an edge device.
     Called when edge device comes back online after offline period.
     """
-    received = 0
-    for log in batch.logs:
-        try:
-            # Parse timestamp (ISO format from edge)
+    try:
+        received = 0
+        for log in batch.logs:
             try:
-                ts = datetime.fromisoformat(log.timestamp.replace('Z', '+00:00'))
-            except (ValueError, AttributeError):
-                ts = datetime.utcnow()
+                # Parse timestamp (ISO format from edge)
+                try:
+                    ts = datetime.fromisoformat(log.timestamp.replace('Z', '+00:00'))
+                except (ValueError, AttributeError):
+                    ts = datetime.utcnow()
 
-            entry = SensorHealthLog(
-                device_id=device.id,
-                timestamp=ts,
-                sensor=log.sensor,
-                status=log.status,
-                message=log.message or '',
-                value=log.value or '',
-                received_at=datetime.utcnow(),
-            )
-            db.add(entry)
-            received += 1
-        except Exception:
-            continue  # Skip individual failures
+                entry = SensorHealthLog(
+                    device_id=device.id,
+                    timestamp=ts,
+                    sensor=log.sensor,
+                    status=log.status,
+                    message=log.message or '',
+                    value=log.value or '',
+                    received_at=datetime.utcnow(),
+                )
+                db.add(entry)
+                received += 1
+            except Exception as e:
+                logger.error(f"Health log insert error: {e}")
+                continue  # Skip individual failures
 
-    await db.commit()
-    return {"received": received}
+        await db.commit()
+        return {"received": received}
+    except Exception as e:
+        logger.error(f"HEALTH-LOGS ERROR for {device_id}: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)[:200])
 
 
 # ---- Health Summary (smart aggregation) ----

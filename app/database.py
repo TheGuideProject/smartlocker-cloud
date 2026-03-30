@@ -220,6 +220,32 @@ async def _migrate_add_columns():
         except Exception as e:
             logger.debug(f"  inventory_adjustments table check: {e}")
 
+        # Create device_commands table if not exists
+        try:
+            result = await conn.execute(text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_name = 'device_commands'"
+            ))
+            if not result.scalar_one_or_none():
+                await conn.execute(text("""
+                    CREATE TABLE device_commands (
+                        id VARCHAR(36) PRIMARY KEY,
+                        device_id VARCHAR(36) NOT NULL REFERENCES locker_devices(id),
+                        command_type VARCHAR(50) NOT NULL,
+                        payload JSONB DEFAULT '{}',
+                        created_at TIMESTAMP DEFAULT now(),
+                        delivered_at TIMESTAMP,
+                        acked_at TIMESTAMP,
+                        status VARCHAR(30) DEFAULT 'pending'
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX idx_device_commands_device ON device_commands(device_id)"
+                ))
+                logger.info("  Created device_commands table")
+        except Exception as e:
+            logger.debug(f"  device_commands table check: {e}")
+
         # Add device monitoring columns if missing
         monitoring_columns = {
             "driver_status": "JSONB",
