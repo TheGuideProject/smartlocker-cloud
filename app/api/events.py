@@ -100,44 +100,45 @@ async def ingest_events(
         duplicates = 0
         acked_ids = []
         new_events = []  # Collect newly created events for inventory processing
+        device_id_fk = str(device.id)
 
         for event_in in batch.events:
-            # Check for duplicate (device_id + event_uuid must be unique)
+            # Use savepoint so a single failure doesn't poison the whole batch
             try:
-                existing = await db.execute(
-                    select(DeviceEvent).where(
-                        DeviceEvent.device_id == str(device.id),
-                        DeviceEvent.event_uuid == event_in.event_id,
+                async with db.begin_nested():
+                    existing = await db.execute(
+                        select(DeviceEvent).where(
+                            DeviceEvent.device_id == device_id_fk,
+                            DeviceEvent.event_uuid == event_in.event_id,
+                        )
                     )
-                )
-                if existing.scalar_one_or_none():
-                    duplicates += 1
-                    acked_ids.append(event_in.event_id)
-                    continue
+                    if existing.scalar_one_or_none():
+                        duplicates += 1
+                        acked_ids.append(event_in.event_id)
+                        continue
 
-                event = DeviceEvent(
-                    device_id=str(device.id),
-                    event_uuid=event_in.event_id,
-                    event_type=event_in.event_type,
-                    timestamp=datetime.utcfromtimestamp(event_in.timestamp),
-                    shelf_id=event_in.shelf_id or None,
-                    slot_id=event_in.slot_id or None,
-                    tag_id=event_in.tag_id or None,
-                    session_id=event_in.session_id or None,
-                    user_name=event_in.user_name or None,
-                    data=event_in.data,
-                    confirmation=event_in.confirmation,
-                    received_at=datetime.utcnow(),
-                )
-                db.add(event)
-                await db.flush()
-                new_events.append(event)
-                received += 1
-                acked_ids.append(event_in.event_id)
+                    event = DeviceEvent(
+                        device_id=device_id_fk,
+                        event_uuid=event_in.event_id,
+                        event_type=event_in.event_type,
+                        timestamp=datetime.utcfromtimestamp(event_in.timestamp),
+                        shelf_id=event_in.shelf_id or None,
+                        slot_id=event_in.slot_id or None,
+                        tag_id=event_in.tag_id or None,
+                        session_id=event_in.session_id or None,
+                        user_name=event_in.user_name or None,
+                        data=event_in.data,
+                        confirmation=event_in.confirmation,
+                        received_at=datetime.utcnow(),
+                    )
+                    db.add(event)
+                    await db.flush()
+                    new_events.append(event)
+                    received += 1
+                    acked_ids.append(event_in.event_id)
             except Exception as e:
                 logger.error(f"Event insert error for {event_in.event_id}: {e}")
-                await db.rollback()
-                # Skip individual failures, continue with batch
+                # Savepoint auto-rolls back, main transaction stays valid
                 duplicates += 1
                 acked_ids.append(event_in.event_id)
 
@@ -158,10 +159,9 @@ async def ingest_events(
         # Process new events into inventory state (CanTracking)
         if new_events:
             try:
-                await process_inventory_events(db, str(device.id), new_events)
+                await process_inventory_events(db, device_id_fk, new_events)
             except Exception as e:
-                logger.error(f"Error processing inventory events for device {device_id}: {e}")
-                # Don't fail the event ingestion if inventory processing fails
+                logger.error(f"Error processing inventory events for {device_id}: {e}")
 
         await db.commit()
         return EventAck(
@@ -226,32 +226,33 @@ async def _process_heartbeat(device_id, heartbeat, device, db):
         device.system_info = heartbeat.system_info
 
     # Deliver pending commands via heartbeat response (faster than config polling)
-    # This makes OTA/restart/reboot commands arrive within ~60s instead of ~120s
     pending_commands = []
     try:
         from app.models.command import DeviceCommand
-        pending_cmds_result = await db.execute(
-            select(DeviceCommand)
-            .where(
-                DeviceCommand.device_id == device.id,
-                DeviceCommand.status == "pending",
+        async with db.begin_nested():
+            pending_cmds_result = await db.execute(
+                select(DeviceCommand)
+                .where(
+                    DeviceCommand.device_id == device.id,
+                    DeviceCommand.status == "pending",
+                )
+                .order_by(DeviceCommand.created_at)
+                .limit(10)
             )
-            .order_by(DeviceCommand.created_at)
-            .limit(10)
-        )
-        pending_cmds = pending_cmds_result.scalars().all()
-        if pending_cmds:
-            for cmd in pending_cmds:
-                pending_commands.append({
-                    "command_id": cmd.id,
-                    "command_type": cmd.command_type,
-                    "payload": cmd.payload or {},
-                })
-                cmd.status = "delivered"
-                cmd.delivered_at = datetime.utcnow()
-            logger.info(f"Delivered {len(pending_cmds)} commands via heartbeat to {device_id}")
+            pending_cmds = pending_cmds_result.scalars().all()
+            if pending_cmds:
+                for cmd in pending_cmds:
+                    pending_commands.append({
+                        "command_id": cmd.id,
+                        "command_type": cmd.command_type,
+                        "payload": cmd.payload or {},
+                    })
+                    cmd.status = "delivered"
+                    cmd.delivered_at = datetime.utcnow()
+                logger.info(f"Delivered {len(pending_cmds)} commands via heartbeat to {device_id}")
     except Exception as e:
-        logger.warning(f"Error delivering commands via heartbeat: {e}")
+        # Table might not exist yet — savepoint prevents session poisoning
+        logger.debug(f"Commands query skipped: {e}")
 
     await db.commit()
 
@@ -353,13 +354,16 @@ async def receive_health_logs(
         for log in batch.logs:
             try:
                 # Parse timestamp (ISO format from edge)
+                # Always strip timezone info to keep naive UTC (PostgreSQL TIMESTAMP without TZ)
                 try:
                     ts = datetime.fromisoformat(log.timestamp.replace('Z', '+00:00'))
+                    if ts.tzinfo is not None:
+                        ts = ts.replace(tzinfo=None)  # Strip timezone, keep UTC value
                 except (ValueError, AttributeError):
                     ts = datetime.utcnow()
 
                 entry = SensorHealthLog(
-                    device_id=device.id,
+                    device_id=str(device.id),
                     timestamp=ts,
                     sensor=log.sensor,
                     status=log.status,
