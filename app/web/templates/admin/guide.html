@@ -361,8 +361,50 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
     </p>
 
-    <!-- v2.3.6 -->
+    <!-- v2.4.0 -->
     <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v2.4.0</span> PN532 USB NFC + Tag Writer + UI Optimization</span>
+            <span class="version-date">2026-03-30</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">PN532 USB NFC Driver</div>
+            <ul>
+                <li>New <code>real_rfid_pn532_usb.py</code> driver for PN532 V3 modules via USB-UART (CH340 bridge)</li>
+                <li>Auto-detects USB port by VID:PID (1A86:7523) or description matching</li>
+                <li>Full NTAG215 read/write support with product data format <code>CODE|BATCH|NAME|COLOR</code></li>
+                <li>Thread-safe with auto-reconnect on USB disconnect</li>
+                <li>Configurable via <code>RFID_MODULE = "pn532_usb"</code> in settings</li>
+            </ul>
+            <div class="change-subtitle">Tag Writer Screen</div>
+            <ul>
+                <li>New UI screen to write product data to NFC tags from the local product database</li>
+                <li>Product dropdown populated from cloud-synced catalog</li>
+                <li>Batch number, color, and can size input fields with quick presets</li>
+                <li>Live tag detection with UID display and current data preview</li>
+                <li>Writes tag + registers tag-to-product mapping in local DB for inventory tracking</li>
+                <li>Accessible from Settings &rarr; TAG WRITER</li>
+            </ul>
+            <div class="change-subtitle">UI Optimization for 800x480 Touch</div>
+            <ul>
+                <li>Complete rewrite of Sensor Test screen with horizontal layouts and compact fonts</li>
+                <li>Home: reduced nav tiles (60px), hero card padding, status panel spacing</li>
+                <li>System Health: 2x2 metric grid layout, shortened labels, compact card padding</li>
+                <li>Paint Now: reduced button heights (40px), input sizes, and font sizes</li>
+                <li>Inventory: compact header and product card fonts</li>
+                <li>Settings: reduced system button heights (40px)</li>
+            </ul>
+            <div class="change-subtitle">End-to-End Inventory Flow</div>
+            <ul>
+                <li>RFID tag read &rarr; InventoryEngine &rarr; event_log &rarr; SyncEngine &rarr; cloud (verified)</li>
+                <li>Tag Writer registers tag-product mapping so shelf reads identify products</li>
+                <li>Cloud receives events, updates CanTracking and InventoryAdjustment records</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.3.6 -->
+    <details class="changelog-entry">
         <summary>
             <span><span class="version-tag">v2.3.6</span> Mixing Consumption Auto-Subtraction</span>
             <span class="version-date">2026-03-12</span>
