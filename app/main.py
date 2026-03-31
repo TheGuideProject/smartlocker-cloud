@@ -77,7 +77,7 @@ templates = Jinja2Templates(directory="app/web/templates")
 # ---- Include API Routers ----
 
 from app.api.auth import router as auth_router
-from app.api.products import router as products_router, recipe_router
+from app.api.products import router as products_router, recipe_router, barcode_router
 from app.api.events import router as events_router
 from app.api.pairing import router as pairing_router
 from app.api.websocket import router as ws_router
@@ -85,6 +85,7 @@ from app.api.websocket import router as ws_router
 app.include_router(auth_router)
 app.include_router(products_router)
 app.include_router(recipe_router)
+app.include_router(barcode_router)
 app.include_router(events_router)
 app.include_router(pairing_router)
 app.include_router(ws_router)

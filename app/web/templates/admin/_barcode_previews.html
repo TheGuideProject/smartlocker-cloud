@@ -1,3 +1,28 @@
+{% if has_product %}
+    {% if saved_count > 0 %}
+    <div style="background: rgba(51,209,122,0.1); border: 1px solid rgba(51,209,122,0.3); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+        <span style="color: #33D17A; font-size: 18px;">&#10003;</span>
+        <span style="color: #33D17A; font-size: 13px; font-weight: 600;">
+            {{ saved_count }} barcode{{ 's' if saved_count > 1 else '' }} saved to database and linked to product
+        </span>
+    </div>
+    {% else %}
+    <div style="background: rgba(250,194,34,0.1); border: 1px solid rgba(250,194,34,0.3); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+        <span style="color: #FAC222; font-size: 18px;">&#9888;</span>
+        <span style="color: #FAC222; font-size: 13px; font-weight: 600;">
+            All barcodes already exist in database (duplicates skipped)
+        </span>
+    </div>
+    {% endif %}
+{% else %}
+<div style="background: rgba(237,68,82,0.1); border: 1px solid rgba(237,68,82,0.3); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+    <span style="color: #ED4452; font-size: 18px;">&#9888;</span>
+    <span style="color: #ED4452; font-size: 13px; font-weight: 600;">
+        No product linked! Select a product from the catalog to save barcodes for inventory tracking.
+    </span>
+</div>
+{% endif %}
+
 <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
     Generated {{ previews|length }} label{{ 's' if previews|length > 1 else '' }}
     &mdash; {{ 'QR Code' if barcode_type == 'qr' else 'Code 128' }}

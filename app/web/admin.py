@@ -2198,18 +2198,32 @@ def _make_barcode_image(data: str, barcode_type: str) -> bytes:
 async def admin_barcode_create(
     request: Request,
     user=Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
     ppg_code: str = Form(...),
     batch_start: str = Form(...),
     batch_end: str = Form(""),
     product_name: str = Form(...),
-    color: str = Form(...),
+    color: str = Form(""),
+    product_id: str = Form(""),
     barcode_type: str = Form("code128"),
 ):
-    """Generate barcode preview(s) and return HTML fragment."""
+    """Generate barcode preview(s), save to DB, and return HTML fragment."""
+    from app.models.product_barcode import ProductBarcode
+
     ppg_code = ppg_code.strip().upper()
     product_name = product_name.strip().upper().replace(" ", "-")
-    color = color.strip().upper().replace(" ", "")
+    color = color.strip().upper().replace(" ", "") if color else ""
     barcode_type = barcode_type.strip().lower()
+    product_id = product_id.strip() if product_id else ""
+
+    # If no product_id provided, try to find by ppg_code
+    if not product_id:
+        result = await db.execute(
+            select(Product).where(Product.ppg_code == ppg_code)
+        )
+        product = result.scalar_one_or_none()
+        if product:
+            product_id = product.id
 
     batches: list[str] = []
     batch_start = batch_start.strip()
@@ -2220,7 +2234,6 @@ async def admin_barcode_create(
         end_n = int(batch_end)
         if end_n < start_n:
             start_n, end_n = end_n, start_n
-        # Cap at 50 to avoid abuse
         end_n = min(end_n, start_n + 49)
         width = max(len(batch_start), len(batch_end))
         batches = [str(n).zfill(width) for n in range(start_n, end_n + 1)]
@@ -2228,6 +2241,7 @@ async def admin_barcode_create(
         batches = [batch_start]
 
     previews: list[dict] = []
+    saved_count = 0
     for batch in batches:
         data_string = f"{ppg_code}/{batch}/{product_name}/{color}"
         png_bytes = _make_barcode_image(data_string, barcode_type)
@@ -2238,6 +2252,31 @@ async def admin_barcode_create(
             "batch": batch,
         })
 
+        # Save barcode to database (skip duplicates)
+        if product_id:
+            existing = await db.execute(
+                select(ProductBarcode).where(ProductBarcode.barcode_data == data_string)
+            )
+            if not existing.scalar_one_or_none():
+                barcode_record = ProductBarcode(
+                    barcode_data=data_string,
+                    product_id=product_id,
+                    ppg_code=ppg_code,
+                    batch_number=batch,
+                    product_name=product_name,
+                    color=color,
+                    barcode_type=barcode_type,
+                    created_by=user.get("email", "admin") if isinstance(user, dict) else getattr(user, "email", "admin"),
+                )
+                db.add(barcode_record)
+                saved_count += 1
+
+    if saved_count > 0:
+        try:
+            await db.flush()
+        except Exception as e:
+            logger.error(f"Failed to save barcodes: {e}")
+
     return templates.TemplateResponse("admin/_barcode_previews.html", {
         "request": request,
         "previews": previews,
@@ -2245,6 +2284,8 @@ async def admin_barcode_create(
         "ppg_code": ppg_code,
         "product_name": product_name,
         "color": color,
+        "saved_count": saved_count,
+        "has_product": bool(product_id),
     })
 
 
@@ -2368,4 +2409,66 @@ def _generate_ppg_code(name: str) -> str:
             break
 
     return f"{prefix}-{num}"
+
+
+# ---- Saved Barcodes List ----
+
+@router.get("/barcodes", response_class=HTMLResponse)
+async def admin_barcodes_list(
+    request: Request,
+    user=Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all saved barcodes with linked product info."""
+    from app.models.product_barcode import ProductBarcode
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(ProductBarcode)
+        .options(selectinload(ProductBarcode.product))
+        .order_by(ProductBarcode.created_at.desc())
+        .limit(500)
+    )
+    barcodes = result.scalars().all()
+
+    # Group by product for summary
+    product_summary = {}
+    for bc in barcodes:
+        pid = bc.product_id
+        if pid not in product_summary:
+            product_summary[pid] = {
+                "name": bc.product_name,
+                "ppg_code": bc.ppg_code,
+                "count": 0,
+                "total_scans": 0,
+            }
+        product_summary[pid]["count"] += 1
+        product_summary[pid]["total_scans"] += bc.times_scanned or 0
+
+    return templates.TemplateResponse("admin/barcodes_list.html", {
+        "request": request,
+        "user": user,
+        "active": "barcode",
+        "barcodes": barcodes,
+        "product_summary": product_summary,
+    })
+
+
+@router.post("/barcodes/{barcode_id}/delete")
+async def admin_barcode_delete(
+    barcode_id: str,
+    request: Request,
+    user=Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a saved barcode."""
+    from app.models.product_barcode import ProductBarcode
+
+    result = await db.execute(
+        select(ProductBarcode).where(ProductBarcode.id == barcode_id)
+    )
+    barcode = result.scalar_one_or_none()
+    if barcode:
+        await db.delete(barcode)
+    return RedirectResponse(url="/admin/barcodes?success=Barcode+deleted", status_code=303)
 

@@ -246,6 +246,42 @@ async def _migrate_add_columns():
         except Exception as e:
             logger.debug(f"  device_commands table check: {e}")
 
+        # Create product_barcodes table if not exists
+        try:
+            result = await conn.execute(text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_name = 'product_barcodes'"
+            ))
+            if not result.scalar_one_or_none():
+                await conn.execute(text("""
+                    CREATE TABLE product_barcodes (
+                        id VARCHAR(36) PRIMARY KEY,
+                        barcode_data VARCHAR(500) NOT NULL UNIQUE,
+                        product_id VARCHAR(36) NOT NULL REFERENCES products(id),
+                        ppg_code VARCHAR(50) NOT NULL,
+                        batch_number VARCHAR(100) NOT NULL,
+                        product_name VARCHAR(255) NOT NULL,
+                        color VARCHAR(100),
+                        barcode_type VARCHAR(20) DEFAULT 'code128',
+                        times_scanned INTEGER DEFAULT 0,
+                        last_scanned_at TIMESTAMP,
+                        created_by VARCHAR(100),
+                        created_at TIMESTAMP DEFAULT now()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX idx_product_barcodes_data ON product_barcodes(barcode_data)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX idx_product_barcodes_product ON product_barcodes(product_id)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX idx_product_barcodes_ppg ON product_barcodes(ppg_code)"
+                ))
+                logger.info("  Created product_barcodes table")
+        except Exception as e:
+            logger.debug(f"  product_barcodes table check: {e}")
+
         # Add device monitoring columns if missing
         monitoring_columns = {
             "driver_status": "JSONB",

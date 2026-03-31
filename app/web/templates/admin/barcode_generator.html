@@ -166,6 +166,7 @@
         <hr class="bc-divider">
 
         <form id="barcodeForm">
+            <input type="hidden" id="product_id" name="product_id" value="">
             <div class="bc-field">
                 <label for="ppg_code">PPG Code</label>
                 <input type="text" id="ppg_code" name="ppg_code" placeholder="e.g. 616826" required>
@@ -220,6 +221,9 @@
         <button type="button" class="bc-btn bc-btn-pdf" id="downloadPdfBtn" style="display:none;">
             Download PDF Labels
         </button>
+        <a href="/admin/barcodes" style="display: block; text-align: center; margin-top: 16px; font-size: 13px; color: var(--accent-blue);">
+            View all saved barcodes
+        </a>
     </div>
 
     <!-- Results Panel -->
@@ -247,6 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const productNameInput = document.getElementById('product_name');
     const colorInput = document.getElementById('color');
     const colorSelect = document.getElementById('color_select');
+    const productIdInput = document.getElementById('product_id');
     const form = document.getElementById('barcodeForm');
     const previewArea = document.getElementById('previewArea');
     const spinner = document.getElementById('spinner');
@@ -263,6 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!productId) {
             productInfo.classList.remove('active');
             selectedProduct = null;
+            productIdInput.value = '';
             colorSelect.style.display = 'none';
             colorSelect.innerHTML = '<option value="">-- Select color --</option>';
             if (!manualMode) {
@@ -277,6 +283,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!selectedProduct) return;
 
         // Auto-fill fields
+        productIdInput.value = selectedProduct.id;
         ppgCodeInput.value = selectedProduct.ppg_code;
         productNameInput.value = selectedProduct.name;
 

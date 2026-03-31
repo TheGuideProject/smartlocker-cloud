@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% set active = "barcode" %}
+
+{% block title %}Saved Barcodes - SmartLocker{% endblock %}
+{% block page_title %}Saved Barcodes{% endblock %}
+
+{% block actions %}
+<a href="/admin/barcode-generator" class="btn btn-primary" style="font-size: 13px;">+ Generate New</a>
+{% endblock %}
+
+{% block content %}
+<!-- Summary Stats -->
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+    <div class="stat-card accent-blue">
+        <div class="label">Total Barcodes</div>
+        <div class="value blue">{{ barcodes|length }}</div>
+    </div>
+    <div class="stat-card accent-teal">
+        <div class="label">Products Linked</div>
+        <div class="value teal">{{ product_summary|length }}</div>
+    </div>
+    <div class="stat-card accent-green">
+        <div class="label">Total Scans</div>
+        <div class="value green">{{ product_summary.values()|map(attribute='total_scans')|sum }}</div>
+    </div>
+    <div class="stat-card accent-orange">
+        <div class="label">Batches</div>
+        <div class="value orange">{{ barcodes|map(attribute='batch_number')|unique|list|length }}</div>
+    </div>
+</div>
+
+<!-- Product Summary Cards -->
+{% if product_summary %}
+<div class="section-title">By Product</div>
+<div class="grid-auto" style="margin-bottom: 24px;">
+    {% for pid, info in product_summary.items() %}
+    <div class="panel" style="padding: 16px;">
+        <div style="font-weight: 700; font-size: 15px; color: var(--text-primary);">{{ info.name }}</div>
+        <div style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">PPG {{ info.ppg_code }}</div>
+        <div style="display: flex; gap: 16px; margin-top: 10px;">
+            <div>
+                <span style="font-size: 20px; font-weight: 700; color: var(--accent-blue);">{{ info.count }}</span>
+                <span style="font-size: 12px; color: var(--text-muted);"> barcodes</span>
+            </div>
+            <div>
+                <span style="font-size: 20px; font-weight: 700; color: var(--accent-green);">{{ info.total_scans }}</span>
+                <span style="font-size: 12px; color: var(--text-muted);"> scans</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Barcode Table -->
+<div class="section-title">All Barcodes</div>
+{% if barcodes %}
+<div class="panel" style="padding: 0; overflow: hidden;">
+    <table class="data-table" style="border: none; border-radius: 0;">
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>PPG Code</th>
+                <th>Batch</th>
+                <th>Color</th>
+                <th>Type</th>
+                <th>Scans</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bc in barcodes %}
+            <tr>
+                <td><strong style="color: var(--text-primary);">{{ bc.product_name }}</strong></td>
+                <td>
+                    <code style="font-size: 12px; background: var(--bg-input); padding: 2px 6px; border-radius: 3px;">
+                        {{ bc.ppg_code }}
+                    </code>
+                </td>
+                <td style="font-family: monospace; font-size: 13px;">{{ bc.batch_number }}</td>
+                <td>{{ bc.color or '-' }}</td>
+                <td>
+                    <span class="type-badge" style="background: rgba(96,165,250,0.12); color: var(--info-text);">
+                        {{ 'QR' if bc.barcode_type == 'qr' else '1D' }}
+                    </span>
+                </td>
+                <td>
+                    {% if bc.times_scanned and bc.times_scanned > 0 %}
+                    <span style="color: var(--accent-green); font-weight: 600;">{{ bc.times_scanned }}</span>
+                    {% else %}
+                    <span style="color: var(--text-muted);">0</span>
+                    {% endif %}
+                </td>
+                <td style="white-space: nowrap;">
+                    <span style="font-size: 12px; color: var(--text-secondary);">
+                        {{ bc.created_at.strftime('%Y-%m-%d %H:%M') if bc.created_at else '-' }}
+                    </span>
+                </td>
+                <td>
+                    <form method="post" action="/admin/barcodes/{{ bc.id }}/delete"
+                          style="display: inline;"
+                          onsubmit="return confirm('Delete this barcode?');">
+                        <button type="submit" class="btn btn-ghost"
+                                style="font-size: 12px; padding: 4px 8px; color: var(--danger-text);">
+                            Delete
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="panel empty-state">
+    <div class="empty-title">No barcodes saved yet</div>
+    <div class="empty-desc">Generate barcodes linked to products from the <a href="/admin/barcode-generator">Barcode Generator</a>.</div>
+</div>
+{% endif %}
+{% endblock %}

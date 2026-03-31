@@ -178,3 +178,123 @@ async def update_recipe(
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(recipe, key, value)
     return recipe
+
+
+# ---- Barcode Lookup Endpoints ----
+
+barcode_router = APIRouter(prefix="/api/barcodes", tags=["barcodes"])
+
+
+class BarcodeOut(BaseModel):
+    id: str
+    barcode_data: str
+    product_id: str
+    ppg_code: str
+    batch_number: str
+    product_name: str
+    color: Optional[str] = None
+    barcode_type: str = "code128"
+    times_scanned: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class BarcodeLookupOut(BaseModel):
+    """Response when a barcode is scanned — includes full product info."""
+    barcode: BarcodeOut
+    product: Optional[ProductOut] = None
+
+
+@barcode_router.get("/lookup")
+async def barcode_lookup(
+    data: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Look up a barcode string and return linked product info.
+
+    Used by edge devices when scanning a barcode to identify the product.
+    Query param: ?data=00001/808080/SIGMAPRIME-200/RED
+    """
+    from app.models.product_barcode import ProductBarcode
+    from datetime import datetime
+
+    result = await db.execute(
+        select(ProductBarcode).where(ProductBarcode.barcode_data == data.strip())
+    )
+    barcode = result.scalar_one_or_none()
+
+    if not barcode:
+        # Try partial match by ppg_code (first segment)
+        parts = data.strip().split("/")
+        if parts:
+            ppg_code = parts[0].upper()
+            result = await db.execute(
+                select(Product).where(Product.ppg_code == ppg_code)
+            )
+            product = result.scalar_one_or_none()
+            if product:
+                return {
+                    "found": True,
+                    "match_type": "ppg_code",
+                    "product": {
+                        "id": product.id,
+                        "ppg_code": product.ppg_code,
+                        "name": product.name,
+                        "product_type": product.product_type,
+                    },
+                    "barcode": None,
+                }
+        raise HTTPException(status_code=404, detail="Barcode not found")
+
+    # Update scan count
+    barcode.times_scanned = (barcode.times_scanned or 0) + 1
+    barcode.last_scanned_at = datetime.utcnow()
+
+    # Get product details
+    prod_result = await db.execute(
+        select(Product).where(Product.id == barcode.product_id)
+    )
+    product = prod_result.scalar_one_or_none()
+
+    return {
+        "found": True,
+        "match_type": "exact",
+        "barcode": {
+            "id": barcode.id,
+            "barcode_data": barcode.barcode_data,
+            "ppg_code": barcode.ppg_code,
+            "batch_number": barcode.batch_number,
+            "product_name": barcode.product_name,
+            "color": barcode.color,
+            "barcode_type": barcode.barcode_type,
+            "times_scanned": barcode.times_scanned,
+        },
+        "product": {
+            "id": product.id,
+            "ppg_code": product.ppg_code,
+            "name": product.name,
+            "product_type": product.product_type,
+            "density_g_per_ml": product.density_g_per_ml,
+            "can_sizes_ml": product.can_sizes_ml,
+        } if product else None,
+    }
+
+
+@barcode_router.get("", response_model=List[BarcodeOut])
+async def list_barcodes(
+    product_id: Optional[str] = None,
+    ppg_code: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all registered barcodes, optionally filtered by product."""
+    from app.models.product_barcode import ProductBarcode
+
+    query = select(ProductBarcode).order_by(ProductBarcode.created_at.desc())
+    if product_id:
+        query = query.where(ProductBarcode.product_id == product_id)
+    if ppg_code:
+        query = query.where(ProductBarcode.ppg_code == ppg_code.upper())
+
+    result = await db.execute(query)
+    return result.scalars().all()
