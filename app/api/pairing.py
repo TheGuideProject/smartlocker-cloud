@@ -360,6 +360,13 @@ async def get_device_config(
                         "colors_json": p.colors_json or [],
                     })
 
+    # Load product barcodes for this device's products
+    from app.models.product_barcode import ProductBarcode
+    barcodes_result = await db.execute(
+        select(ProductBarcode).order_by(ProductBarcode.created_at.desc())
+    )
+    barcodes = barcodes_result.scalars().all()
+
     response = {
         "config_version": device.config_version,
         "slot_count": device.slot_count or 4,
@@ -405,6 +412,20 @@ async def get_device_config(
 
     # Include vessel inventory summary (always send, even if empty, so edge clears stale data)
     response["vessel_inventory"] = vessel_inventory
+
+    # Include product barcodes for scanner lookup
+    response["barcodes"] = [
+        {
+            "barcode_data": b.barcode_data,
+            "product_id": str(b.product_id),
+            "ppg_code": b.ppg_code or "",
+            "batch_number": b.batch_number or "",
+            "product_name": b.product_name or "",
+            "color": b.color or "",
+            "barcode_type": b.barcode_type or "code128",
+        }
+        for b in barcodes
+    ]
 
     # If admin has set a new password for this device, include it (one-time delivery)
     if device.pending_admin_password:
