@@ -157,11 +157,15 @@ async def ingest_events(
                 pass  # Non-critical
 
         # Process new events into inventory state (CanTracking)
+        # Use a savepoint so inventory processing failures don't poison the
+        # main commit (which must succeed to ack the events)
         if new_events:
             try:
-                await process_inventory_events(db, device_id_fk, new_events)
+                async with db.begin_nested():
+                    await process_inventory_events(db, device_id_fk, new_events)
             except Exception as e:
                 logger.error(f"Error processing inventory events for {device_id}: {e}")
+                # Savepoint rolled back — events are still safe to commit
 
         await db.commit()
         return EventAck(

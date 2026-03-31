@@ -51,8 +51,12 @@ async def process_inventory_events(
                     product_id = await _resolve_product_id(
                         db, data["ppg_code"]
                     )
+                # Validate product_id exists before setting FK
                 if product_id and not can.product_id:
-                    can.product_id = product_id
+                    if await _product_exists(db, product_id):
+                        can.product_id = product_id
+                    else:
+                        logger.warning(f"Invalid product_id '{product_id}' for tag {tag_id}, skipping FK")
                 updated += 1
 
             elif event_type == "can_removed":
@@ -152,6 +156,20 @@ async def _find_can(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def _product_exists(
+    db: AsyncSession,
+    product_id: str,
+) -> bool:
+    """Check if a product_id exists in the Product table (FK validation)."""
+    try:
+        result = await db.execute(
+            select(Product.id).where(Product.id == product_id)
+        )
+        return result.scalar_one_or_none() is not None
+    except Exception:
+        return False
 
 
 async def _resolve_product_id(
