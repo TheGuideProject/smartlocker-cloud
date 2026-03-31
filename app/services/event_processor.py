@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.can_tracking import CanTracking
 from app.models.event import DeviceEvent
 from app.models.product import Product
+from app.models.inventory import InventoryAdjustment
 
 logger = logging.getLogger("smartlocker.event_processor")
 
@@ -57,6 +58,29 @@ async def process_inventory_events(
                         can.product_id = product_id
                     else:
                         logger.warning(f"Invalid product_id '{product_id}' for tag {tag_id}, skipping FK")
+
+                # Create InventoryAdjustment for barcode-scanned loads
+                # so they show up in cloud inventory
+                if data.get("source") == "barcode_scan" and product_id:
+                    if await _product_exists(db, product_id):
+                        weight_g = abs(data.get("weight_g", 0))
+                        product = await db.get(Product, product_id)
+                        density = (product.density_g_per_ml if product else 1.0) or 1.0
+                        liters = (weight_g / density) / 1000 if weight_g > 0 else 0
+                        db.add(InventoryAdjustment(
+                            device_id=device_id,
+                            product_id=product_id,
+                            adjustment_type="manual_add",
+                            quantity_liters=round(liters, 3),
+                            weight_g=weight_g,
+                            notes=f"Barcode scan: {data.get('ppg_code', '')} batch={data.get('batch_number', '')}",
+                            created_by="barcode_scan",
+                        ))
+                        logger.info(
+                            f"InventoryAdjustment created: +{liters:.2f}L "
+                            f"for product {data.get('product_name', product_id)}"
+                        )
+
                 updated += 1
 
             elif event_type == "can_removed":
@@ -68,6 +92,30 @@ async def process_inventory_events(
                     if data.get("weight_g"):
                         can.weight_current_g = data["weight_g"]
                     updated += 1
+
+                # Also create InventoryAdjustment for barcode unloads
+                if data.get("source") == "barcode_scan":
+                    rm_product_id = data.get("product_id") or ""
+                    if not rm_product_id and data.get("ppg_code"):
+                        rm_product_id = await _resolve_product_id(db, data["ppg_code"])
+                    if rm_product_id and await _product_exists(db, rm_product_id):
+                        weight_g = abs(data.get("weight_g", 0))
+                        product = await db.get(Product, rm_product_id)
+                        density = (product.density_g_per_ml if product else 1.0) or 1.0
+                        liters = (weight_g / density) / 1000 if weight_g > 0 else 0
+                        db.add(InventoryAdjustment(
+                            device_id=device_id,
+                            product_id=rm_product_id,
+                            adjustment_type="manual_remove",
+                            quantity_liters=round(liters, 3),
+                            weight_g=weight_g,
+                            notes=f"Barcode scan unload: {data.get('ppg_code', '')}",
+                            created_by="barcode_scan",
+                        ))
+                        logger.info(
+                            f"InventoryAdjustment created: -{liters:.2f}L "
+                            f"for product {data.get('product_name', rm_product_id)}"
+                        )
 
             elif event_type == "can_returned":
                 can = await _find_can(db, tag_id, device_id)
