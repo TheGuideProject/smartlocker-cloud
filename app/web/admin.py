@@ -2143,12 +2143,37 @@ async def admin_guide(request: Request, user=Depends(require_admin_session)):
 # ---- Barcode Generator ----
 
 @router.get("/barcode-generator", response_class=HTMLResponse)
-async def admin_barcode_generator(request: Request, user=Depends(require_admin_session)):
+async def admin_barcode_generator(request: Request, user=Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Barcode / QR-code label generator page."""
+    result = await db.execute(
+        select(Product).where(Product.is_active == True).order_by(Product.name)
+    )
+    products = result.scalars().all()
+
+    # Build JSON-serializable product list for JavaScript autofill
+    products_json = []
+    for p in products:
+        colors = []
+        if p.colors_json and isinstance(p.colors_json, list):
+            for c in p.colors_json:
+                if isinstance(c, dict):
+                    colors.append(c.get("name", ""))
+                elif isinstance(c, str):
+                    colors.append(c)
+        products_json.append({
+            "id": p.id,
+            "ppg_code": p.ppg_code or "",
+            "name": p.name or "",
+            "product_type": p.product_type or "",
+            "colors": colors,
+        })
+
     return templates.TemplateResponse("admin/barcode_generator.html", {
         "request": request,
         "user": user,
         "active": "barcode",
+        "products": products,
+        "products_json": products_json,
     })
 
 

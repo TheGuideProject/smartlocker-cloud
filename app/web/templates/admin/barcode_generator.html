@@ -7,7 +7,7 @@
 {% block content %}
 <style>
     .bc-layout {
-        display: grid; grid-template-columns: 380px 1fr; gap: 24px; align-items: start;
+        display: grid; grid-template-columns: 420px 1fr; gap: 24px; align-items: start;
     }
     @media (max-width: 900px) { .bc-layout { grid-template-columns: 1fr; } }
 
@@ -20,7 +20,7 @@
         margin-bottom: 20px;
     }
 
-    .bc-field { margin-bottom: 16px; }
+    .bc-field { margin-bottom: 14px; }
     .bc-field label {
         display: block; font-size: 12px; font-weight: 600;
         color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;
@@ -43,6 +43,30 @@
     .bc-batch-row {
         display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
     }
+
+    .bc-divider {
+        border: none; border-top: 1px solid var(--border);
+        margin: 16px 0;
+    }
+
+    .bc-product-info {
+        background: var(--bg-input); border: 1px solid var(--border);
+        border-radius: 6px; padding: 10px 14px; margin-bottom: 14px;
+        display: none;
+    }
+    .bc-product-info.active { display: block; }
+    .bc-product-info .info-row {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 13px; padding: 3px 0;
+    }
+    .bc-product-info .info-label { color: var(--text-muted); }
+    .bc-product-info .info-value { color: var(--text-primary); font-weight: 600; }
+
+    .bc-manual-toggle {
+        font-size: 12px; color: var(--accent-blue); cursor: pointer;
+        text-decoration: underline; margin-bottom: 12px; display: inline-block;
+    }
+    .bc-manual-toggle:hover { color: var(--text-primary); }
 
     .bc-btn {
         width: 100%; padding: 12px; font-size: 14px; font-weight: 600;
@@ -108,11 +132,59 @@
     <!-- Form Panel -->
     <div class="bc-form-card">
         <h2>Label Configuration</h2>
+
+        <!-- Product Selector -->
+        <div class="bc-field">
+            <label for="product_select">Select Product</label>
+            <select id="product_select">
+                <option value="">-- Select a product from catalog --</option>
+                {% for p in products %}
+                <option value="{{ p.id }}">{{ p.name }} ({{ p.ppg_code }}) - {{ p.product_type }}</option>
+                {% endfor %}
+            </select>
+            <div class="hint">Select a product to auto-fill PPG code, name, and available colors.</div>
+        </div>
+
+        <!-- Product Info Banner -->
+        <div class="bc-product-info" id="productInfo">
+            <div class="info-row">
+                <span class="info-label">Product</span>
+                <span class="info-value" id="infoName">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">PPG Code</span>
+                <span class="info-value" id="infoCode">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Type</span>
+                <span class="info-value" id="infoType">--</span>
+            </div>
+        </div>
+
+        <span class="bc-manual-toggle" id="manualToggle">Or enter manually...</span>
+
+        <hr class="bc-divider">
+
         <form id="barcodeForm">
             <div class="bc-field">
                 <label for="ppg_code">PPG Code</label>
                 <input type="text" id="ppg_code" name="ppg_code" placeholder="e.g. 616826" required>
             </div>
+            <div class="bc-field">
+                <label for="product_name">Product Name</label>
+                <input type="text" id="product_name" name="product_name" placeholder="e.g. SIGMAPRIME-200" required>
+            </div>
+            <div class="bc-field">
+                <label for="color">Color</label>
+                <select id="color_select" style="display: none; margin-bottom: 8px;">
+                    <option value="">-- Select color --</option>
+                </select>
+                <input type="text" id="color" name="color" placeholder="e.g. YELLOWGREEN">
+                <div class="hint">Select from product colors or type a custom color name.</div>
+            </div>
+
+            <hr class="bc-divider">
+
             <div class="bc-field">
                 <label>Batch Number</label>
                 <div class="bc-batch-row">
@@ -124,14 +196,6 @@
                     </div>
                 </div>
                 <div class="hint">Leave "End" empty for a single label, or enter a range for batch generation (max 50).</div>
-            </div>
-            <div class="bc-field">
-                <label for="product_name">Product Name</label>
-                <input type="text" id="product_name" name="product_name" placeholder="e.g. SIGMAPRIME-200" required>
-            </div>
-            <div class="bc-field">
-                <label for="color">Color</label>
-                <input type="text" id="color" name="color" placeholder="e.g. YELLOWGREEN" required>
             </div>
             <div class="bc-field">
                 <label for="barcode_type">Barcode Type</label>
@@ -163,7 +227,7 @@
         <h2>Preview</h2>
         <div id="previewArea">
             <div class="bc-empty">
-                <div class="icon">&#x1F4CB;</div>
+                <div class="icon">&#128203;</div>
                 <p>Configure your label and click "Generate Preview"</p>
             </div>
         </div>
@@ -173,6 +237,16 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Product catalog data from server
+    const PRODUCTS = {{ products_json | tojson }};
+
+    const productSelect = document.getElementById('product_select');
+    const productInfo = document.getElementById('productInfo');
+    const manualToggle = document.getElementById('manualToggle');
+    const ppgCodeInput = document.getElementById('ppg_code');
+    const productNameInput = document.getElementById('product_name');
+    const colorInput = document.getElementById('color');
+    const colorSelect = document.getElementById('color_select');
     const form = document.getElementById('barcodeForm');
     const previewArea = document.getElementById('previewArea');
     const spinner = document.getElementById('spinner');
@@ -180,6 +254,97 @@ document.addEventListener('DOMContentLoaded', function() {
     const downloadPdfBtn = document.getElementById('downloadPdfBtn');
     const pdfForm = document.getElementById('pdfForm');
 
+    let manualMode = false;
+    let selectedProduct = null;
+
+    // ── Product selection ──
+    productSelect.addEventListener('change', function() {
+        const productId = this.value;
+        if (!productId) {
+            productInfo.classList.remove('active');
+            selectedProduct = null;
+            colorSelect.style.display = 'none';
+            colorSelect.innerHTML = '<option value="">-- Select color --</option>';
+            if (!manualMode) {
+                ppgCodeInput.value = '';
+                productNameInput.value = '';
+                colorInput.value = '';
+            }
+            return;
+        }
+
+        selectedProduct = PRODUCTS.find(p => p.id === productId);
+        if (!selectedProduct) return;
+
+        // Auto-fill fields
+        ppgCodeInput.value = selectedProduct.ppg_code;
+        productNameInput.value = selectedProduct.name;
+
+        // Show product info banner
+        document.getElementById('infoName').textContent = selectedProduct.name;
+        document.getElementById('infoCode').textContent = selectedProduct.ppg_code;
+        document.getElementById('infoType').textContent = selectedProduct.product_type.replace('_', ' ');
+        productInfo.classList.add('active');
+
+        // Populate color dropdown
+        colorSelect.innerHTML = '<option value="">-- Select color --</option>';
+        if (selectedProduct.colors && selectedProduct.colors.length > 0) {
+            selectedProduct.colors.forEach(function(c) {
+                if (c) {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.textContent = c;
+                    colorSelect.appendChild(opt);
+                }
+            });
+            colorSelect.style.display = 'block';
+            // Auto-select first color if only one
+            if (selectedProduct.colors.length === 1) {
+                colorSelect.value = selectedProduct.colors[0];
+                colorInput.value = selectedProduct.colors[0];
+            } else {
+                colorInput.value = '';
+            }
+        } else {
+            colorSelect.style.display = 'none';
+            colorInput.value = '';
+            colorInput.placeholder = 'No colors defined - enter manually';
+        }
+
+        // Lock fields from editing (show they came from product)
+        ppgCodeInput.style.backgroundColor = 'var(--bg-dark)';
+        productNameInput.style.backgroundColor = 'var(--bg-dark)';
+    });
+
+    // ── Color select → fill input ──
+    colorSelect.addEventListener('change', function() {
+        if (this.value) {
+            colorInput.value = this.value;
+        }
+    });
+
+    // ── Manual mode toggle ──
+    manualToggle.addEventListener('click', function() {
+        manualMode = !manualMode;
+        if (manualMode) {
+            manualToggle.textContent = 'Back to product selector';
+            ppgCodeInput.style.backgroundColor = '';
+            productNameInput.style.backgroundColor = '';
+            ppgCodeInput.readOnly = false;
+            productNameInput.readOnly = false;
+        } else {
+            manualToggle.textContent = 'Or enter manually...';
+            // Re-apply product data if selected
+            if (selectedProduct) {
+                ppgCodeInput.value = selectedProduct.ppg_code;
+                productNameInput.value = selectedProduct.name;
+                ppgCodeInput.style.backgroundColor = 'var(--bg-dark)';
+                productNameInput.style.backgroundColor = 'var(--bg-dark)';
+            }
+        }
+    });
+
+    // ── Form submit → generate preview ──
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         generateBtn.disabled = true;
