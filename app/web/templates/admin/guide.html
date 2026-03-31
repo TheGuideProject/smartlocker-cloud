@@ -135,7 +135,7 @@
     </div>
     <div class="stat-card accent-green">
         <div class="label">Edge Version</div>
-        <div class="value green">3.1.1</div>
+        <div class="value green">3.1.2</div>
     </div>
     <div class="stat-card accent-orange">
         <div class="label">Hardware Components</div>
@@ -363,8 +363,33 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
     </p>
 
-    <!-- v3.1.0 -->
+    <!-- v3.1.2 -->
     <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v3.1.2</span> System Health Dashboard + Cloud Telemetry Sync</span>
+            <span class="version-date">2026-03-31</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">System Health Dashboard (Edge)</div>
+            <ul>
+                <li>Complete rewrite of System Health screen with 4 sections: Hardware Metrics, Cloud Sync, Sensor Health, System Info</li>
+                <li>Hardware metrics: CPU temp, CPU %, RAM %, Disk % with color-coded progress bars and sparkline history graphs</li>
+                <li>Cloud sync panel: connection status, last sync time, event queue depth, heartbeat timing, WebSocket status</li>
+                <li>Sensor health: per-driver status (RFID, Weight, LED, Buzzer) with real/fake indicators and health checks</li>
+                <li>System info: version, uptime, network IP, NTP sync, SD card health, power stability, DB size</li>
+            </ul>
+            <div class="change-subtitle">Cloud Telemetry Sync Fix</div>
+            <ul>
+                <li>Fixed <code>set_monitoring_refs()</code> not being called in PyQt6 app &mdash; heartbeats now include full sensor health and system telemetry</li>
+                <li>Fixed <code>system_monitor.start()</code> not being called &mdash; background health checks now run every 60 seconds</li>
+                <li>Added CPU usage % and network connectivity info to SystemMonitor</li>
+                <li>Proper <code>system_monitor.stop()</code> on app close to prevent thread leaks</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v3.1.0 -->
+    <details class="changelog-entry">
         <summary>
             <span><span class="version-tag">v3.1.0</span> PyQt6 UI + Calibration Wizard + Cloud Redesign</span>
             <span class="version-date">2026-03-31</span>
@@ -976,7 +1001,7 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
             <span class="stack-tag">Git OTA</span>
         </div>
         <p style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">
-            Cloud v3.1 &bull; Edge v3.1.1 &bull; Last updated 2026-03-31
+            Cloud v3.1 &bull; Edge v3.1.2 &bull; Last updated 2026-03-31
         </p>
     </div>
 </div>
