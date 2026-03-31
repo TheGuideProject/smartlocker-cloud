@@ -47,4 +47,49 @@
 {% if not companies %}
 <div class="panel"><p style="color: var(--text-muted); padding: 20px; text-align: center;">No vessels found. Add vessels via Fleet Management first.</p></div>
 {% endif %}
+
+{% if all_cans %}
+<div class="panel" style="margin-top: 20px;">
+    <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>All Tracked Products (from device scans)</span>
+        <span class="type-badge base_paint">{{ all_cans|length }} items</span>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Weight (g)</th>
+                <th>Liters</th>
+                <th>Last Seen</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for can in all_cans %}
+        <tr>
+            <td><strong>{{ can.product_name }}</strong></td>
+            <td>
+                {% if can.product_type %}
+                <span class="type-badge {{ can.product_type }}">{{ can.product_type }}</span>
+                {% else %}-{% endif %}
+            </td>
+            <td>
+                {% if can.status == 'in_stock' %}
+                <span style="color:var(--success);">In Stock</span>
+                {% elif can.status == 'in_use' %}
+                <span style="color:var(--warning);">In Use</span>
+                {% elif can.status == 'removed' %}
+                <span style="color:var(--danger);">Removed</span>
+                {% else %}{{ can.status }}{% endif %}
+            </td>
+            <td>{{ can.weight_g|int }}</td>
+            <td>{{ can.liters }}</td>
+            <td>{{ can.last_seen.strftime('%d/%m %H:%M') if can.last_seen else '-' }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 {% endblock %}

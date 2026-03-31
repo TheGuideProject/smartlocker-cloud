@@ -1112,11 +1112,33 @@ async def admin_inventory(
     return templates.TemplateResponse("admin/inventory.html", {
         "request": request,
         "user": user,
+    # Build flat list of ALL tracked cans (regardless of vessel linkage)
+    all_cans_list = []
+    for can in all_cans:
+        p = products_by_id.get(can.product_id)
+        product_name = p.name if p else (can.tag_uid if can.tag_uid else "Unknown")
+        density = p.density_g_per_ml if p else 1.0
+        liters = (can.weight_current_g / density / 1000.0) if (can.weight_current_g and density) else 0
+        all_cans_list.append({
+            "tag_uid": can.tag_uid or "",
+            "product_name": product_name,
+            "product_type": p.product_type if p else "",
+            "status": can.status,
+            "weight_g": round(can.weight_current_g or 0, 0),
+            "liters": round(liters, 2),
+            "last_seen": can.last_seen_at,
+            "placed_at": can.placed_at,
+        })
+
+    return templates.TemplateResponse("admin/inventory.html", {
+        "request": request,
+        "user": user,
         "companies": company_list,
         "total_vessels": total_vessels,
         "total_liters": round(total_liters, 1),
         "total_products": len(total_products_set),
         "alerts": alerts,
+        "all_cans": all_cans_list,
     })
 
 
