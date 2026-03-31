@@ -2244,7 +2244,7 @@ async def admin_barcode_create(
     saved_count = 0
     for batch in batches:
         # Short barcode format: SL-{PPG_CODE}-{BATCH} (scanner-friendly)
-        data_string = f"SL-{ppg_code}-{batch}"
+        data_string = f"SL_{ppg_code}_{batch}"
         png_bytes = _make_barcode_image(data_string, barcode_type)
         b64 = base64.b64encode(png_bytes).decode()
         previews.append({
@@ -2337,7 +2337,7 @@ async def admin_barcode_pdf(
             c.showPage()
 
         # Short barcode format: SL-{PPG_CODE}-{BATCH}
-        data_string = f"SL-{ppg_code}-{batch}"
+        data_string = f"SL_{ppg_code}_{batch}"
         png_bytes = _make_barcode_image(data_string, barcode_type)
         img_reader = ImageReader(io.BytesIO(png_bytes))
 
