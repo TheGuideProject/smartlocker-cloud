@@ -1,128 +1,166 @@
 {% extends "base.html" %}
 {% set active = "dashboard" %}
 
-{% block title %}Dashboard - SmartLocker{% endblock %}
+{% block title %}Dashboard - SmartLocker Cloud{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 
+{% block actions %}
+<span style="font-size: 12px; color: var(--text-muted);">Last refresh: <span id="refreshTime"></span></span>
+<script>document.getElementById('refreshTime').textContent = new Date().toLocaleTimeString();</script>
+{% endblock %}
+
 {% block content %}
-<div class="stats-grid">
-    <div class="stat-card">
+<!-- KPI Stats Row -->
+<div class="stats-grid" style="grid-template-columns: repeat(6, 1fr);">
+    <div class="stat-card accent-teal">
         <div class="label">Products</div>
-        <div class="value blue">{{ products_count }}</div>
+        <div class="value teal">{{ products_count }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-blue">
         <div class="label">Recipes</div>
-        <div class="value green">{{ recipes_count }}</div>
+        <div class="value blue">{{ recipes_count }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-green">
         <div class="label">Devices</div>
-        <div class="value orange">{{ devices_count }}</div>
+        <div class="value green">{{ devices_count }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-blue">
         <div class="label">Events</div>
         <div class="value blue">{{ events_count }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-orange">
         <div class="label">Companies</div>
-        <div class="value green">{{ companies_count }}</div>
+        <div class="value orange">{{ companies_count }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card {% if open_support_count > 0 %}accent-red{% else %}accent-green{% endif %}">
         <div class="label">Open Support</div>
-        <div class="value" style="color: {% if open_support_count > 0 %}#ed4552{% else %}var(--success){% endif %};">{{ open_support_count }}</div>
+        <div class="value {% if open_support_count > 0 %}red{% else %}green{% endif %}">{{ open_support_count }}</div>
     </div>
 </div>
 
-<!-- Offline Devices Alert -->
-{% if offline_devices %}
-<div class="panel" style="border-left: 4px solid var(--danger);">
-    <div class="panel-title" style="color: var(--danger);">⚠️ Offline Devices ({{ offline_devices|length }})</div>
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Device</th>
-                <th>Vessel</th>
-                <th>Last Seen</th>
-                <th>Version</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for device in offline_devices %}
-            <tr>
-                <td><strong>{{ device.name or device.device_id }}</strong></td>
-                <td>{{ device.vessel.name if device.vessel else '-' }}</td>
-                <td style="color: var(--danger);">
-                    {% if device.last_heartbeat %}
-                    {{ device.last_heartbeat.strftime('%Y-%m-%d %H:%M') }}
-                    {% else %}-{% endif %}
-                </td>
-                <td>{{ device.software_version or '-' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% endif %}
+<!-- Alerts Row -->
+<div class="grid-2" style="margin-bottom: 20px;">
+    <!-- Offline Devices -->
+    <div class="panel" {% if offline_devices %}style="border-left: 3px solid var(--danger);"{% endif %}>
+        <div class="panel-title">
+            <span style="font-size: 14px;">Offline Devices</span>
+            {% if offline_devices %}
+            <span class="badge-sm" style="background: var(--bg-danger); color: var(--danger-text);">{{ offline_devices|length }}</span>
+            {% else %}
+            <span class="badge-sm" style="background: var(--bg-success); color: var(--success-text);">All Online</span>
+            {% endif %}
+        </div>
+        {% if offline_devices %}
+        <table class="data-table" style="margin: -4px -24px -24px; width: calc(100% + 48px); border: none; border-radius: 0 0 var(--radius) var(--radius);">
+            <thead>
+                <tr>
+                    <th>Device</th>
+                    <th>Vessel</th>
+                    <th>Last Seen</th>
+                    <th>Version</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for device in offline_devices %}
+                <tr>
+                    <td><strong style="color: var(--text);">{{ device.name or device.device_id }}</strong></td>
+                    <td>{{ device.vessel.name if device.vessel else '-' }}</td>
+                    <td class="text-danger">
+                        {% if device.last_heartbeat %}
+                        {{ device.last_heartbeat.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td><code class="font-mono" style="font-size: 12px;">{{ device.software_version or '-' }}</code></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="padding: 16px 0; text-align: center;">
+            <div class="text-success" style="font-size: 14px;">All devices are online and reporting</div>
+        </div>
+        {% endif %}
+    </div>
 
-<!-- Open Support Requests Alert -->
-{% if open_support_count and open_support_count > 0 %}
-<div class="panel" style="border-left: 4px solid var(--accent-orange);">
-    <div class="panel-title" style="color: var(--accent-orange);">&#x1F4DE; Open Support Requests ({{ open_support_count }})</div>
-    <p style="color: var(--text-muted);">There are {{ open_support_count }} open support request(s) from devices. <a href="/admin/support" style="color: var(--accent-blue);">View all &#x2192;</a></p>
+    <!-- Open Support Requests -->
+    <div class="panel" {% if open_support_count and open_support_count > 0 %}style="border-left: 3px solid var(--warning);"{% endif %}>
+        <div class="panel-title">
+            <span style="font-size: 14px;">Support Requests</span>
+            {% if open_support_count and open_support_count > 0 %}
+            <span class="badge-sm" style="background: var(--bg-warning); color: var(--warning-text);">{{ open_support_count }} open</span>
+            {% else %}
+            <span class="badge-sm" style="background: var(--bg-success); color: var(--success-text);">Clear</span>
+            {% endif %}
+        </div>
+        {% if open_support_count and open_support_count > 0 %}
+        <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 12px;">
+            {{ open_support_count }} unresolved request{{ 's' if open_support_count > 1 else '' }} from devices.
+        </p>
+        <a href="/admin/support" class="btn btn-secondary" style="font-size: 13px;">View All Requests</a>
+        {% else %}
+        <div style="padding: 16px 0; text-align: center;">
+            <div class="text-success" style="font-size: 14px;">No open support tickets</div>
+        </div>
+        {% endif %}
+    </div>
 </div>
-{% endif %}
 
-<!-- Recent Errors -->
+<!-- Recent Errors & Alerts -->
 <div class="panel">
-    <div class="panel-title" style="color: var(--danger);">🔴 Recent Errors & Alerts</div>
+    <div class="panel-title">
+        <span>Recent Errors & Alerts</span>
+    </div>
     {% if recent_errors %}
-    <table class="data-table">
+    <table class="data-table" style="margin: -4px -24px -24px; width: calc(100% + 48px); border: none; border-radius: 0 0 var(--radius) var(--radius);">
         <thead>
             <tr>
                 <th>Time</th>
                 <th>Device</th>
                 <th>Error Type</th>
-                <th>Shelf / Slot</th>
+                <th>Location</th>
                 <th>Details</th>
             </tr>
         </thead>
         <tbody>
             {% for event in recent_errors %}
             <tr>
-                <td>{{ event.received_at.strftime('%Y-%m-%d %H:%M') if event.received_at else '-' }}</td>
-                <td>{{ event.device_id }}</td>
+                <td style="white-space: nowrap;">
+                    <span class="font-mono" style="font-size: 12px;">{{ event.received_at.strftime('%Y-%m-%d %H:%M') if event.received_at else '-' }}</span>
+                </td>
+                <td><strong style="color: var(--text);">{{ event.device_id }}</strong></td>
                 <td>
                     {% if 'unauthorized' in event.event_type %}
-                    <span class="type-badge" style="background: rgba(237,69,82,0.15); color: #ed4552;">🚨 {{ event.event_type }}</span>
+                    <span class="type-badge" style="background: rgba(248,113,113,0.12); color: var(--danger-text);">{{ event.event_type }}</span>
                     {% elif 'anomaly' in event.event_type %}
-                    <span class="type-badge" style="background: rgba(251,166,64,0.15); color: #fba640;">⚠️ {{ event.event_type }}</span>
+                    <span class="type-badge" style="background: rgba(251,191,36,0.12); color: var(--warning-text);">{{ event.event_type }}</span>
                     {% elif 'error' in event.event_type %}
-                    <span class="type-badge" style="background: rgba(237,69,82,0.15); color: #ed4552;">❌ {{ event.event_type }}</span>
+                    <span class="type-badge" style="background: rgba(248,113,113,0.12); color: var(--danger-text);">{{ event.event_type }}</span>
                     {% else %}
                     <span class="type-badge base_paint">{{ event.event_type }}</span>
                     {% endif %}
                 </td>
-                <td>{{ event.shelf_id or '-' }} / {{ event.slot_id or '-' }}</td>
-                <td style="color: var(--text-muted);">{{ event.user_name or '-' }}</td>
+                <td style="font-size: 13px;">{{ event.shelf_id or '-' }} / {{ event.slot_id or '-' }}</td>
+                <td style="color: var(--text-muted); font-size: 13px;">{{ event.user_name or '-' }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <p style="color: var(--success); padding: 20px 0; text-align: center;">✅ No recent errors. All systems operating normally.</p>
+    <div style="padding: 24px 0; text-align: center;">
+        <div class="text-success" style="font-size: 14px; font-weight: 600;">No recent errors — all systems operating normally</div>
+    </div>
     {% endif %}
 </div>
 
-<div class="stats-grid">
-    <div class="panel" style="grid-column: span 2;">
-        <div class="panel-title">Quick Actions</div>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <a href="/admin/products" class="btn btn-primary">Manage Products</a>
-            <a href="/admin/recipes" class="btn btn-primary">Manage Recipes</a>
-            <a href="/admin/devices" class="btn btn-secondary">View Devices</a>
-            <a href="/admin/inventory" class="btn btn-secondary">Inventory</a>
-            <a href="/admin/events" class="btn btn-secondary">Event Log</a>
-            <a href="/docs" target="_blank" class="btn btn-secondary">API Docs</a>
-        </div>
-    </div>
+<!-- Quick Actions -->
+<div class="section-title">Quick Actions</div>
+<div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+    <a href="/admin/products" class="btn btn-primary">Manage Products</a>
+    <a href="/admin/recipes" class="btn btn-primary">Manage Recipes</a>
+    <a href="/admin/devices" class="btn btn-secondary">View Devices</a>
+    <a href="/admin/inventory" class="btn btn-secondary">Inventory</a>
+    <a href="/admin/mixing-sessions" class="btn btn-secondary">Mixing Sessions</a>
+    <a href="/admin/events" class="btn btn-secondary">Event Log</a>
+    <a href="/docs" target="_blank" class="btn btn-ghost">API Docs</a>
 </div>
 {% endblock %}

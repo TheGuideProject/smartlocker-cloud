@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SmartLocker{% endblock %}</title>
-    <link rel="stylesheet" href="/static/style.css?v=2.3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=3.0">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    {% block head %}{% endblock %}
 </head>
 <body>
     <nav class="sidebar">
@@ -15,26 +18,41 @@
         </div>
         <ul class="nav-links">
             {% block nav %}
-            <li><a href="/admin/" class="{% if active == 'dashboard' %}active{% endif %}">Dashboard</a></li>
-            <li><a href="/admin/products" class="{% if active == 'products' %}active{% endif %}">Products</a></li>
-            <li><a href="/admin/recipes" class="{% if active == 'recipes' %}active{% endif %}">Recipes</a></li>
-            <li><a href="/admin/fleet" class="{% if active == 'fleet' %}active{% endif %}">Fleet</a></li>
-            <li><a href="/admin/devices" class="{% if active == 'devices' %}active{% endif %}">Devices</a></li>
-            <li><a href="/admin/inventory" class="{% if active == 'inventory' %}active{% endif %}">Inventory</a></li>
-            <li><a href="/admin/charts" class="{% if active == 'charts' %}active{% endif %}">Charts</a></li>
-            <li><a href="/admin/pairing" class="{% if active == 'pairing' %}active{% endif %}">Pairing</a></li>
-            <li><a href="/admin/events" class="{% if active == 'events' %}active{% endif %}">Events</a></li>
-            <li><a href="/admin/mixing-sessions" class="{% if active == 'mixing' %}active{% endif %}">Mixing</a></li>
-            <li><a href="/admin/support" class="{% if active == 'support' %}active{% endif %}">Support</a></li>
-            <li><a href="/admin/users" class="{% if active == 'users' %}active{% endif %}">Users</a></li>
-            <li><a href="/admin/error-codes" class="{% if active == 'error_codes' %}active{% endif %}">Error Codes</a></li>
-            <li><a href="/admin/guide" class="{% if active == 'guide' %}active{% endif %}">System Guide</a></li>
-            <li><a href="/admin/barcode-generator" class="{% if active == 'barcode' %}active{% endif %}">Barcode Generator</a></li>
+            <li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Overview</li>
+            <li><a href="/admin/" class="{% if active == 'dashboard' %}active{% endif %}"><span class="nav-icon">&#9671;</span> Dashboard</a></li>
+            <li><a href="/dashboard/" class="{% if active == 'owner_dashboard' %}active{% endif %}"><span class="nav-icon">&#9670;</span> Fleet Overview</a></li>
+
+            <li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Catalog</li>
+            <li><a href="/admin/products" class="{% if active == 'products' %}active{% endif %}"><span class="nav-icon">&#9632;</span> Products</a></li>
+            <li><a href="/admin/recipes" class="{% if active == 'recipes' %}active{% endif %}"><span class="nav-icon">&#9733;</span> Recipes</a></li>
+            <li><a href="/admin/charts" class="{% if active == 'charts' %}active{% endif %}"><span class="nav-icon">&#9783;</span> Maint. Charts</a></li>
+            <li><a href="/admin/barcode-generator" class="{% if active == 'barcode' %}active{% endif %}"><span class="nav-icon">&#9783;</span> Barcode Gen</a></li>
+
+            <li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Fleet</li>
+            <li><a href="/admin/fleet" class="{% if active == 'fleet' %}active{% endif %}"><span class="nav-icon">&#9875;</span> Companies</a></li>
+            <li><a href="/admin/devices" class="{% if active == 'devices' %}active{% endif %}"><span class="nav-icon">&#8862;</span> Devices</a></li>
+            <li><a href="/admin/inventory" class="{% if active == 'inventory' %}active{% endif %}"><span class="nav-icon">&#9638;</span> Inventory</a></li>
+            <li><a href="/admin/pairing" class="{% if active == 'pairing' %}active{% endif %}"><span class="nav-icon">&#8644;</span> Pairing</a></li>
+
+            <li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Operations</li>
+            <li><a href="/admin/mixing-sessions" class="{% if active == 'mixing' %}active{% endif %}"><span class="nav-icon">&#9880;</span> Mixing</a></li>
+            <li><a href="/admin/events" class="{% if active == 'events' %}active{% endif %}"><span class="nav-icon">&#9776;</span> Events</a></li>
+            <li><a href="/admin/support" class="{% if active == 'support' %}active{% endif %}"><span class="nav-icon">&#9888;</span> Support</a></li>
+
+            <li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Admin</li>
+            <li><a href="/admin/users" class="{% if active == 'users' %}active{% endif %}"><span class="nav-icon">&#9679;</span> Users</a></li>
+            <li><a href="/admin/error-codes" class="{% if active == 'error_codes' %}active{% endif %}"><span class="nav-icon">&#9888;</span> Error Codes</a></li>
+            <li><a href="/admin/guide" class="{% if active == 'guide' %}active{% endif %}"><span class="nav-icon">&#9881;</span> System Guide</a></li>
+
             <li class="nav-divider"></li>
-            <li><a href="/dashboard/">Owner Dashboard</a></li>
-            <li><a href="/docs" target="_blank">API Docs</a></li>
+            <li><a href="/docs" target="_blank"><span class="nav-icon">&#8599;</span> API Docs</a></li>
+            <li><a href="/admin/logout" style="color: var(--danger);"><span class="nav-icon">&#10140;</span> Logout</a></li>
             {% endblock %}
         </ul>
+        <div class="sidebar-footer">
+            <div style="color: var(--text-muted); font-size: 11px;">PPG SmartLocker Platform</div>
+            <div style="color: var(--text-muted); font-size: 10px; margin-top: 2px;">v3.1 &middot; Marine Coatings</div>
+        </div>
     </nav>
 
     <main class="content">
@@ -45,6 +63,12 @@
             </div>
         </header>
         <div class="page-content">
+            {% if request.query_params.get('success') %}
+            <div class="alert alert-success animate-fade-in">{{ request.query_params.get('success') }}</div>
+            {% endif %}
+            {% if request.query_params.get('error') %}
+            <div class="alert alert-danger animate-fade-in">{{ request.query_params.get('error') }}</div>
+            {% endif %}
             {% block content %}{% endblock %}
         </div>
     </main>

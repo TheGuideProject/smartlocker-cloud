@@ -4,51 +4,52 @@
 {% block page_title %}Fleet Overview{% endblock %}
 
 {% block nav %}
-<li><a href="/dashboard/" class="active">Fleet Overview</a></li>
+<li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Fleet</li>
+<li><a href="/dashboard/" class="active"><span class="nav-icon">&#9670;</span> Fleet Overview</a></li>
 <li class="nav-divider"></li>
-<li><a href="/admin/">Admin Portal</a></li>
-<li><a href="/docs" target="_blank">API Docs</a></li>
+<li><a href="/admin/"><span class="nav-icon">&#9671;</span> Admin Portal</a></li>
+<li><a href="/docs" target="_blank"><span class="nav-icon">&#8599;</span> API Docs</a></li>
 {% endblock %}
 
 {% block content %}
 <!-- Fleet Summary Stats -->
-<div class="stats-grid">
-    <div class="stat-card">
+<div class="stats-grid" style="grid-template-columns: repeat(6, 1fr);">
+    <div class="stat-card accent-blue">
         <div class="label">Vessels</div>
         <div class="value blue">{{ total_vessels }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-teal">
         <div class="label">Devices</div>
-        <div class="value green">{{ total_devices }}</div>
+        <div class="value teal">{{ total_devices }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-green">
         <div class="label">Online</div>
         <div class="value green">{{ online_count }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card {% if offline_count > 0 %}accent-orange{% endif %}">
         <div class="label">Offline</div>
-        <div class="value{% if offline_count > 0 %} orange{% endif %}">{{ offline_count }}</div>
+        <div class="value {% if offline_count > 0 %}orange{% endif %}">{{ offline_count }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-blue">
         <div class="label">Events (24h)</div>
         <div class="value blue">{{ event_count_24h }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card {% if support_requests|length > 0 %}accent-red{% endif %}">
         <div class="label">Open Tickets</div>
-        <div class="value{% if support_requests|length > 0 %} red{% endif %}">{{ support_requests|length }}</div>
+        <div class="value {% if support_requests|length > 0 %}red{% endif %}">{{ support_requests|length }}</div>
     </div>
 </div>
 
 <!-- Vessel Cards -->
 <div class="section-title">Vessels</div>
 {% if vessels %}
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 15px; margin-bottom: 25px;">
+<div class="grid-auto" style="margin-bottom: 28px;">
     {% for vessel in vessels %}
-    <div class="panel" style="margin-bottom: 0;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+    <div class="vessel-card">
+        <div class="flex justify-between items-center mb-3">
             <div>
-                <div style="font-weight: 600; font-size: 15px; color: var(--text-primary);">{{ vessel.name }}</div>
-                <div style="color: var(--text-muted); font-size: 12px; margin-top: 2px;">
+                <div style="font-weight: 700; font-size: 15px; color: var(--text);">{{ vessel.name }}</div>
+                <div style="color: var(--text-muted); font-size: 12px; margin-top: 3px;">
                     {% if vessel.imo_number %}IMO {{ vessel.imo_number }}{% else %}No IMO{% endif %}
                     {% if vessel.fleet %} &middot; {{ vessel.fleet.name }}{% endif %}
                     {% if vessel.fleet and vessel.fleet.company %} &middot; {{ vessel.fleet.company.name }}{% endif %}
@@ -72,28 +73,21 @@
         </div>
 
         {% if vessel.devices|length > 0 %}
-        <table style="width: 100%; font-size: 13px;">
-            {% for dev in vessel.devices %}
-            <tr style="border-top: 1px solid var(--border);">
-                <td style="padding: 6px 0; color: var(--text-secondary);">
-                    {{ dev.name or dev.device_id }}
-                </td>
-                <td style="padding: 6px 0; text-align: right;">
-                    <span class="status-badge {{ 'online' if dev.is_online else 'offline' }}" style="font-size: 11px;">
-                        {{ 'Online' if dev.is_online else 'Offline' }}
-                    </span>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="padding: 0 0 6px 0; color: var(--text-muted); font-size: 11px;">
-                    v{{ dev.software_version or '?' }}
-                    &middot; Last seen: {{ dev.last_seen_ago }}
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
+        {% for dev in vessel.devices %}
+        <div style="padding: 10px 0; {% if not loop.first %}border-top: 1px solid var(--border);{% endif %}">
+            <div class="flex justify-between items-center">
+                <span style="color: var(--text-secondary); font-size: 13px;">{{ dev.name or dev.device_id }}</span>
+                <span class="status-badge {{ 'online' if dev.is_online else 'offline' }}" style="font-size: 11px;">
+                    {{ 'Online' if dev.is_online else 'Offline' }}
+                </span>
+            </div>
+            <div style="color: var(--text-muted); font-size: 11px; margin-top: 3px;">
+                v{{ dev.software_version or '?' }} &middot; Last seen: {{ dev.last_seen_ago }}
+            </div>
+        </div>
+        {% endfor %}
         {% else %}
-        <div style="color: var(--text-muted); font-size: 13px; padding: 8px 0;">
+        <div style="color: var(--text-muted); font-size: 13px; padding: 10px 0;">
             No SmartLocker device installed on this vessel.
         </div>
         {% endif %}
@@ -101,95 +95,98 @@
     {% endfor %}
 </div>
 {% else %}
-<div class="panel" style="text-align: center; padding: 40px;">
-    <div style="color: var(--text-muted); font-size: 14px;">
-        No vessels found. Vessels and devices are configured by PPG administration.
-    </div>
+<div class="panel empty-state">
+    <div class="empty-title">No vessels found</div>
+    <div class="empty-desc">Vessels and devices are configured by PPG administration.</div>
 </div>
 {% endif %}
 
 <!-- Recent Activity -->
 <div class="section-title">Recent Activity (Last 24h)</div>
 {% if recent_events %}
-<table class="data-table" style="margin-bottom: 25px;">
-    <thead>
-        <tr>
-            <th>Time</th>
-            <th>Type</th>
-            <th>User</th>
-            <th>Details</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for event in recent_events %}
-        <tr>
-            <td style="white-space: nowrap; font-size: 13px; color: var(--text-muted);">
-                {{ event.timestamp.strftime('%H:%M:%S') if event.timestamp else '-' }}
-            </td>
-            <td>
-                <span class="type-badge" style="background: rgba(95,168,211,0.15); color: var(--accent-blue);">
-                    {{ event.event_type.replace('_', ' ').title() }}
-                </span>
-            </td>
-            <td style="font-size: 13px;">{{ event.user_name or '-' }}</td>
-            <td style="font-size: 13px; color: var(--text-secondary);">
-                {% if event.tag_id %}Tag: {{ event.tag_id[:12] }}{% endif %}
-                {% if event.slot_id %} Slot: {{ event.slot_id }}{% endif %}
-                {% if event.session_id %} Session: {{ event.session_id[:8] }}...{% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="panel" style="padding: 0; overflow: hidden;">
+    <table class="data-table" style="border: none; border-radius: 0;">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Type</th>
+                <th>User</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in recent_events %}
+            <tr>
+                <td style="white-space: nowrap;">
+                    <span class="font-mono" style="font-size: 12px;">{{ event.timestamp.strftime('%H:%M:%S') if event.timestamp else '-' }}</span>
+                </td>
+                <td>
+                    <span class="type-badge" style="background: rgba(96,165,250,0.12); color: var(--info-text);">
+                        {{ event.event_type.replace('_', ' ').title() }}
+                    </span>
+                </td>
+                <td style="font-size: 13px;">{{ event.user_name or '-' }}</td>
+                <td style="font-size: 13px; color: var(--text-secondary);">
+                    {% if event.tag_id %}Tag: {{ event.tag_id[:12] }}{% endif %}
+                    {% if event.slot_id %} Slot: {{ event.slot_id }}{% endif %}
+                    {% if event.session_id %} Session: {{ event.session_id[:8] }}...{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% else %}
-<div class="panel" style="text-align: center; padding: 25px; margin-bottom: 25px;">
+<div class="panel" style="text-align: center; padding: 32px;">
     <div style="color: var(--text-muted); font-size: 14px;">No events in the last 24 hours.</div>
 </div>
 {% endif %}
 
 <!-- Support Requests -->
-<div class="section-title">Open Support Requests</div>
+<div class="section-title" style="margin-top: 28px;">Open Support Requests</div>
 {% if support_requests %}
-<table class="data-table">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Device</th>
-            <th>Error</th>
-            <th>Severity</th>
-            <th>Status</th>
-            <th>Created</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for req in support_requests %}
-        <tr>
-            <td>#{{ req.id }}</td>
-            <td style="font-size: 13px;">{{ req.device_id }}</td>
-            <td>
-                <strong>{{ req.error_code }}</strong>
-                {% if req.error_title %} - {{ req.error_title }}{% endif %}
-            </td>
-            <td>
-                <span class="status-badge {{ 'online' if req.severity == 'info' else ('delayed' if req.severity == 'warning' else 'offline') }}">
-                    {{ req.severity }}
-                </span>
-            </td>
-            <td>
-                <span class="status-badge {{ 'online' if req.status == 'open' else 'used' }}">
-                    {{ req.status_label }}
-                </span>
-            </td>
-            <td style="font-size: 13px; color: var(--text-muted);">
-                {{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at else '-' }}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="panel" style="padding: 0; overflow: hidden;">
+    <table class="data-table" style="border: none; border-radius: 0;">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Device</th>
+                <th>Error</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for req in support_requests %}
+            <tr>
+                <td><strong style="color: var(--text);">#{{ req.id }}</strong></td>
+                <td style="font-size: 13px;">{{ req.device_id }}</td>
+                <td>
+                    <strong>{{ req.error_code }}</strong>
+                    {% if req.error_title %} - {{ req.error_title }}{% endif %}
+                </td>
+                <td>
+                    <span class="status-badge {{ 'online' if req.severity == 'info' else ('delayed' if req.severity == 'warning' else 'offline') }}">
+                        {{ req.severity }}
+                    </span>
+                </td>
+                <td>
+                    <span class="status-badge {{ 'online' if req.status == 'open' else 'used' }}">
+                        {{ req.status_label }}
+                    </span>
+                </td>
+                <td>
+                    <span class="font-mono" style="font-size: 12px;">{{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at else '-' }}</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% else %}
-<div class="panel" style="text-align: center; padding: 25px;">
-    <div style="color: var(--text-muted); font-size: 14px;">No open support requests.</div>
+<div class="panel" style="text-align: center; padding: 32px;">
+    <div class="text-success" style="font-size: 14px;">No open support requests</div>
 </div>
 {% endif %}
 {% endblock %}
