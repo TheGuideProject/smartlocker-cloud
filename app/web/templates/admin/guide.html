@@ -129,26 +129,26 @@
 
 <!-- ====== HEADER STATS ====== -->
 <div class="stats-grid">
-    <div class="stat-card">
+    <div class="stat-card accent-blue">
         <div class="label">Cloud Version</div>
-        <div class="value blue">2.3.3</div>
+        <div class="value blue">3.1</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-green">
         <div class="label">Edge Version</div>
-        <div class="value green">2.3.5</div>
+        <div class="value green">3.1.1</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-orange">
         <div class="label">Hardware Components</div>
         <div class="value orange">4</div>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">RFID + Weight + LED + Buzzer</div>
     </div>
-    <div class="stat-card">
-        <div class="label">Uptime Target</div>
-        <div class="value green">99.9%</div>
+    <div class="stat-card accent-teal">
+        <div class="label">UI Framework</div>
+        <div class="value teal" style="font-size: 22px;">PyQt6</div>
     </div>
     <div class="stat-card">
         <div class="label">Last Update</div>
-        <div class="value" style="font-size: 20px;">2026-03-11</div>
+        <div class="value" style="font-size: 20px;">2026-03-31</div>
     </div>
 </div>
 
@@ -166,9 +166,11 @@
             <div class="challenge-card">
                 <div class="card-title"><span class="card-icon">&#128421;</span> Edge Device (Raspberry Pi 5)</div>
                 <p>
-                    Kivy touchscreen UI &bull; PN532 RFID reader (I2C) &bull; HX711 load cells via Arduino Nano bridge &bull;
-                    WS2812B LED strip for slot guidance &bull; PWM buzzer for audio alerts &bull;
-                    SQLite (WAL) for local-first persistence &bull; Runs 24/7 via systemd service
+                    PyQt6 touchscreen UI (800x480) &bull; PN532 USB NFC reader (tag read/write) &bull;
+                    Dual HX711 load cells via direct GPIO (lgpio) with background thread &bull;
+                    WS2812B LED strip for slot guidance &bull; PWM buzzer with zone-based feedback &bull;
+                    SQLite (WAL) for local-first persistence &bull; In-app calibration wizard &bull;
+                    Runs 24/7 via systemd service
                 </p>
             </div>
             <div class="challenge-card">
@@ -187,9 +189,9 @@
 &#9474;          EDGE DEVICE (RPi 5)          &#9474;          &#9474;         CLOUD PLATFORM              &#9474;
 &#9474;                                        &#9474;          &#9474;                                    &#9474;
 &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;   &#9474;  &#9581;&#9472;&#9472;&#9583;  &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;
-&#9474;  &#9474; Kivy   &#9474;  &#9474; Sensors:     &#9474;   &#9474;  &#9474;    &#9474;  &#9474; FastAPI   &#9474;  &#9474; Admin   &#9474;  &#9474;
+&#9474;  &#9474; PyQt6  &#9474;  &#9474; Sensors:     &#9474;   &#9474;  &#9474;    &#9474;  &#9474; FastAPI   &#9474;  &#9474; Admin   &#9474;  &#9474;
 &#9474;  &#9474; Touch  &#9474;  &#9474; RFID PN532   &#9474;   &#9474;  &#9474;HTTP&#9474;  &#9474; REST API  &#9474;  &#9474; Portal  &#9474;  &#9474;
-&#9474;  &#9474;   UI   &#9474;  &#9474; HX711 Weight &#9474;   &#9474;  &#9474; +  &#9474;  &#9474; (JWT +   &#9474;  &#9474; (Jinja2 &#9474;  &#9474;
+&#9474;  &#9474;   UI   &#9474;  &#9474; HX711 Direct &#9474;   &#9474;  &#9474; +  &#9474;  &#9474; (JWT +   &#9474;  &#9474; (Jinja2 &#9474;  &#9474;
 &#9474;  &#9474;        &#9474;  &#9474; WS2812B LED  &#9474;   &#9474;  &#9474; WS &#9474;  &#9474;  API Key) &#9474;  &#9474;  + HTMX) &#9474;  &#9474;
 &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474; PWM Buzzer   &#9474;   &#9474;  &#9474;    &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;
 &#9474;       &#9474;      &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;   &#9474;  &#9580;&#9472;&#9472;&#9583;  &#9474;       &#9474;                  &#9474;
@@ -293,7 +295,7 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
     <div class="tech-grid">
         <div class="tech-item">
             <div class="tech-icon">&#128013;</div>
-            <div class="tech-name">Python 3.11</div>
+            <div class="tech-name">Python 3.13</div>
             <div class="tech-desc">Core language for both edge &amp; cloud</div>
         </div>
         <div class="tech-item">
@@ -303,7 +305,7 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         </div>
         <div class="tech-item">
             <div class="tech-icon">&#128247;</div>
-            <div class="tech-name">Kivy</div>
+            <div class="tech-name">PyQt6</div>
             <div class="tech-desc">Touchscreen UI framework (RPi)</div>
         </div>
         <div class="tech-item">
@@ -318,13 +320,13 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         </div>
         <div class="tech-item">
             <div class="tech-icon">&#128225;</div>
-            <div class="tech-name">PN532 RFID (I2C)</div>
-            <div class="tech-desc">NFC tag reader for paint cans</div>
+            <div class="tech-name">PN532 USB NFC</div>
+            <div class="tech-desc">NFC tag read/write for paint cans</div>
         </div>
         <div class="tech-item">
             <div class="tech-icon">&#9878;</div>
-            <div class="tech-name">HX711 + Arduino Nano</div>
-            <div class="tech-desc">Weight sensing bridge</div>
+            <div class="tech-name">HX711 Direct GPIO</div>
+            <div class="tech-desc">Dual load cells via lgpio</div>
         </div>
         <div class="tech-item">
             <div class="tech-icon">&#128161;</div>
@@ -361,8 +363,55 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
     </p>
 
-    <!-- v2.5.0 -->
+    <!-- v3.1.0 -->
     <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v3.1.0</span> PyQt6 UI + Calibration Wizard + Cloud Redesign</span>
+            <span class="version-date">2026-03-31</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">UI Framework Migration (Kivy &rarr; PyQt6)</div>
+            <ul>
+                <li>Complete UI rewrite from Kivy to <strong>PyQt6</strong> for Python 3.13 compatibility</li>
+                <li>Modern dark maritime theme with Inter font, optimized for 800x480 4.3" touchscreen</li>
+                <li>All Qt enums use full paths (e.g., <code>Qt.AlignmentFlag.AlignCenter</code>)</li>
+                <li>Global click sound: buzzer tick on every QPushButton press via QEvent filter</li>
+            </ul>
+            <div class="change-subtitle">In-App Calibration Wizard (4-Step)</div>
+            <ul>
+                <li>Step 1: Remove weight &rarr; SET ZERO (reads raw offset)</li>
+                <li>Step 2: Enter known weight (presets: 500g, 1kg, 2kg, 5kg or custom)</li>
+                <li>Step 3: Place weight &rarr; READ loaded value with live display</li>
+                <li>Step 4: Review results (offset, scale, resolution, status) &rarr; SAVE to database</li>
+                <li>Calibration persisted in SQLite config table, auto-loaded on startup</li>
+            </ul>
+            <div class="change-subtitle">HX711 Weight Improvements</div>
+            <ul>
+                <li>Background reader thread: GPIO reads in daemon thread, Qt reads cached values (no timing conflict)</li>
+                <li>Spike filter: rejects single readings that jump &gt;500g from last (accepts after 3 consecutive)</li>
+                <li>Increased averaging: 7 samples per read, outlier removal, 15g stability threshold</li>
+                <li>Direct GPIO via <code>lgpio</code> (no Arduino bridge needed)</li>
+            </ul>
+            <div class="change-subtitle">Mixing Enhancements</div>
+            <ul>
+                <li>PaintNow &rarr; Mixing auto-flow: calculated quantities pass directly (no manual entry)</li>
+                <li>Zone-based buzzer feedback: TICK while pouring, WARNING at 90%, TARGET_REACHED at 95-105%, ERROR if over</li>
+                <li>Liters auto-converted to grams using density 1.3 kg/L</li>
+            </ul>
+            <div class="change-subtitle">Cloud Platform Redesign</div>
+            <ul>
+                <li>Complete CSS redesign: Inter font, refined color palette, gradient buttons, glass-morphism cards</li>
+                <li>Organized sidebar: Overview, Catalog, Fleet, Operations, Admin sections with icons</li>
+                <li>KPI dashboard cards with colored top borders and hover animations</li>
+                <li>Status badges with animated dots for online/offline</li>
+                <li>Fixed event sync 500 errors: savepoints for batch resilience + timezone fix</li>
+                <li>Fixed remote restart: replaced Kivy shutdown with PyQt6 <code>QApplication.quit()</code></li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v2.5.0 -->
+    <details class="changelog-entry">
         <summary>
             <span><span class="version-tag">v2.5.0</span> Dual HX711 Scales + PaintNow-to-Mixing Auto-Flow + Cloud Sync Fix</span>
             <span class="version-date">2026-03-31</span>
@@ -859,7 +908,7 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
             </ul>
             <div class="change-subtitle">Edge Device</div>
             <ul>
-                <li>Kivy touchscreen UI with 4 main screens (Home, Inventory, Mixing, Settings)</li>
+                <li>Touchscreen UI with 4 main screens (Home, Inventory, Mixing, Settings) — originally Kivy, migrated to PyQt6 in v3.0</li>
                 <li>Cloud sync engine with 6-digit pairing</li>
                 <li>Paint Now mixing wizard with step-by-step flow</li>
                 <li>Chart Viewer for maintenance schedules</li>
@@ -912,22 +961,22 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
             in paint inventory management aboard vessels.
         </p>
         <div class="credits-stack">
-            <span class="stack-tag">Python 3.11</span>
+            <span class="stack-tag">Python 3.13</span>
             <span class="stack-tag">FastAPI</span>
-            <span class="stack-tag">Kivy</span>
+            <span class="stack-tag">PyQt6</span>
             <span class="stack-tag">PostgreSQL</span>
             <span class="stack-tag">SQLite</span>
             <span class="stack-tag">Raspberry Pi 5</span>
-            <span class="stack-tag">PN532 RFID</span>
-            <span class="stack-tag">HX711 Load Cells</span>
+            <span class="stack-tag">PN532 USB NFC</span>
+            <span class="stack-tag">HX711 Direct GPIO</span>
             <span class="stack-tag">WS2812B LED</span>
-            <span class="stack-tag">Arduino Nano</span>
+            <span class="stack-tag">lgpio</span>
             <span class="stack-tag">Railway</span>
             <span class="stack-tag">systemd</span>
             <span class="stack-tag">Git OTA</span>
         </div>
         <p style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">
-            Cloud v2.3.3 &bull; Edge v2.3.5 &bull; Last updated 2026-03-11
+            Cloud v3.1 &bull; Edge v3.1.1 &bull; Last updated 2026-03-31
         </p>
     </div>
 </div>
