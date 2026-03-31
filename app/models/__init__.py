@@ -14,6 +14,7 @@ from app.models.pairing import PairingCode
 from app.models.health_log import SensorHealthLog
 from app.models.support_request import SupportRequest
 from app.models.command import DeviceCommand
+from app.models.product_barcode import ProductBarcode
 
 __all__ = [
     "User", "Company", "Fleet", "Vessel", "LockerDevice",
@@ -24,4 +25,5 @@ __all__ = [
     "MixingSessionCloud", "PairingCode", "SensorHealthLog",
     "SupportRequest",
     "DeviceCommand",
+    "ProductBarcode",
 ]
