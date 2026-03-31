@@ -1109,9 +1109,6 @@ async def admin_inventory(
                 "vessels": vessel_list,
             })
 
-    return templates.TemplateResponse("admin/inventory.html", {
-        "request": request,
-        "user": user,
     # Build flat list of ALL tracked cans (regardless of vessel linkage)
     all_cans_list = []
     for can in all_cans:
