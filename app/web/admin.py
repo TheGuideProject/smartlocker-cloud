@@ -2189,7 +2189,7 @@ def _make_barcode_image(data: str, barcode_type: str) -> bytes:
         from barcode.writer import ImageWriter
         code128 = barcode_lib.get_barcode_class("code128")
         bc = code128(data, writer=ImageWriter())
-        bc.write(buf, options={"module_width": 0.4, "module_height": 12, "font_size": 10, "text_distance": 5})
+        bc.write(buf, options={"module_width": 0.5, "module_height": 15, "font_size": 12, "text_distance": 5, "quiet_zone": 6.5})
     buf.seek(0)
     return buf.read()
 
@@ -2243,7 +2243,8 @@ async def admin_barcode_create(
     previews: list[dict] = []
     saved_count = 0
     for batch in batches:
-        data_string = f"{ppg_code}/{batch}/{product_name}/{color}"
+        # Short barcode format: SL-{PPG_CODE}-{BATCH} (scanner-friendly)
+        data_string = f"SL-{ppg_code}-{batch}"
         png_bytes = _make_barcode_image(data_string, barcode_type)
         b64 = base64.b64encode(png_bytes).decode()
         previews.append({
@@ -2335,7 +2336,8 @@ async def admin_barcode_pdf(
         if i > 0:
             c.showPage()
 
-        data_string = f"{ppg_code}/{batch}/{product_name}/{color}"
+        # Short barcode format: SL-{PPG_CODE}-{BATCH}
+        data_string = f"SL-{ppg_code}-{batch}"
         png_bytes = _make_barcode_image(data_string, barcode_type)
         img_reader = ImageReader(io.BytesIO(png_bytes))
 
@@ -2350,8 +2352,8 @@ async def admin_barcode_pdf(
         img_y = label_h - 12 * mm - img_h_pt
         c.drawImage(img_reader, img_x, img_y, width=img_w_pt, height=img_h_pt, preserveAspectRatio=True, mask='auto')
 
-        # Data string below barcode
-        c.setFont("Courier", 7)
+        # Short barcode ID below barcode
+        c.setFont("Courier-Bold", 9)
         c.drawCentredString(label_w / 2, img_y - 4 * mm, data_string)
 
         # Info lines at bottom
