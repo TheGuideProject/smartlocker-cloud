@@ -109,12 +109,15 @@ async def process_event_batch(
             acked_ids.append(event_id)
 
     # Process new events into inventory state (CanTracking)
+    # Use a savepoint so inventory processing failures don't poison the
+    # main commit (which must succeed to ack the events)
     if new_events:
         try:
-            await process_inventory_events(db, str(device.id), new_events)
+            async with db.begin_nested():
+                await process_inventory_events(db, str(device.id), new_events)
         except Exception as e:
             logger.error(f"Error processing inventory events: {e}")
-            # Don't fail the event ingestion if inventory processing fails
+            # Savepoint rolled back — events are still safe to commit
 
     return received, duplicates, acked_ids
 
@@ -390,12 +393,21 @@ async def process_inventory_snapshot(
             elif status == "in_use":
                 can.status = "in_use"
             if prod_id and not can.product_id:
-                can.product_id = prod_id
+                # Validate FK before setting
+                from app.services.event_processor import _product_exists
+                if await _product_exists(db, prod_id):
+                    can.product_id = prod_id
         else:
+            # Validate product_id FK before creating
+            validated_prod_id = prod_id
+            if prod_id:
+                from app.services.event_processor import _product_exists
+                if not await _product_exists(db, prod_id):
+                    validated_prod_id = None
             can = CanTracking(
                 tag_uid=tag,
                 device_id=str(device.id),
-                product_id=prod_id,
+                product_id=validated_prod_id,
                 slot_id=slot_id,
                 weight_current_g=weight,
                 weight_full_g=weight,
