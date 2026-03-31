@@ -2,11 +2,12 @@
 
 import logging
 from datetime import datetime
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.can_tracking import CanTracking
 from app.models.event import DeviceEvent
+from app.models.product import Product
 
 logger = logging.getLogger("smartlocker.event_processor")
 
@@ -44,8 +45,14 @@ async def process_inventory_events(
                     can.weight_current_g = data["weight_g"]
                     if not can.weight_full_g:
                         can.weight_full_g = data["weight_g"]
-                if data.get("product_id") and not can.product_id:
-                    can.product_id = data["product_id"]
+                # Resolve product_id: direct or by ppg_code lookup
+                product_id = data.get("product_id") or ""
+                if not product_id and data.get("ppg_code"):
+                    product_id = await _resolve_product_id(
+                        db, data["ppg_code"]
+                    )
+                if product_id and not can.product_id:
+                    can.product_id = product_id
                 updated += 1
 
             elif event_type == "can_removed":
@@ -145,3 +152,19 @@ async def _find_can(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def _resolve_product_id(
+    db: AsyncSession,
+    ppg_code: str,
+) -> str | None:
+    """Resolve a PPG code to a product_id by looking up the Product table."""
+    result = await db.execute(
+        select(Product.id).where(
+            func.upper(Product.ppg_code) == ppg_code.upper()
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row:
+        return str(row)
+    return None
