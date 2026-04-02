@@ -352,7 +352,7 @@ async def admin_device_logs(
 
     # Get device list for filter dropdown
     devices_result = await db.execute(
-        select(LockerDevice).order_by(LockerDevice.device_name)
+        select(LockerDevice).order_by(LockerDevice.name)
     )
     devices = devices_result.scalars().all()
 
