@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% set active = "device_logs" %}
+
+{% block title %}Device Logs - SmartLocker{% endblock %}
+{% block page_title %}Device Logs{% endblock %}
+
+{% block content %}
+<style>
+    .log-filters {
+        display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap;
+    }
+    .log-filters select {
+        background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border);
+        border-radius: 6px; padding: 8px 12px; font-size: 13px; min-width: 180px;
+    }
+    .log-filters button {
+        background: var(--accent-blue); color: #fff; border: none; border-radius: 6px;
+        padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .log-filters button:hover { opacity: 0.9; }
+    .log-table {
+        width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Courier New', monospace;
+    }
+    .log-table th {
+        background: var(--bg-card); color: var(--text-muted); padding: 8px 10px;
+        text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+        border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 1;
+    }
+    .log-table td {
+        padding: 5px 10px; border-bottom: 1px solid var(--border); vertical-align: top;
+        max-width: 600px; word-break: break-word;
+    }
+    .log-table tr:hover { background: rgba(255,255,255,0.02); }
+    .log-level {
+        display: inline-block; padding: 2px 8px; border-radius: 10px;
+        font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-align: center; min-width: 60px;
+    }
+    .log-level.DEBUG { background: rgba(100,100,100,0.2); color: var(--text-muted); }
+    .log-level.INFO { background: rgba(94,168,211,0.15); color: var(--accent-blue); }
+    .log-level.WARNING { background: rgba(250,194,34,0.15); color: var(--accent-orange); }
+    .log-level.ERROR { background: rgba(248,81,73,0.15); color: var(--danger); }
+    .log-level.CRITICAL { background: rgba(248,81,73,0.3); color: #ff4444; }
+    .log-logger { color: var(--accent-green); font-size: 11px; }
+    .log-msg { color: var(--text-secondary); line-height: 1.4; }
+    .log-time { color: var(--text-muted); white-space: nowrap; font-size: 11px; }
+    .log-device { color: var(--accent-blue); font-size: 11px; }
+    .log-container {
+        background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+        overflow: auto; max-height: 70vh;
+    }
+    .empty-state {
+        text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px;
+    }
+    .stats-row {
+        display: flex; gap: 12px; margin-bottom: 16px;
+    }
+    .stat-mini {
+        background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+        padding: 10px 16px; font-size: 12px; color: var(--text-secondary);
+    }
+    .stat-mini strong { color: var(--text-primary); font-size: 18px; margin-right: 6px; }
+</style>
+
+<!-- Stats -->
+<div class="stats-row">
+    <div class="stat-mini"><strong>{{ logs|length }}</strong> log lines shown</div>
+    <div class="stat-mini"><strong>{{ devices|length }}</strong> devices</div>
+    {% set errors = logs|selectattr("level", "equalto", "ERROR")|list %}
+    {% set warnings = logs|selectattr("level", "equalto", "WARNING")|list %}
+    {% if errors %}<div class="stat-mini" style="border-color: var(--danger);"><strong style="color:var(--danger);">{{ errors|length }}</strong> errors</div>{% endif %}
+    {% if warnings %}<div class="stat-mini" style="border-color: var(--accent-orange);"><strong style="color:var(--accent-orange);">{{ warnings|length }}</strong> warnings</div>{% endif %}
+</div>
+
+<!-- Filters -->
+<form class="log-filters" method="GET" action="/admin/device-logs">
+    <select name="device_id">
+        <option value="">All Devices</option>
+        {% for d in devices %}
+        <option value="{{ d.id }}" {% if filter_device == d.id|string %}selected{% endif %}>{{ d.device_name or d.id }}</option>
+        {% endfor %}
+    </select>
+    <select name="level">
+        <option value="">All Levels</option>
+        {% for lvl in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] %}
+        <option value="{{ lvl }}" {% if filter_level == lvl %}selected{% endif %}>{{ lvl }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Filter</button>
+    {% if filter_device or filter_level %}
+    <a href="/admin/device-logs" style="color: var(--text-muted); font-size: 12px; text-decoration: underline;">Clear filters</a>
+    {% endif %}
+</form>
+
+<!-- Log table -->
+<div class="log-container">
+    {% if logs %}
+    <table class="log-table">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Level</th>
+                <th>Logger</th>
+                <th>Message</th>
+                <th>Device</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td class="log-time">{{ log.timestamp.strftime('%d/%m %H:%M:%S') if log.timestamp else '—' }}</td>
+                <td><span class="log-level {{ log.level }}">{{ log.level }}</span></td>
+                <td class="log-logger">{{ log.logger_name }}</td>
+                <td class="log-msg">{{ log.message }}</td>
+                <td class="log-device">{{ log.device_id[:12] }}...</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        No logs received yet.<br>
+        <span style="font-size: 12px; color: var(--text-muted);">Logs are uploaded from edge devices every 60 seconds.</span>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

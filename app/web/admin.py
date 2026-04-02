@@ -328,6 +328,44 @@ async def admin_events(request: Request, user = Depends(require_admin_session), 
     })
 
 
+@router.get("/device-logs", response_class=HTMLResponse)
+async def admin_device_logs(
+    request: Request,
+    device_id: str = "",
+    level: str = "",
+    user=Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remote device log viewer for debugging."""
+    from app.models.device_log import DeviceLog
+
+    query = select(DeviceLog).order_by(DeviceLog.timestamp.desc())
+
+    if device_id:
+        query = query.where(DeviceLog.device_id == device_id)
+    if level:
+        query = query.where(DeviceLog.level == level.upper())
+
+    query = query.limit(200)
+    result = await db.execute(query)
+    logs = result.scalars().all()
+
+    # Get device list for filter dropdown
+    devices_result = await db.execute(
+        select(LockerDevice).order_by(LockerDevice.device_name)
+    )
+    devices = devices_result.scalars().all()
+
+    return templates.TemplateResponse("admin/device_logs.html", {
+        "request": request,
+        "user": user,
+        "logs": logs,
+        "devices": devices,
+        "filter_device": device_id,
+        "filter_level": level,
+    })
+
+
 _GITHUB_API_URL = (
     "https://api.github.com/repos/"
     "TheGuideProject/smartlocker-edge/contents/config/VERSION"

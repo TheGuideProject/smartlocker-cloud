@@ -14,6 +14,7 @@ from app.models.device import LockerDevice
 from app.models.event import DeviceEvent
 from app.models.health_log import SensorHealthLog
 from app.models.support_request import SupportRequest
+from app.models.device_log import DeviceLog
 from app.services.event_processor import process_inventory_events
 
 logger = logging.getLogger("smartlocker.events")
@@ -387,6 +388,76 @@ async def receive_health_logs(
         logger.error(f"HEALTH-LOGS ERROR for {device_id}: {type(e).__name__}: {e}")
         import traceback
         logger.error(traceback.format_exc())
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)[:200])
+
+
+# ---- Device Logs (remote debug) ----
+
+class DeviceLogIn(BaseModel):
+    timestamp: str
+    level: str = "INFO"
+    logger_name: str = ""
+    message: str
+
+
+class DeviceLogBatch(BaseModel):
+    logs: List[DeviceLogIn]
+
+
+@router.post("/{device_id}/logs")
+async def receive_device_logs(
+    device_id: str,
+    batch: DeviceLogBatch,
+    device: LockerDevice = Depends(verify_device_api_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Receive application log lines from an edge device for remote debugging."""
+    try:
+        received = 0
+        for log in batch.logs:
+            try:
+                try:
+                    ts = datetime.fromisoformat(log.timestamp.replace('Z', '+00:00'))
+                    if ts.tzinfo is not None:
+                        ts = ts.replace(tzinfo=None)
+                except (ValueError, AttributeError):
+                    ts = datetime.utcnow()
+
+                entry = DeviceLog(
+                    device_id=str(device.id),
+                    timestamp=ts,
+                    level=log.level[:10],
+                    logger_name=log.logger_name[:100],
+                    message=log.message[:2000],
+                    received_at=datetime.utcnow(),
+                )
+                db.add(entry)
+                received += 1
+            except Exception as e:
+                logger.error(f"Device log insert error: {e}")
+                continue
+
+        await db.commit()
+
+        # Cleanup: keep only last 500 logs per device
+        try:
+            subq = select(DeviceLog.id).where(
+                DeviceLog.device_id == str(device.id)
+            ).order_by(DeviceLog.timestamp.desc()).offset(500)
+            old_ids = (await db.execute(subq)).scalars().all()
+            if old_ids:
+                from sqlalchemy import delete
+                await db.execute(
+                    delete(DeviceLog).where(DeviceLog.id.in_(old_ids))
+                )
+                await db.commit()
+        except Exception:
+            pass
+
+        return {"received": received}
+    except Exception as e:
+        logger.error(f"DEVICE-LOGS ERROR for {device_id}: {type(e).__name__}: {e}")
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e)[:200])
 
