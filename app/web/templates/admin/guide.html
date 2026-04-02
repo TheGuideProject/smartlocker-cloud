@@ -507,6 +507,13 @@ Sync:  Events + Mixing Sessions + Telemetry (30s)  |  Heartbeat (60s)  |  Config
                 <li>Fixed <strong>RFID poll/write contention</strong>: <code>_rfid_pause</code> flag in daemon poll loop</li>
                 <li>Sensor Test screen shows multi-reader count: "PN532 Multi (N readers)"</li>
             </ul>
+            <div class="change-subtitle">Daemon Parity Fixes (Code Review)</div>
+            <ul>
+                <li><strong>[P1]</strong> Daemon now passes <code>skip_ports</code> to multi-reader PN532 driver &mdash; prevents stealing the Arduino serial port (only direct Qt mode did this before)</li>
+                <li><strong>[P1]</strong> Daemon now loads admin DB overrides (serial port assignments, weight mode) and restores saved <code>rfid_reader_map</code> on startup &mdash; matches direct Qt and CLI mode behavior</li>
+                <li><strong>[P2]</strong> LED Arduino driver returns <code>False</code> when handshake fails instead of reporting fake success &mdash; no more misleading "healthy" status when Arduino link is dead</li>
+                <li><strong>[P3]</strong> Multi-PN532 import error now logs the actual exception instead of always saying "not installed" &mdash; prevents false diagnosis when a transitive dependency fails</li>
+            </ul>
         </div>
     </details>
 
