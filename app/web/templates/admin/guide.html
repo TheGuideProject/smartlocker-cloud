@@ -461,8 +461,124 @@ Sync:  Events + Mixing Sessions + Telemetry (30s)  |  Heartbeat (60s)  |  Config
         Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
     </p>
 
-    <!-- v3.2.0 -->
+    <!-- v4.2.0 -->
     <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v4.2.0</span> LED Blink Patterns + Tag Writer Upgrade + Cross-Slot Moves</span>
+            <span class="version-date">2026-04-02</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">LED System Rewrite</div>
+            <ul>
+                <li>Complete rewrite of Arduino LED driver with <strong>software blink thread</strong> (100ms tick loop)</li>
+                <li>Supports SOLID, BLINK_SLOW (1 Hz), BLINK_FAST (2.5 Hz) patterns via GPIO toggling</li>
+                <li>LED <strong>OFF</strong> when product on shelf, <strong>RED SOLID</strong> when removed, <strong>RED BLINK</strong> during mixing guidance</li>
+                <li>Thread-safe slot config with lock &mdash; no more freezes on rapid button presses</li>
+                <li>Immediate OFF on <code>clear_slot()</code> (no blink-thread delay)</li>
+            </ul>
+            <div class="change-subtitle">Tag Writer Improvements</div>
+            <ul>
+                <li><strong>Reader/slot selector</strong> dropdown &mdash; choose which PN532 reader to use for scanning &amp; writing</li>
+                <li><strong>Color dropdown</strong> populated from cloud product catalog (synced colors from DB)</li>
+                <li>RFID polling <strong>paused</strong> on screen enter, <strong>single-reader scan</strong> only (was polling all 4 = 800ms lag)</li>
+                <li>Polling automatically resumes on screen leave</li>
+            </ul>
+            <div class="change-subtitle">Cross-Slot Can Move Detection</div>
+            <ul>
+                <li>Moving a can from slot 3 to slot 1 no longer triggers wrong-slot error</li>
+                <li>New <code>_find_slot_with_removed_tag()</code> searches all REMOVED slots for matching tag_id</li>
+                <li>Source slot cleaned up automatically, <code>CAN_MOVED</code> event published</li>
+            </ul>
+            <div class="change-subtitle">RFID Fixes</div>
+            <ul>
+                <li>Fixed <strong>skip_ports timing bug</strong>: now uses actual detected Arduino port (was using settings default)</li>
+                <li>Fixed <strong>reorder swap reverting</strong>: full state reset (<code>notify_reader_swap()</code>) after reader swap</li>
+                <li>Fixed <strong>mapping persistence</strong>: <code>apply_saved_mapping()</code> runs after RFID init (when readers populated)</li>
+            </ul>
+            <div class="change-subtitle">Arduino OTA Flash</div>
+            <ul>
+                <li>Auto-detect .ino firmware changes during OTA git pull</li>
+                <li>Full flash pipeline: release serial &rarr; compile (arduino-cli) &rarr; flash (avrdude) &rarr; ping verify</li>
+                <li>Remapped slot LED pins: Slot 1 = A2, Slot 2 = A1 (matches physical wiring)</li>
+            </ul>
+            <div class="change-subtitle">Mixing Engine LED Colors</div>
+            <ul>
+                <li>Pick guidance: RED BLINK_SLOW (was GREEN &mdash; hardware is single-color red LED)</li>
+                <li>Return guidance: RED BLINK_SLOW (was BLUE)</li>
+                <li>Alarm restore: correct per-slot state (OCCUPIED = OFF, REMOVED = RED)</li>
+            </ul>
+            <div class="change-subtitle">Cloud Fixes</div>
+            <ul>
+                <li>Fixed Device Logs page crash: <code>LockerDevice.device_name</code> &rarr; <code>LockerDevice.name</code></li>
+                <li>Products &amp; colors sync continuously via heartbeat (every 2 min)</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v4.1.0 -->
+    <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v4.1.0</span> UI Redesign + Unified Icons + Sensor Health</span>
+            <span class="version-date">2026-03-28</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">UI Redesign</div>
+            <ul>
+                <li>Unified icon system with consistent dark theme styling across all screens</li>
+                <li>All screens optimized for <strong>800&times;480</strong> 4.3" capacitive touchscreen</li>
+                <li>Sensor health dots now update dynamically (were static after init)</li>
+                <li>Fixed RESUME button cut-off + long mixing text truncation</li>
+                <li>Home screen layout corrected for touch display</li>
+            </ul>
+            <div class="change-subtitle">Hardware Daemon</div>
+            <ul>
+                <li>TCP daemon architecture separates hardware I/O from UI process</li>
+                <li>Background thread polling &mdash; <strong>UI never freezes</strong> during sensor reads</li>
+                <li>Daemon guards commands during hardware init phase (<code>hw_ready</code> event)</li>
+                <li><code>run_in_executor</code> for all blocking I/O in daemon poll loop</li>
+                <li>TCP server opens before hardware init (prevents client connection timeouts)</li>
+            </ul>
+            <div class="change-subtitle">RFID &amp; NFC</div>
+            <ul>
+                <li>NFC tag write via daemon socket (no direct serial access needed from UI)</li>
+                <li>Daemon passes Arduino port to RFID driver (prevents serial conflict)</li>
+                <li>Cache NTAG data per tag UID (eliminates redundant NFC memory reads)</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v4.0.0 -->
+    <details class="changelog-entry">
+        <summary>
+            <span><span class="version-tag">v4.0.0</span> PyQt6 Migration + Hardware Daemon + Alarm System</span>
+            <span class="version-date">2026-03-26</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Major Architecture Changes</div>
+            <ul>
+                <li>Migrated from <strong>Kivy to PyQt6</strong> (Python 3.13 compatibility)</li>
+                <li>Hardware daemon process with TCP bridge to UI</li>
+                <li>Desktop launcher for RPi autostart via systemd</li>
+            </ul>
+            <div class="change-subtitle">Alarm System</div>
+            <ul>
+                <li>Alarm screen with GPIO LED driver for individual red indicator LEDs per shelf slot</li>
+                <li>Buzzer mode setting: <code>all</code> / <code>alarms_only</code> / <code>mute</code></li>
+                <li>LED throttle (100ms debounce) for rapid state changes</li>
+                <li>Remote cloud log sync for device diagnostics</li>
+            </ul>
+            <div class="change-subtitle">Bug Fixes</div>
+            <ul>
+                <li>Fixed QPainter.Antialiasing enum for PyQt6</li>
+                <li>Fixed QSizePolicy enum flags for PyQt6</li>
+                <li>Fixed <code>get_config_value</code> &rarr; <code>get_config</code></li>
+                <li>Fixed AlarmManager and SystemMonitor constructor args</li>
+            </ul>
+        </div>
+    </details>
+
+    <!-- v3.2.0 -->
+    <details class="changelog-entry">
         <summary>
             <span><span class="version-tag">v3.2.0</span> Multi-Reader RFID + Arduino Bridge + Shelf Reorder</span>
             <span class="version-date">2026-04-02</span>
@@ -518,7 +634,7 @@ Sync:  Events + Mixing Sessions + Telemetry (30s)  |  Heartbeat (60s)  |  Config
     </details>
 
     <!-- v3.1.2 -->
-    <details class="changelog-entry" open>
+    <details class="changelog-entry">
         <summary>
             <span><span class="version-tag">v3.1.2</span> System Health Dashboard + Cloud Telemetry Sync</span>
             <span class="version-date">2026-03-31</span>
