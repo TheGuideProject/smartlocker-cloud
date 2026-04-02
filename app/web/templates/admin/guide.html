@@ -131,24 +131,25 @@
 <div class="stats-grid">
     <div class="stat-card accent-blue">
         <div class="label">Cloud Version</div>
-        <div class="value blue">3.1</div>
+        <div class="value blue">3.2</div>
     </div>
     <div class="stat-card accent-green">
         <div class="label">Edge Version</div>
-        <div class="value green">3.1.2</div>
+        <div class="value green">3.2.0</div>
     </div>
     <div class="stat-card accent-orange">
         <div class="label">Hardware Components</div>
-        <div class="value orange">4</div>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">RFID + Weight + LED + Buzzer</div>
+        <div class="value orange">5</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Multi-RFID + Arduino + Weight + LED + Buzzer</div>
     </div>
     <div class="stat-card accent-teal">
-        <div class="label">UI Framework</div>
-        <div class="value teal" style="font-size: 22px;">PyQt6</div>
+        <div class="label">Max Readers</div>
+        <div class="value teal" style="font-size: 22px;">50+</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">PN532 NFC via USB hub</div>
     </div>
     <div class="stat-card">
         <div class="label">Last Update</div>
-        <div class="value" style="font-size: 20px;">2026-03-31</div>
+        <div class="value" style="font-size: 20px;">2026-04-02</div>
     </div>
 </div>
 
@@ -166,10 +167,13 @@
             <div class="challenge-card">
                 <div class="card-title"><span class="card-icon">&#128421;</span> Edge Device (Raspberry Pi 5)</div>
                 <p>
-                    PyQt6 touchscreen UI (800x480) &bull; PN532 USB NFC reader (tag read/write) &bull;
-                    Dual HX711 load cells via direct GPIO (lgpio) with background thread &bull;
-                    WS2812B LED strip for slot guidance &bull; PWM buzzer with zone-based feedback &bull;
-                    SQLite (WAL) for local-first persistence &bull; In-app calibration wizard &bull;
+                    PyQt6 touchscreen UI (800&times;480) &bull;
+                    <strong>Multi-reader PN532 NFC</strong> (4&ndash;50 readers via USB hub, one per slot) &bull;
+                    <strong>Arduino Nano</strong> serial bridge for weight sensor (HX711), WS2812B LED strip &amp; buzzer &bull;
+                    Shelf Map with drag-and-drop reader&harr;slot reorder (persisted across reboots) &bull;
+                    Tag Writer for encoding NFC tags with product data &bull;
+                    Barcode scanner fallback when RFID is down &bull;
+                    SQLite (WAL) for local-first persistence &bull;
                     Runs 24/7 via systemd service
                 </p>
             </div>
@@ -185,25 +189,32 @@
         </div>
 
         <div class="arch-diagram">
-&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;          &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
-&#9474;          EDGE DEVICE (RPi 5)          &#9474;          &#9474;         CLOUD PLATFORM              &#9474;
-&#9474;                                        &#9474;          &#9474;                                    &#9474;
-&#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;   &#9474;  &#9581;&#9472;&#9472;&#9583;  &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;
-&#9474;  &#9474; PyQt6  &#9474;  &#9474; Sensors:     &#9474;   &#9474;  &#9474;    &#9474;  &#9474; FastAPI   &#9474;  &#9474; Admin   &#9474;  &#9474;
-&#9474;  &#9474; Touch  &#9474;  &#9474; RFID PN532   &#9474;   &#9474;  &#9474;HTTP&#9474;  &#9474; REST API  &#9474;  &#9474; Portal  &#9474;  &#9474;
-&#9474;  &#9474;   UI   &#9474;  &#9474; HX711 Direct &#9474;   &#9474;  &#9474; +  &#9474;  &#9474; (JWT +   &#9474;  &#9474; (Jinja2 &#9474;  &#9474;
-&#9474;  &#9474;        &#9474;  &#9474; WS2812B LED  &#9474;   &#9474;  &#9474; WS &#9474;  &#9474;  API Key) &#9474;  &#9474;  + HTMX) &#9474;  &#9474;
-&#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474; PWM Buzzer   &#9474;   &#9474;  &#9474;    &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;
-&#9474;       &#9474;      &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;   &#9474;  &#9580;&#9472;&#9472;&#9583;  &#9474;       &#9474;                  &#9474;
-&#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;   &#9474;          &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;
-&#9474;  &#9474; SQLite (WAL)  &#9474; Event  &#9474;   &#9474;  &#9581;&#9472;&#9472;&#9472;&#9583;  &#9474; PostgreSQL   &#9474; Owner  &#9474;  &#9474;
-&#9474;  &#9474; Local-first   &#9474;  Bus   &#9474;&#9472;&#9472;&#9472;&#9496;  &#9474;sync&#9474;  &#9474; Central DB   &#9474; Dash   &#9474;  &#9474;
-&#9474;  &#9474; persistence   &#9474;       &#9474;&#9472;&#9472;&#9472;&#9488;  &#9580;&#9472;&#9472;&#9472;&#9583;  &#9474; + OTA engine &#9474;        &#9474;  &#9474;
-&#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;   &#9474;          &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;
-&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;          &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                          EDGE DEVICE (Raspberry Pi 5)
+  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+  &#9474;                                                                          &#9474;
+  &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;   &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;   &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;
+  &#9474;  &#9474;  PyQt6  &#9474;   &#9474;  USB Hub (N ports)    &#9474;   &#9474;  Arduino Nano (CH340) &#9474;  &#9474;
+  &#9474;  &#9474;  Touch  &#9474;   &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;   &#9474;  USB-serial bridge    &#9474;  &#9474;
+  &#9474;  &#9474;   UI   &#9474;   &#9474;  &#9474; PN532 #1 (slot1) &#9474;  &#9474;   &#9474;  &#9500;&#9472; HX711 weight       &#9474;  &#9474;
+  &#9474;  &#9474; 800x480&#9474;   &#9474;  &#9474; PN532 #2 (slot2) &#9474;  &#9474;   &#9474;  &#9500;&#9472; WS2812B LED strip  &#9474;  &#9474;
+  &#9474;  &#9474;        &#9474;   &#9474;  &#9474; PN532 #3 (slot3) &#9474;  &#9474;   &#9474;  &#9492;&#9472; Piezo buzzer       &#9474;  &#9474;
+  &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;   &#9474;  &#9474;  ... up to 50+  &#9474;  &#9474;   &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;
+  &#9474;       &#9474;       &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;                           &#9474;
+  &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;
+  &#9474;  &#9474; SQLite (WAL) &#9474; Event Bus &#9474;  &#9474; Inventory + Mixing      &#9474;  &#9474;
+  &#9474;  &#9474; Local-first persistence  &#9474;  &#9474; Engine + Sync Engine     &#9474;  &#9474;
+  &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;
+  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9474;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                              &#9474;
+                     HTTP + WebSocket
+                              &#9474;
+  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9474;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+  &#9474;                       CLOUD PLATFORM (FastAPI + PostgreSQL)               &#9474;
+  &#9474;  FastAPI REST API (JWT + API Key)  &#9474;  Admin Portal  &#9474;  Owner Dashboard  &#9474;
+  &#9474;  PostgreSQL + OTA engine           &#9474;  (Jinja2+HTMX) &#9474;  (fleet overview)  &#9474;
+  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
 
-Data Flow:  Edge &#9472;&#9472; events &#9472;&#9472;&#9658; Cloud (HTTP POST)  |  Cloud &#9472;&#9472; config/commands &#9472;&#9472;&#9658; Edge (heartbeat response)
-Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (every 60s)  |  Config poll (every 120s)</div>
+Sync:  Events + Mixing Sessions + Telemetry (30s)  |  Heartbeat (60s)  |  Config poll (120s)  |  WebSocket real-time</div>
 
         <p class="guide-intro" style="margin-top: 10px;">
             <strong>Security model:</strong> API key authentication for device-to-cloud, session cookies for web admin, JWT tokens for API consumers.
@@ -320,23 +331,23 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
         </div>
         <div class="tech-item">
             <div class="tech-icon">&#128225;</div>
-            <div class="tech-name">PN532 USB NFC</div>
-            <div class="tech-desc">NFC tag read/write for paint cans</div>
+            <div class="tech-name">Multi PN532 USB</div>
+            <div class="tech-desc">N&times; NFC readers via USB hub (4&ndash;50+)</div>
         </div>
         <div class="tech-item">
-            <div class="tech-icon">&#9878;</div>
-            <div class="tech-name">HX711 Direct GPIO</div>
-            <div class="tech-desc">Dual load cells via lgpio</div>
+            <div class="tech-icon">&#129302;</div>
+            <div class="tech-name">Arduino Nano</div>
+            <div class="tech-desc">Serial bridge: HX711 + LED + buzzer</div>
         </div>
         <div class="tech-item">
             <div class="tech-icon">&#128161;</div>
             <div class="tech-name">WS2812B LED Strip</div>
-            <div class="tech-desc">RGB slot guidance lights</div>
+            <div class="tech-desc">RGB slot guidance via Arduino</div>
         </div>
         <div class="tech-item">
             <div class="tech-icon">&#128266;</div>
-            <div class="tech-name">PWM Buzzer</div>
-            <div class="tech-desc">Audio alerts &amp; feedback</div>
+            <div class="tech-name">USB Barcode Scanner</div>
+            <div class="tech-desc">Fallback when RFID is down</div>
         </div>
         <div class="tech-item">
             <div class="tech-icon">&#128736;</div>
@@ -356,12 +367,148 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
     </div>
 </div>
 
+<!-- ====== HOW IT WILL WORK ====== -->
+<div class="guide-section">
+    <h2><span class="section-icon">&#127919;</span> How It Will Work &mdash; Complete Vision</h2>
+    <p class="guide-intro">
+        When fully deployed, SmartLocker is a <strong>smart paint locker</strong> installed aboard vessels.
+        It combines RFID tracking, weight sensing, LED guidance, and cloud monitoring to automate
+        paint inventory management &mdash; eliminating manual spreadsheets, preventing waste, and ensuring
+        compliance with maintenance schedules.
+    </p>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0;">
+        <!-- Physical setup -->
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#128230;</span> Physical Locker</div>
+            <p>
+                A metal cabinet with <strong>40&ndash;50 shelf slots</strong>, each holding one paint can.
+                Under each slot sits a <strong>PN532 NFC reader</strong> connected via USB hub to a Raspberry Pi 5.
+                An <strong>Arduino Nano</strong> drives the weight sensor, WS2812B LED strip (one LED per slot),
+                and buzzer. An <strong>800&times;480 touchscreen</strong> is mounted on the door for operator interaction.
+                A <strong>USB barcode scanner</strong> provides fallback identification when RFID is unavailable.
+            </p>
+        </div>
+        <!-- Setup -->
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#128295;</span> Initial Setup</div>
+            <p>
+                <strong>1.</strong> Install the locker and connect all hardware (PN532 readers, Arduino, RPi, touchscreen).<br>
+                <strong>2.</strong> Power on &mdash; the system auto-detects all readers and the Arduino.<br>
+                <strong>3.</strong> Pair the device with the cloud via 6-digit code.<br>
+                <strong>4.</strong> Products, recipes, and maintenance charts sync automatically.<br>
+                <strong>5.</strong> Use the <strong>Shelf Map REORDER</strong> screen to assign each physical reader to the correct slot position (persisted across reboots).<br>
+                <strong>6.</strong> Use the <strong>Tag Writer</strong> to encode each paint can's NFC tag with product data (PPG code, batch, name, colour).
+            </p>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 18px;">
+        <!-- Daily operation -->
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#9989;</span> Daily Operation</div>
+            <p>
+                <strong>Stocking:</strong> Place a tagged paint can on any slot &rarr; NFC reader identifies the product &rarr; LED turns green &rarr; inventory updated locally and synced to cloud.<br><br>
+                <strong>Taking a can:</strong> Remove a can &rarr; system detects absence &rarr; if no active mixing session, triggers <strong>unauthorized removal alarm</strong> (red LED + buzzer + 30-second barcode scan window). Crew must scan the barcode to confirm.<br><br>
+                <strong>Returning a can:</strong> Place the can back &rarr; system measures weight difference to estimate paint consumed &rarr; inventory adjusted automatically.<br><br>
+                <strong>Weight alarm fallback:</strong> If RFID fails entirely, the shelf weight sensor detects significant changes (&gt;5kg sustained for 10s) and triggers the barcode scan alarm.
+            </p>
+        </div>
+        <!-- Mixing -->
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#9879;</span> Guided Mixing</div>
+            <p>
+                <strong>1. Select area:</strong> Tap "Paint Now" &rarr; select the area to paint from the maintenance chart.<br>
+                <strong>2. Auto-calculate:</strong> System calculates required quantities of base, hardener, and thinner based on area &times; coverage rate &times; coats.<br>
+                <strong>3. LED guidance:</strong> The correct slot LED lights up to guide the operator to the right can.<br>
+                <strong>4. Live weighing:</strong> Place the mixing bucket on the scale &rarr; pour paint &rarr; real-time weight display with colour zones (blue=pouring, yellow=approaching, green=target, red=over).<br>
+                <strong>5. Buzzer feedback:</strong> Tick while pouring, warning at 90%, target reached confirmation, error if overpoured.<br>
+                <strong>6. Pot life timer:</strong> After mixing, countdown shows remaining working time.<br>
+                <strong>7. Record:</strong> Session saved locally + synced to cloud with all measurements.
+            </p>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 18px;">
+        <!-- Fleet monitoring -->
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#127758;</span> Fleet Monitoring (Cloud)</div>
+            <p>
+                Ship owners and PPG managers access the <strong>cloud dashboard</strong> to see:<br>
+                &bull; Real-time inventory levels across all vessels<br>
+                &bull; Mixing session history with ratio compliance (in-spec / out-of-spec)<br>
+                &bull; Device health: CPU temperature, connectivity, last heartbeat<br>
+                &bull; Consumption trends and reorder alerts when stock is low<br>
+                &bull; Remote commands: restart, reboot, OTA software updates<br>
+                &bull; Maintenance chart assignment per vessel
+            </p>
+        </div>
+        <!-- Production scale -->
+        <div class="challenge-card">
+            <div class="card-title"><span class="card-icon">&#128640;</span> Production Scale</div>
+            <p>
+                <strong>Demo (current):</strong> 3&ndash;4 PN532 readers + 1 Arduino on a single RPi 5. Sequential RFID polling (~200ms per cycle).<br><br>
+                <strong>Production:</strong> 40&ndash;50 PN532 readers via powered USB hubs. Automatic switch to <strong>parallel thread pool</strong> polling when reader count exceeds 6 (capped at 16 threads). Readers are mapped to slots via the touchscreen reorder UI &mdash; USB port enumeration is non-deterministic across reboots, so the mapping is persisted in the local database and restored on startup.
+            </p>
+        </div>
+    </div>
+</div>
+
 <!-- ====== CHANGELOG ====== -->
 <div class="guide-section">
     <h2><span class="section-icon">&#128220;</span> Changelog &mdash; Version History</h2>
     <p class="guide-intro" style="margin-bottom: 16px;">
         Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
     </p>
+
+    <!-- v3.2.0 -->
+    <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v3.2.0</span> Multi-Reader RFID + Arduino Bridge + Shelf Reorder</span>
+            <span class="version-date">2026-04-02</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Multi-Reader PN532 NFC Driver</div>
+            <ul>
+                <li>New <code>RealRFIDMultiPN532USB</code> driver managing N&times; PN532 modules simultaneously via USB hub</li>
+                <li>Auto-detects all CH340/CP210x ports, excludes Arduino via <code>skip_ports</code> mechanism</li>
+                <li>Sequential polling for &le;6 readers, automatic <strong>ThreadPoolExecutor</strong> parallel polling for 7+ (capped at 16 threads)</li>
+                <li>Per-reader locks, health tracking, auto-reconnect on USB disconnect</li>
+                <li>Tag data caching per reader to avoid redundant NFC memory reads</li>
+                <li>Configurable via <code>RFID_MODULE = "pn532_multi_usb"</code></li>
+            </ul>
+            <div class="change-subtitle">Arduino Nano Serial Bridge</div>
+            <ul>
+                <li>Arduino Nano (CH340 clone) serves as primary bridge for HX711 weight sensor, WS2812B LED strip, and piezo buzzer</li>
+                <li>3.5-second boot wait for CH340 USB stabilisation on primary port, 1.5s for auto-detected ports</li>
+                <li>PN532 binary detection to quickly skip non-Arduino ports during auto-detection</li>
+                <li>Both Arduino and PN532 share same VID:PID (1A86:7523) &mdash; ordered init (weight first) + port exclusion resolves conflict</li>
+            </ul>
+            <div class="change-subtitle">Shelf Map Reorder Mode</div>
+            <ul>
+                <li>New <strong>REORDER</strong> button on Shelf Map screen enters tap-to-swap mode</li>
+                <li>Tap first slot &rarr; highlights yellow &rarr; tap second slot &rarr; readers swap assignments</li>
+                <li>Cards show USB port badge and health indicator during reorder</li>
+                <li>Reader&harr;slot mapping persisted to SQLite <code>config</code> table (<code>rfid_reader_map</code>)</li>
+                <li>Saved mapping auto-restored on startup via <code>apply_saved_mapping()</code></li>
+                <li>Solves USB port enumeration non-determinism across reboots</li>
+            </ul>
+            <div class="change-subtitle">Tag Writer Improvements</div>
+            <ul>
+                <li>RFID polling paused during NFC write operations (eliminates PN532 serial bus contention)</li>
+                <li>8-second safety timeout &mdash; UI auto-resets if write hangs (no more stuck "WRITING..." state)</li>
+                <li>RFID polling resumes on write complete, timeout, or screen exit</li>
+            </ul>
+            <div class="change-subtitle">Bug Fixes</div>
+            <ul>
+                <li>Fixed <strong>FOREIGN KEY constraint failed</strong> on <code>slot_state</code>: <code>rebuild_shelves()</code> now called during <code>initialize()</code> to create shelf/slot DB rows before any slot_state INSERT</li>
+                <li>Fixed <strong>QFont::setPixelSize &le; 0</strong> warnings: QProgressBar <code>font-size: 0px</code> changed to <code>1px</code></li>
+                <li>Fixed <strong>FAN log spam</strong>: removed duplicate root logger handler, added GPIO error suppression flag</li>
+                <li>Fixed <strong>RFID poll/write contention</strong>: <code>_rfid_pause</code> flag in daemon poll loop</li>
+                <li>Sensor Test screen shows multi-reader count: "PN532 Multi (N readers)"</li>
+            </ul>
+        </div>
+    </details>
 
     <!-- v3.1.2 -->
     <details class="changelog-entry" open>
@@ -992,16 +1139,17 @@ Sync:       Events + Mixing Sessions + Telemetry (every 30s)  |  Heartbeat (ever
             <span class="stack-tag">PostgreSQL</span>
             <span class="stack-tag">SQLite</span>
             <span class="stack-tag">Raspberry Pi 5</span>
-            <span class="stack-tag">PN532 USB NFC</span>
-            <span class="stack-tag">HX711 Direct GPIO</span>
+            <span class="stack-tag">Multi PN532 NFC</span>
+            <span class="stack-tag">Arduino Nano</span>
+            <span class="stack-tag">HX711 Load Cell</span>
             <span class="stack-tag">WS2812B LED</span>
-            <span class="stack-tag">lgpio</span>
+            <span class="stack-tag">USB Barcode</span>
             <span class="stack-tag">Railway</span>
             <span class="stack-tag">systemd</span>
             <span class="stack-tag">Git OTA</span>
         </div>
         <p style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">
-            Cloud v3.1 &bull; Edge v3.1.2 &bull; Last updated 2026-03-31
+            Cloud v3.2 &bull; Edge v3.2.0 &bull; Last updated 2026-04-02
         </p>
     </div>
 </div>
