@@ -135,7 +135,7 @@
     </div>
     <div class="stat-card accent-green">
         <div class="label">Edge Version</div>
-        <div class="value green">3.2.0</div>
+        <div class="value green">4.3.0</div>
     </div>
     <div class="stat-card accent-orange">
         <div class="label">Hardware Components</div>
@@ -460,6 +460,51 @@ Sync:  Events + Mixing Sessions + Telemetry (30s)  |  Heartbeat (60s)  |  Config
     <p class="guide-intro" style="margin-bottom: 16px;">
         Complete release history of SmartLocker. Each version details the changes, fixes, and improvements made.
     </p>
+
+    <!-- v4.3.0 -->
+    <details class="changelog-entry" open>
+        <summary>
+            <span><span class="version-tag">v4.3.0</span> Weight Scale Calibration + Tare Persistence + Mixing Focus Mode</span>
+            <span class="version-date">2026-04-03</span>
+        </summary>
+        <div class="changelog-body">
+            <div class="change-subtitle">Weight Scale Calibration Fix</div>
+            <ul>
+                <li>Corrected HX711 scale factors from raw diagnostic data: shelf=23.4484, mix=12.7868</li>
+                <li>Fixed weight formula: <code>grams = (offset &minus; raw) / scale</code> &mdash; removed incorrect <code>fabs()</code></li>
+                <li>Fixed channel cross-contamination: <code>_recv()</code> now validates <code>expect_ch</code> and discards wrong-channel responses</li>
+                <li><code>_send()</code> drains stale serial buffer before each command (prevents shifted responses)</li>
+                <li>Timeout increased from 1.5s to 5.0s to accommodate 20-sample averaging (~2s per read)</li>
+            </ul>
+            <div class="change-subtitle">Tare Persistence (3-tier)</div>
+            <ul>
+                <li><strong>EEPROM</strong> (primary): Arduino saves/loads tare offsets to EEPROM on every tare &mdash; survives reboot</li>
+                <li><strong>DB backup</strong> (fallback): Python driver saves tare offsets to SQLite after successful tare command</li>
+                <li><strong>Auto-tare</strong> (last resort): Only when EEPROM invalid AND no DB backup available</li>
+                <li>New Arduino command <code>set_offset</code>: restores offsets from DB without physical re-tare</li>
+                <li>New Arduino command <code>reset_tare</code>: clears EEPROM and forces fresh auto-tare</li>
+                <li>Firmware v1.5: warm-up reads, settle delay, <code>source</code> field in hx711_ready response</li>
+            </ul>
+            <div class="change-subtitle">Mixing Scale Focus Mode</div>
+            <ul>
+                <li><code>focus_mixing_scale(True)</code>: polls only mixing channel at 10ms cycle (was 50ms both channels)</li>
+                <li>Mixing screen calls focus on enter, restores all channels on leave</li>
+                <li>Result: ~3&times; faster weight updates during active mixing</li>
+            </ul>
+            <div class="change-subtitle">Stable USB Paths</div>
+            <ul>
+                <li>All 5 USB devices (4&times; PN532 + Arduino) use <code>/dev/serial/by-path/</code> symlinks</li>
+                <li>Eliminates ttyUSB renumbering across reboots</li>
+                <li>RFID driver skips auto-detect when configured ports exist</li>
+            </ul>
+            <div class="change-subtitle">Weight Snapshots</div>
+            <ul>
+                <li>New <code>weight_snapshot</code> table: periodic stable readings saved every 60 minutes</li>
+                <li>Tracks shelf_id, channel, grams, raw_value, stable flag, source</li>
+                <li>Enables offline inventory history and drift analysis</li>
+            </ul>
+        </div>
+    </details>
 
     <!-- v4.2.0 -->
     <details class="changelog-entry" open>
