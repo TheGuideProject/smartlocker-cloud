@@ -34,6 +34,90 @@ logger = logging.getLogger("smartlocker.pairing")
 router = APIRouter(prefix="/api/devices", tags=["pairing"])
 
 
+# ---- Paint color helpers (shared logic with admin.py) ----
+
+PAINT_COLOR_HEX = {
+    'red': '#E64040', 'dark red': '#B32626', 'brown': '#9A6133',
+    'green': '#33B359', 'dark green': '#1F7A33', 'blue': '#4080D9',
+    'dark blue': '#264D99', 'white': '#EBEBEF', 'black': '#2E2E33',
+    'grey': '#8D9199', 'gray': '#8D9199', 'yellow': '#F2D940',
+    'orange': '#F29930', 'pink': '#E67A94', 'maroon': '#8C2630',
+    'copper': '#BF7A38', 'beige': '#D9C8A3', 'cream': '#EBE3C8',
+    'silver': '#B8BCC6', 'aluminum': '#ADB3BD', 'aluminium': '#ADB3BD',
+    'redbrown': '#B5462A', 'red brown': '#B5462A', 'reddish brown': '#B5462A',
+    'light grey': '#B0B5BD', 'light gray': '#B0B5BD',
+    'dark grey': '#5A5E66', 'dark gray': '#5A5E66',
+    'light blue': '#6BA3D9', 'light green': '#66CC85',
+    'rust': '#C45B28', 'rust red': '#C45B28', 'oxide red': '#B5462A',
+    'primer red': '#C8534D', 'signal red': '#E6333F',
+    'olive': '#808C3B', 'olive green': '#808C3B',
+    'navy': '#1F3366', 'navy blue': '#1F3366',
+    'tan': '#D9B982', 'sand': '#D9C896', 'buff': '#D9C28C',
+    'turquoise': '#40B5AD', 'teal': '#2D8C8C',
+    'purple': '#8040B3', 'violet': '#6A40B3',
+    'ivory': '#F5F0DC', 'off-white': '#F0EDE0', 'offwhite': '#F0EDE0',
+    'charcoal': '#3D4047', 'graphite': '#4A4E56',
+    'bronze': '#B08040', 'gold': '#D9A830',
+}
+
+
+def _color_name_to_hex(name: str) -> str:
+    """Resolve paint color name to hex."""
+    if not name:
+        return '#737880'
+    key = name.strip().lower()
+    words = key.split()
+    name_only = ' '.join(w for w in words if not w.isdigit())
+    if not name_only:
+        name_only = key
+    if key in PAINT_COLOR_HEX:
+        return PAINT_COLOR_HEX[key]
+    if name_only in PAINT_COLOR_HEX:
+        return PAINT_COLOR_HEX[name_only]
+    first = words[0]
+    if first in PAINT_COLOR_HEX:
+        return PAINT_COLOR_HEX[first]
+    for color_key, hex_val in PAINT_COLOR_HEX.items():
+        if color_key in name_only or name_only in color_key:
+            return hex_val
+    return '#737880'
+
+
+def _extract_product_colors(parsed_data: dict) -> dict:
+    """Extract product->colors from maintenance chart parsed_data.
+    Returns: {"SIGMAPRIME 200": ["GREY 5284"], ...}
+    """
+    if not parsed_data:
+        return {}
+    colors = {}
+    for area in parsed_data.get('areas', []):
+        for layer in area.get('layers', []):
+            product = layer.get('product', '')
+            color = layer.get('color', '')
+            if product and color:
+                colors.setdefault(product, [])
+                if color not in colors[product]:
+                    colors[product].append(color)
+    return colors
+
+
+def _build_product_colors_from_chart(chart_data: dict) -> dict:
+    """Build product_name -> [{"name": "GREY 5284", "hex": "#8D9199"}, ...] from chart."""
+    product_colors = {}
+    if not chart_data:
+        return product_colors
+    chart_colors = _extract_product_colors(chart_data)
+    for pname, color_names in chart_colors.items():
+        product_colors.setdefault(pname, [])
+        for cn in color_names:
+            if not any(c['name'] == cn for c in product_colors[pname]):
+                product_colors[pname].append({
+                    'name': cn,
+                    'hex': _color_name_to_hex(cn),
+                })
+    return product_colors
+
+
 # ---- Schemas ----
 
 class PairRequest(BaseModel):
@@ -170,6 +254,9 @@ async def pair_device(
     if chart and chart.parsed_data:
         chart_data = chart.parsed_data
 
+    # Build chart-derived product colors for pairing response
+    pair_chart_colors = _build_product_colors_from_chart(chart_data)
+
     # Build vessel inventory for initial sync
     pair_vessel_inventory = []
     vessel_devices_result = await db.execute(
@@ -202,6 +289,7 @@ async def pair_device(
             net_liters = max(0, total_added - total_removed)
             p = products_by_id.get(pid)
             if p and net_liters > 0:
+                effective_colors = p.colors_json if p.colors_json else pair_chart_colors.get(p.name, [])
                 pair_vessel_inventory.append({
                     "product_id": pid,
                     "product_name": p.name,
@@ -209,7 +297,7 @@ async def pair_device(
                     "current_liters": round(net_liters, 1),
                     "initial_liters": round(total_added, 1),
                     "density_g_per_ml": p.density_g_per_ml or 1.0,
-                    "colors_json": p.colors_json or [],
+                    "colors_json": effective_colors,
                 })
 
     # Build config payload
@@ -225,7 +313,7 @@ async def pair_device(
                 "hazard_class": p.hazard_class,
                 "can_sizes_ml": p.can_sizes_ml,
                 "can_tare_weight_g": p.can_tare_weight_g,
-                "colors_json": p.colors_json or [],
+                "colors_json": p.colors_json if p.colors_json else pair_chart_colors.get(p.name, []),
             }
             for p in products
         ],
@@ -309,6 +397,9 @@ async def get_device_config(
         if chart and chart.parsed_data:
             chart_data = chart.parsed_data
 
+    # --- Build chart-derived product colors (fallback for products without colors_json) ---
+    chart_product_colors = _build_product_colors_from_chart(chart_data)
+
     # --- Build vessel inventory summary from InventoryAdjustments ---
     vessel_inventory = []
     if device.vessel_id:
@@ -350,6 +441,8 @@ async def get_device_config(
                 net_liters = max(0, total_added - total_removed)
                 p = products_by_id.get(pid)
                 if p and net_liters > 0:
+                    # Use product.colors_json if set, otherwise fallback to chart colors
+                    effective_colors = p.colors_json if p.colors_json else chart_product_colors.get(p.name, [])
                     vessel_inventory.append({
                         "product_id": pid,
                         "product_name": p.name,
@@ -357,7 +450,7 @@ async def get_device_config(
                         "current_liters": round(net_liters, 1),
                         "initial_liters": round(total_added, 1),
                         "density_g_per_ml": p.density_g_per_ml or 1.0,
-                        "colors_json": p.colors_json or [],
+                        "colors_json": effective_colors,
                     })
 
     # Load product barcodes for this device's products
@@ -381,7 +474,7 @@ async def get_device_config(
                 "hazard_class": p.hazard_class,
                 "can_sizes_ml": p.can_sizes_ml,
                 "can_tare_weight_g": p.can_tare_weight_g,
-                "colors_json": p.colors_json or [],
+                "colors_json": p.colors_json if p.colors_json else chart_product_colors.get(p.name, []),
             }
             for p in products
         ],

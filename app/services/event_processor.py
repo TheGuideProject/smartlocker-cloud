@@ -61,20 +61,22 @@ async def process_inventory_events(
 
                 # Create InventoryAdjustment for barcode-scanned loads
                 # so they show up in cloud inventory
-                if data.get("source") == "barcode_scan" and product_id:
+                source = data.get("source", "")
+                if source in ("barcode_scan", "stock_loading") and product_id:
                     if await _product_exists(db, product_id):
                         weight_g = abs(data.get("weight_g", 0))
                         product = await db.get(Product, product_id)
                         density = (product.density_g_per_ml if product else 1.0) or 1.0
                         liters = (weight_g / density) / 1000 if weight_g > 0 else 0
+                        source_label = "Stock loading" if source == "stock_loading" else "Barcode scan"
                         db.add(InventoryAdjustment(
                             device_id=device_id,
                             product_id=product_id,
                             adjustment_type="manual_add",
                             quantity_liters=round(liters, 3),
                             weight_g=weight_g,
-                            notes=f"Barcode scan: {data.get('ppg_code', '')} batch={data.get('batch_number', '')}",
-                            created_by="barcode_scan",
+                            notes=f"{source_label}: {data.get('ppg_code', '')} batch={data.get('batch_number', '')}",
+                            created_by=source,
                         ))
                         logger.info(
                             f"InventoryAdjustment created: +{liters:.2f}L "
@@ -94,7 +96,8 @@ async def process_inventory_events(
                     updated += 1
 
                 # Also create InventoryAdjustment for barcode unloads
-                if data.get("source") == "barcode_scan":
+                rm_source = data.get("source", "")
+                if rm_source in ("barcode_scan", "stock_loading"):
                     rm_product_id = data.get("product_id") or ""
                     if not rm_product_id and data.get("ppg_code"):
                         rm_product_id = await _resolve_product_id(db, data["ppg_code"])
@@ -103,14 +106,15 @@ async def process_inventory_events(
                         product = await db.get(Product, rm_product_id)
                         density = (product.density_g_per_ml if product else 1.0) or 1.0
                         liters = (weight_g / density) / 1000 if weight_g > 0 else 0
+                        rm_label = "Stock loading" if rm_source == "stock_loading" else "Barcode scan"
                         db.add(InventoryAdjustment(
                             device_id=device_id,
                             product_id=rm_product_id,
                             adjustment_type="manual_remove",
                             quantity_liters=round(liters, 3),
                             weight_g=weight_g,
-                            notes=f"Barcode scan unload: {data.get('ppg_code', '')}",
-                            created_by="barcode_scan",
+                            notes=f"{rm_label} unload: {data.get('ppg_code', '')}",
+                            created_by=rm_source,
                         ))
                         logger.info(
                             f"InventoryAdjustment created: -{liters:.2f}L "
