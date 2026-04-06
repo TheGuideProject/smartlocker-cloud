@@ -173,9 +173,9 @@ window.addEventListener('DOMContentLoaded', function() {
             <tr>
                 <td>
                     {% if alert.level == 'error' %}
-                    <span class="status-badge" style="background: rgba(230,57,70,0.2); color: var(--accent-red);">ERROR</span>
+                    <span class="status-badge" style="background: var(--danger-light); color: var(--danger-text); border: 1px solid #fecaca;">ERROR</span>
                     {% elif alert.level == 'warning' %}
-                    <span class="status-badge" style="background: rgba(244,162,97,0.2); color: var(--accent-orange);">WARNING</span>
+                    <span class="status-badge" style="background: var(--warning-light); color: var(--warning-text); border: 1px solid #fde68a;">WARNING</span>
                     {% endif %}
                 </td>
                 <td>{{ alert.device_name }}</td>
@@ -316,28 +316,28 @@ window.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 
-    <!-- Smart Aggregated Health Summary (from offline health logs) -->
+    <!-- Sensor Health Summary -->
     {% if item.health_summary %}
-    <div style="margin-top: 10px; padding: 10px 14px; background: rgba(30,40,56,0.5); border-radius: 6px;">
-        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">Sensor Health (last 6h)</div>
+    <div style="margin-top: 10px; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;">
+        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Sensor Health (last 6h)</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             {% for hs in item.health_summary %}
                 {% if hs.current_status in ['error', 'disconnected', 'warning', 'out_of_range'] %}
-                <div style="background: rgba(230,57,70,0.12); border: 1px solid rgba(230,57,70,0.3); padding: 6px 12px; border-radius: 6px; flex: 1; min-width: 220px;">
-                    <div style="font-size: 13px; font-weight: 600; color: var(--accent-red); margin-bottom: 2px;">
+                <div style="background: var(--danger-light); border: 1px solid #fecaca; padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 200px;">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--danger-text); margin-bottom: 2px;">
                         &#x26A0; {{ hs.sensor|upper }}
-                        <span style="font-weight: 400; font-size: 11px; opacity: 0.8;">({{ hs.error_count }} errors)</span>
+                        <span style="font-weight: 500; font-size: 11px; color: var(--danger);">({{ hs.error_count }} errors)</span>
                     </div>
                     {% if hs.last_message %}
-                    <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;">
+                    <div style="font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;">
                         {{ hs.last_message }}
                     </div>
                     {% endif %}
                 </div>
                 {% else %}
-                <div style="background: rgba(42,157,143,0.1); border: 1px solid rgba(42,157,143,0.25); padding: 6px 12px; border-radius: 6px; flex: 1; min-width: 180px;">
-                    <div style="font-size: 13px; color: var(--accent-green);">
-                        &#x2714; {{ hs.sensor|upper }}: OK
+                <div style="background: var(--success-light); border: 1px solid #bbf7d0; padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 160px;">
+                    <div style="font-size: 13px; font-weight: 600; color: var(--success-text);">
+                        &#x2714; {{ hs.sensor|upper }}
                     </div>
                 </div>
                 {% endif %}
@@ -348,13 +348,13 @@ window.addEventListener('DOMContentLoaded', function() {
 
     <!-- Sensor Alerts for this device (from live heartbeat) -->
     {% if item.sensor_alerts %}
-    <div style="margin-top: 10px; padding: 8px 12px; background: rgba(244,162,97,0.08); border-radius: 6px;">
+    <div style="margin-top: 10px; padding: 8px 14px; background: var(--warning-light); border: 1px solid #fde68a; border-radius: 8px;">
         {% for alert in item.sensor_alerts %}
-        <div style="font-size: 13px; padding: 3px 0;">
+        <div style="font-size: 13px; padding: 3px 0; color: var(--text);">
             {% if alert.level == 'error' %}
-                <span style="color: var(--accent-red);">&#x2716;</span>
+                <span style="color: var(--danger);">&#x2716;</span>
             {% else %}
-                <span style="color: var(--accent-orange);">&#x26A0;</span>
+                <span style="color: var(--warning);">&#x26A0;</span>
             {% endif %}
             <strong>{{ alert.sensor }}:</strong> {{ alert.message }}
         </div>
@@ -364,9 +364,9 @@ window.addEventListener('DOMContentLoaded', function() {
 
     <!-- Support Request indicator (per device) -->
     {% if d.open_support_count and d.open_support_count > 0 %}
-    <div style="margin-top:8px; padding:6px 10px; background:rgba(251,166,64,0.1); border-radius:6px; border-left:3px solid var(--accent-orange);">
-        <span style="color:var(--accent-orange); font-weight:600; font-size:12px;">&#x1F4DE; {{ d.open_support_count }} open support request(s)</span>
-        <a href="/admin/support" style="color:var(--accent-blue); font-size:12px; margin-left:8px;">View &#x2192;</a>
+    <div style="margin-top:8px; padding:8px 14px; background: var(--warning-light); border: 1px solid #fde68a; border-radius:8px; border-left:3px solid var(--warning);">
+        <span style="color: var(--warning-text); font-weight:600; font-size:12px;">&#x1F4DE; {{ d.open_support_count }} open support request(s)</span>
+        <a href="/admin/support" style="color: var(--ppg-blue); font-size:12px; margin-left:8px;">View &#x2192;</a>
     </div>
     {% endif %}
 
