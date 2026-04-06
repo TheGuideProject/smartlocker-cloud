@@ -1361,17 +1361,6 @@ async def admin_inventory_vessel(
     all_products = products_result.scalars().all()
     products_by_id = {p.id: p for p in all_products}
 
-    # Get can tracking for these devices
-    cans = []
-    if device_ids:
-        cans_result = await db.execute(
-            select(CanTracking).where(
-                CanTracking.device_id.in_(device_ids),
-                CanTracking.status.in_(["in_stock", "in_use"]),
-            )
-        )
-        cans = cans_result.scalars().all()
-
     # Get maintenance chart for this vessel (for colors)
     chart_result = await db.execute(
         select(MaintenanceChart).where(MaintenanceChart.vessel_id == vessel_id)
@@ -1395,45 +1384,152 @@ async def admin_inventory_vessel(
         if p.colors_json:
             vessel_product_colors[p.name] = p.colors_json
 
-    # Build product name→id lookup
-    product_name_to_id = {p.name: p.id for p in all_products}
+    # ── Edge-as-Source-of-Truth ──────────────────────────────
+    # If any device reports vessel_stock via heartbeat, use that
+    # directly.  Edge RFID + weight sensors are authoritative.
+    # Fall back to CanTracking + Adjustments only when no edge
+    # data is available.
+    # ─────────────────────────────────────────────────────────
+    edge_stock = {}          # product_id → dict
+    has_edge_stock = False
+    for dev in devices:
+        si = dev.system_info or {}
+        vs = si.get("vessel_stock")
+        if vs and isinstance(vs, list):
+            has_edge_stock = True
+            for item in vs:
+                pid = item.get("product_id", "")
+                if not pid:
+                    continue
+                if pid in edge_stock:
+                    # Multiple devices same vessel: sum liters
+                    edge_stock[pid]["current_liters"] += float(item.get("current_liters", 0))
+                else:
+                    edge_stock[pid] = {
+                        "product_id": pid,
+                        "product_name": item.get("product_name", "Unknown"),
+                        "product_type": item.get("product_type", "base_paint"),
+                        "current_liters": float(item.get("current_liters", 0)),
+                        "density_g_per_ml": float(item.get("density_g_per_ml", 1.0)),
+                        "colors_json": item.get("colors_json", "[]"),
+                    }
 
-    # Build product inventory summary
     product_summary = {}
-    for can in cans:
-        pname = "Unknown Product"
-        density = 1.0
-        product_type = "base_paint"
-        hardener_name = None
+    low_stock_count = 0
 
-        if can.product_id and can.product_id in products_by_id:
-            p = products_by_id[can.product_id]
-            pname = p.name
-            density = p.density_g_per_ml or 1.0
-            product_type = p.product_type
-
-        if pname not in product_summary:
+    if has_edge_stock:
+        # ── Use edge-reported data (authoritative) ──
+        for pid, item in edge_stock.items():
+            pname = item["product_name"]
+            liters = round(item["current_liters"], 3)
+            if liters <= 0:
+                continue   # Don't show empty products
+            product_type = item["product_type"]
+            # Parse colors
+            colors = item.get("colors_json", "[]")
+            if isinstance(colors, str):
+                try:
+                    import json as _json
+                    colors = _json.loads(colors)
+                except Exception:
+                    colors = []
+            # Prefer catalog/chart colors over edge-stored colors
+            display_colors = vessel_product_colors.get(pname, colors or [])
             product_summary[pname] = {
                 "name": pname,
-                "product_id": product_name_to_id.get(pname, ""),
+                "product_id": pid,
                 "product_type": product_type,
                 "product_type_label": product_type.replace("_", " ").title(),
-                "liters": 0.0,
+                "liters": round(liters, 1),
                 "full_liters": 0.0,
                 "low_stock": False,
-                "colors": vessel_product_colors.get(pname, []),
-                "hardener_name": hardener_name,
+                "colors": display_colors,
+                "hardener_name": None,
                 "is_hardener_pair": False,
             }
+    else:
+        # ── Fallback: CanTracking + Adjustments (no edge data) ──
+        product_name_to_id = {p.name: p.id for p in all_products}
+        cans = []
+        if device_ids:
+            cans_result = await db.execute(
+                select(CanTracking).where(
+                    CanTracking.device_id.in_(device_ids),
+                    CanTracking.status.in_(["in_stock", "in_use"]),
+                )
+            )
+            cans = cans_result.scalars().all()
 
-        ps = product_summary[pname]
-        if can.weight_current_g and density > 0:
-            ps["liters"] += (can.weight_current_g / density) / 1000.0
-        if can.weight_full_g and density > 0:
-            ps["full_liters"] += (can.weight_full_g / density) / 1000.0
+        for can in cans:
+            pname = "Unknown Product"
+            density = 1.0
+            product_type = "base_paint"
+            if can.product_id and can.product_id in products_by_id:
+                p = products_by_id[can.product_id]
+                pname = p.name
+                density = p.density_g_per_ml or 1.0
+                product_type = p.product_type
 
-    # Calculate low stock flags
-    low_stock_count = 0
+            if pname not in product_summary:
+                product_summary[pname] = {
+                    "name": pname,
+                    "product_id": product_name_to_id.get(pname, ""),
+                    "product_type": product_type,
+                    "product_type_label": product_type.replace("_", " ").title(),
+                    "liters": 0.0,
+                    "full_liters": 0.0,
+                    "low_stock": False,
+                    "colors": vessel_product_colors.get(pname, []),
+                    "hardener_name": None,
+                    "is_hardener_pair": False,
+                }
+            ps = product_summary[pname]
+            if can.weight_current_g and density > 0:
+                ps["liters"] += (can.weight_current_g / density) / 1000.0
+            if can.weight_full_g and density > 0:
+                ps["full_liters"] += (can.weight_full_g / density) / 1000.0
+
+        if device_ids:
+            adj_result = await db.execute(
+                select(InventoryAdjustment).where(
+                    InventoryAdjustment.device_id.in_(device_ids),
+                    InventoryAdjustment.adjustment_type.in_(["manual_add", "pdf_import"]),
+                )
+            )
+            for adj in adj_result.scalars().all():
+                if adj.product_id and adj.product_id in products_by_id:
+                    p = products_by_id[adj.product_id]
+                    adj_liters = adj.quantity_liters or 0
+                    if p.name in product_summary:
+                        product_summary[p.name]["liters"] += adj_liters
+                    else:
+                        product_summary[p.name] = {
+                            "name": p.name,
+                            "product_id": p.id,
+                            "product_type": p.product_type,
+                            "product_type_label": p.product_type.replace("_", " ").title(),
+                            "liters": round(adj_liters, 1),
+                            "full_liters": 0.0,
+                            "low_stock": False,
+                            "colors": vessel_product_colors.get(p.name, []),
+                            "hardener_name": None,
+                            "is_hardener_pair": False,
+                        }
+            adj_remove_result = await db.execute(
+                select(InventoryAdjustment).where(
+                    InventoryAdjustment.device_id.in_(device_ids),
+                    InventoryAdjustment.adjustment_type == "manual_remove",
+                )
+            )
+            for adj in adj_remove_result.scalars().all():
+                if adj.product_id and adj.product_id in products_by_id:
+                    p = products_by_id[adj.product_id]
+                    if p.name in product_summary:
+                        product_summary[p.name]["liters"] -= (adj.quantity_liters or 0)
+                        if product_summary[p.name]["liters"] < 0:
+                            product_summary[p.name]["liters"] = 0
+
+    # Calculate low stock flags + round liters
     for pname, ps in product_summary.items():
         ps["liters"] = round(ps["liters"], 1)
         if ps["full_liters"] > 0:
@@ -1441,50 +1537,6 @@ async def admin_inventory_vessel(
             if used_pct > 80:
                 ps["low_stock"] = True
                 low_stock_count += 1
-
-    # Also include products from adjustments (manual adds) that may not have cans yet
-    if device_ids:
-        adj_result = await db.execute(
-            select(InventoryAdjustment).where(
-                InventoryAdjustment.device_id.in_(device_ids),
-                InventoryAdjustment.adjustment_type.in_(["manual_add", "pdf_import"]),
-            )
-        )
-        vessel_adjustments_for_products = adj_result.scalars().all()
-        for adj in vessel_adjustments_for_products:
-            if adj.product_id and adj.product_id in products_by_id:
-                p = products_by_id[adj.product_id]
-                adj_liters = adj.quantity_liters or 0
-                if p.name in product_summary:
-                    # Add liters to existing product entry
-                    product_summary[p.name]["liters"] += adj_liters
-                else:
-                    product_summary[p.name] = {
-                        "name": p.name,
-                        "product_id": p.id,
-                        "product_type": p.product_type,
-                        "product_type_label": p.product_type.replace("_", " ").title(),
-                        "liters": round(adj_liters, 1),
-                        "full_liters": 0.0,
-                        "low_stock": False,
-                        "colors": vessel_product_colors.get(p.name, []),
-                        "hardener_name": None,
-                        "is_hardener_pair": False,
-                    }
-        # Also handle manual_remove adjustments
-        adj_remove_result = await db.execute(
-            select(InventoryAdjustment).where(
-                InventoryAdjustment.device_id.in_(device_ids),
-                InventoryAdjustment.adjustment_type == "manual_remove",
-            )
-        )
-        for adj in adj_remove_result.scalars().all():
-            if adj.product_id and adj.product_id in products_by_id:
-                p = products_by_id[adj.product_id]
-                if p.name in product_summary:
-                    product_summary[p.name]["liters"] -= (adj.quantity_liters or 0)
-                    if product_summary[p.name]["liters"] < 0:
-                        product_summary[p.name]["liters"] = 0
 
     products_list = sorted(product_summary.values(), key=lambda x: x["name"])
 
