@@ -1621,6 +1621,114 @@ async def admin_adjust_vessel_inventory(
     return RedirectResponse(url=f"/admin/inventory/{vessel_id}", status_code=303)
 
 
+@router.post("/inventory/{vessel_id}/clear-all")
+async def admin_clear_all_stock(
+    vessel_id: str,
+    request: Request,
+    user = Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Purge ALL inventory data for a vessel — CanTracking, Adjustments,
+    and edge-cached vessel_stock.  Gives a completely clean slate."""
+    devices_result = await db.execute(
+        select(LockerDevice).where(LockerDevice.vessel_id == vessel_id)
+    )
+    devices = devices_result.scalars().all()
+    device_ids = [d.id for d in devices]
+
+    deleted_cans = 0
+    deleted_adjs = 0
+    if device_ids:
+        # Delete all CanTracking records for these devices
+        cans_result = await db.execute(
+            select(CanTracking).where(CanTracking.device_id.in_(device_ids))
+        )
+        for can in cans_result.scalars().all():
+            await db.delete(can)
+            deleted_cans += 1
+
+        # Delete all InventoryAdjustment records
+        adj_result = await db.execute(
+            select(InventoryAdjustment).where(
+                InventoryAdjustment.device_id.in_(device_ids)
+            )
+        )
+        for adj in adj_result.scalars().all():
+            await db.delete(adj)
+            deleted_adjs += 1
+
+        # Clear edge-cached vessel_stock from device system_info
+        for dev in devices:
+            if dev.system_info and "vessel_stock" in dev.system_info:
+                si = dict(dev.system_info)
+                si["vessel_stock"] = []
+                dev.system_info = si
+
+    await db.commit()
+    logger.info(
+        f"Purge inventory for vessel {vessel_id}: "
+        f"{deleted_cans} cans, {deleted_adjs} adjustments deleted"
+    )
+    return RedirectResponse(
+        url=f"/admin/inventory/{vessel_id}?success=All+inventory+data+purged",
+        status_code=303,
+    )
+
+
+@router.post("/inventory/{vessel_id}/delete-stock/{product_id}")
+async def admin_delete_product_stock(
+    vessel_id: str,
+    product_id: str,
+    request: Request,
+    user = Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete all stock for a single product — cans, adjustments, and
+    edge-cached data for this product."""
+    devices_result = await db.execute(
+        select(LockerDevice).where(LockerDevice.vessel_id == vessel_id)
+    )
+    devices = devices_result.scalars().all()
+    device_ids = [d.id for d in devices]
+
+    if device_ids:
+        # Delete CanTracking for this product
+        cans_result = await db.execute(
+            select(CanTracking).where(
+                CanTracking.device_id.in_(device_ids),
+                CanTracking.product_id == product_id,
+            )
+        )
+        for can in cans_result.scalars().all():
+            await db.delete(can)
+
+        # Delete InventoryAdjustment for this product
+        adj_result = await db.execute(
+            select(InventoryAdjustment).where(
+                InventoryAdjustment.device_id.in_(device_ids),
+                InventoryAdjustment.product_id == product_id,
+            )
+        )
+        for adj in adj_result.scalars().all():
+            await db.delete(adj)
+
+        # Remove this product from edge-cached vessel_stock
+        for dev in devices:
+            if dev.system_info and "vessel_stock" in dev.system_info:
+                si = dict(dev.system_info)
+                si["vessel_stock"] = [
+                    item for item in si["vessel_stock"]
+                    if item.get("product_id") != product_id
+                ]
+                dev.system_info = si
+
+    await db.commit()
+    return RedirectResponse(
+        url=f"/admin/inventory/{vessel_id}?success=Product+stock+deleted",
+        status_code=303,
+    )
+
+
 @router.post("/inventory/{vessel_id}/import-pdf")
 async def admin_import_vessel_pdf(
     vessel_id: str,
