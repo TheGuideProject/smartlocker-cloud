@@ -1104,27 +1104,43 @@ async def admin_inventory(
                 vessel_products = set()
                 vessel_low_stock = False
 
-                for did in device_ids:
-                    device_cans = cans_by_device.get(did, [])
-                    for can in device_cans:
-                        if can.product_id:
-                            vessel_products.add(can.product_id)
-                            p = products_by_id.get(can.product_id)
-                            density = p.density_g_per_ml if p else 1.0
-                            if can.weight_current_g and density > 0:
-                                vessel_liters += (can.weight_current_g / density) / 1000.0
-                            if can.weight_full_g and can.weight_current_g:
-                                used_pct = ((can.weight_full_g - can.weight_current_g) / can.weight_full_g) * 100
-                                if used_pct > 80:
-                                    vessel_low_stock = True
+                # ── Edge-as-source-of-truth: prefer heartbeat data ──
+                has_edge = False
+                for dev in vessel.devices:
+                    si = dev.system_info or {}
+                    vs = si.get("vessel_stock")
+                    if vs and isinstance(vs, list):
+                        has_edge = True
+                        for item in vs:
+                            liters = float(item.get("current_liters", 0) or 0)
+                            if liters > 0:
+                                vessel_liters += liters
+                                pid = item.get("product_id", "")
+                                if pid:
+                                    vessel_products.add(pid)
 
-                    # Also count products from adjustments
-                    device_adjs = adjustments_by_device.get(did, [])
-                    for adj in device_adjs:
-                        if adj.product_id:
-                            vessel_products.add(adj.product_id)
-                        if adj.quantity_liters:
-                            vessel_liters += adj.quantity_liters
+                if not has_edge:
+                    # Fallback: CanTracking + Adjustments
+                    for did in device_ids:
+                        device_cans = cans_by_device.get(did, [])
+                        for can in device_cans:
+                            if can.product_id:
+                                vessel_products.add(can.product_id)
+                                p = products_by_id.get(can.product_id)
+                                density = p.density_g_per_ml if p else 1.0
+                                if can.weight_current_g and density > 0:
+                                    vessel_liters += (can.weight_current_g / density) / 1000.0
+                                if can.weight_full_g and can.weight_current_g:
+                                    used_pct = ((can.weight_full_g - can.weight_current_g) / can.weight_full_g) * 100
+                                    if used_pct > 80:
+                                        vessel_low_stock = True
+
+                        device_adjs = adjustments_by_device.get(did, [])
+                        for adj in device_adjs:
+                            if adj.product_id:
+                                vessel_products.add(adj.product_id)
+                            if adj.quantity_liters:
+                                vessel_liters += adj.quantity_liters
 
                 total_liters += vessel_liters
                 total_products_set.update(vessel_products)
