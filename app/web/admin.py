@@ -1181,6 +1181,17 @@ async def admin_inventory(
             "placed_at": can.placed_at,
         })
 
+    # Check if any device has edge heartbeat stock data
+    any_edge_stock = False
+    for company in companies_raw:
+        for fleet in company.fleets:
+            for vessel in fleet.vessels:
+                for dev in vessel.devices:
+                    si = dev.system_info or {}
+                    if si.get("vessel_stock"):
+                        any_edge_stock = True
+                        break
+
     return templates.TemplateResponse("admin/inventory.html", {
         "request": request,
         "user": user,
@@ -1190,6 +1201,7 @@ async def admin_inventory(
         "total_products": len(total_products_set),
         "alerts": alerts,
         "all_cans": all_cans_list,
+        "has_edge_stock": any_edge_stock,
     })
 
 

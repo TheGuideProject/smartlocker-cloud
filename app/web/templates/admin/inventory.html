@@ -48,7 +48,7 @@
 <div class="panel"><p style="color: var(--text-muted); padding: 20px; text-align: center;">No vessels found. Add vessels via Fleet Management first.</p></div>
 {% endif %}
 
-{% if all_cans %}
+{% if all_cans and not has_edge_stock %}
 <div class="panel" style="margin-top: 20px;">
     <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
         <span>All Tracked Products (from device scans)</span>
