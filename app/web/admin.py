@@ -443,7 +443,7 @@ async def admin_devices(request: Request, user = Depends(require_admin_session),
 
         # Smart aggregation: get aggregated health from stored health logs
         try:
-            health_summary = await _aggregate_sensor_issues(db, d.id, hours=48)
+            health_summary = await _aggregate_sensor_issues(db, d.id, hours=6)
         except Exception:
             health_summary = []
 

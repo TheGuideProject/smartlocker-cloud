@@ -319,25 +319,25 @@ window.addEventListener('DOMContentLoaded', function() {
     <!-- Smart Aggregated Health Summary (from offline health logs) -->
     {% if item.health_summary %}
     <div style="margin-top: 10px; padding: 10px 14px; background: rgba(30,40,56,0.5); border-radius: 6px;">
-        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">Sensor Health History (48h)</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">Sensor Health (last 6h)</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             {% for hs in item.health_summary %}
                 {% if hs.current_status in ['error', 'disconnected', 'warning', 'out_of_range'] %}
-                <div style="background: rgba(230,57,70,0.12); border: 1px solid rgba(230,57,70,0.3); padding: 6px 12px; border-radius: 6px; flex: 1; min-width: 250px;">
+                <div style="background: rgba(230,57,70,0.12); border: 1px solid rgba(230,57,70,0.3); padding: 6px 12px; border-radius: 6px; flex: 1; min-width: 220px;">
                     <div style="font-size: 13px; font-weight: 600; color: var(--accent-red); margin-bottom: 2px;">
-                        &#x26A0; {{ hs.sensor|upper }}: FAILING {{ hs.streak_duration_hours }}h
-                        <span style="font-weight: 400; font-size: 12px;">({{ hs.error_count }} errors)</span>
+                        &#x26A0; {{ hs.sensor|upper }}
+                        <span style="font-weight: 400; font-size: 11px; opacity: 0.8;">({{ hs.error_count }} errors)</span>
                     </div>
                     {% if hs.last_message %}
-                    <div style="font-size: 11px; color: var(--text-muted);">
-                        Last: "{{ hs.last_message }}"
+                    <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;">
+                        {{ hs.last_message }}
                     </div>
                     {% endif %}
                 </div>
                 {% else %}
-                <div style="background: rgba(42,157,143,0.1); border: 1px solid rgba(42,157,143,0.25); padding: 6px 12px; border-radius: 6px; flex: 1; min-width: 200px;">
+                <div style="background: rgba(42,157,143,0.1); border: 1px solid rgba(42,157,143,0.25); padding: 6px 12px; border-radius: 6px; flex: 1; min-width: 180px;">
                     <div style="font-size: 13px; color: var(--accent-green);">
-                        &#x2714; {{ hs.sensor|upper }}: {{ hs.summary }}
+                        &#x2714; {{ hs.sensor|upper }}: OK
                     </div>
                 </div>
                 {% endif %}
