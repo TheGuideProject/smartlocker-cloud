@@ -79,6 +79,39 @@ class PlatformSplitContractTest(unittest.TestCase):
         self.assertEqual(options[1], {"id": "company-a", "name": "Alpha Marine", "selected": False})
         self.assertEqual(options[2], {"id": "company-b", "name": "Beta Shipping", "selected": True})
 
+    def test_client_scope_summary_describes_client_and_ppg_preview(self):
+        scope_summary = getattr(dashboard, "_client_scope_summary", None)
+        options = [
+            {"id": "", "name": "All companies", "selected": False},
+            {"id": "company-a", "name": "Alpha Marine", "selected": True},
+        ]
+
+        self.assertIsNotNone(scope_summary)
+        self.assertEqual(
+            scope_summary(is_ppg_staff=False, scoped_company_id="company-a", selector_options=[]),
+            {
+                "title": "Client view",
+                "detail": "Showing only vessels linked to your company.",
+                "badge": "client",
+            },
+        )
+        self.assertEqual(
+            scope_summary(is_ppg_staff=True, scoped_company_id=None, selector_options=options),
+            {
+                "title": "PPG preview",
+                "detail": "Showing all client companies.",
+                "badge": "preview",
+            },
+        )
+        self.assertEqual(
+            scope_summary(is_ppg_staff=True, scoped_company_id="company-a", selector_options=options),
+            {
+                "title": "PPG preview",
+                "detail": "Showing Alpha Marine only.",
+                "badge": "preview",
+            },
+        )
+
     def test_ppg_preview_for_empty_company_does_not_show_global_support(self):
         self.assertFalse(
             _client_dashboard_uses_global_support_scope(

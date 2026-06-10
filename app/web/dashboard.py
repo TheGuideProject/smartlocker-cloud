@@ -77,6 +77,40 @@ def _client_company_selector_options(companies: list, scoped_company_id: str | N
     return options
 
 
+def _client_scope_summary(
+    is_ppg_staff: bool,
+    scoped_company_id: str | None,
+    selector_options: list[dict],
+) -> dict:
+    """Describe the active client-portal data scope for the page header."""
+    if not is_ppg_staff:
+        return {
+            "title": "Client view",
+            "detail": "Showing only vessels linked to your company.",
+            "badge": "client",
+        }
+    if not scoped_company_id:
+        return {
+            "title": "PPG preview",
+            "detail": "Showing all client companies.",
+            "badge": "preview",
+        }
+
+    company_name = next(
+        (
+            option["name"]
+            for option in selector_options
+            if option.get("id") == scoped_company_id
+        ),
+        scoped_company_id,
+    )
+    return {
+        "title": "PPG preview",
+        "detail": f"Showing {company_name} only.",
+        "badge": "preview",
+    }
+
+
 def _support_request_stats(support_requests: list) -> dict:
     """Build compact support stats for the client portal."""
     open_count = sum(1 for request in support_requests if request.status in {"open", "in_progress"})
@@ -297,6 +331,11 @@ async def owner_dashboard(
         is_ppg_staff,
         scoped_company_id,
     )
+    client_scope = _client_scope_summary(
+        is_ppg_staff,
+        scoped_company_id,
+        company_selector_options,
+    )
 
     # ---- Build device lookup by vessel id for template ----
     # Already loaded via selectinload on vessels
@@ -313,6 +352,7 @@ async def owner_dashboard(
         "event_count_24h": event_count_24h,
         "company_id": scoped_company_id,
         "company_selector_options": company_selector_options,
+        "client_scope": client_scope,
         "current_user": current_user,
         "is_ppg_staff": is_ppg_staff,
         "active": "client_dashboard",
@@ -362,6 +402,11 @@ async def client_support_requests(
         is_ppg_staff,
         scoped_company_id,
     )
+    client_scope = _client_scope_summary(
+        is_ppg_staff,
+        scoped_company_id,
+        company_selector_options,
+    )
 
     return templates.TemplateResponse("owner/support.html", {
         "request": request,
@@ -370,6 +415,7 @@ async def client_support_requests(
         "active": "client_support",
         "company_id": scoped_company_id,
         "company_selector_options": company_selector_options,
+        "client_scope": client_scope,
         "devices": devices,
         "support_requests": support_requests,
         "stats": _support_request_stats(support_requests),
@@ -419,6 +465,11 @@ async def client_activity(
         is_ppg_staff,
         scoped_company_id,
     )
+    client_scope = _client_scope_summary(
+        is_ppg_staff,
+        scoped_company_id,
+        company_selector_options,
+    )
 
     return templates.TemplateResponse("owner/activity.html", {
         "request": request,
@@ -427,6 +478,7 @@ async def client_activity(
         "active": "client_activity",
         "company_id": scoped_company_id,
         "company_selector_options": company_selector_options,
+        "client_scope": client_scope,
         "devices": devices,
         "events": events,
         "stats": _client_activity_event_stats(events),

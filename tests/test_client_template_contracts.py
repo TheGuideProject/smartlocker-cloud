@@ -18,6 +18,19 @@ class ClientTemplateContractTest(unittest.TestCase):
                 template = (TEMPLATE_ROOT / "owner" / template_name).read_text(encoding="utf-8")
                 self.assertIn('{% include "owner/_company_selector.html" %}', template)
 
+    def test_client_list_pages_use_scope_summary_partial(self):
+        for template_name in ["dashboard.html", "support.html", "activity.html"]:
+            with self.subTest(template=template_name):
+                template = (TEMPLATE_ROOT / "owner" / template_name).read_text(encoding="utf-8")
+                self.assertIn('{% include "owner/_scope_summary.html" %}', template)
+
+    def test_scope_summary_partial_uses_client_scope_context(self):
+        partial = (TEMPLATE_ROOT / "owner" / "_scope_summary.html").read_text(encoding="utf-8")
+
+        self.assertIn("client_scope.title", partial)
+        self.assertIn("client_scope.detail", partial)
+        self.assertIn("client_scope.badge", partial)
+
     def test_company_selector_is_ppg_only_and_uses_company_id(self):
         partial = (TEMPLATE_ROOT / "owner" / "_company_selector.html").read_text(encoding="utf-8")
 

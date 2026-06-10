@@ -10,10 +10,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="border-left: 3px solid var(--accent-blue); margin-bottom: 16px;">
-    <strong>Client support view</strong>
-    <span style="color: var(--text-muted); margin-left: 8px;">Tickets are created from SmartLocker devices and handled by PPG support.</span>
-</div>
+{% include "owner/_scope_summary.html" %}
 {% include "owner/_company_selector.html" %}
 
 <div class="stats-grid">
