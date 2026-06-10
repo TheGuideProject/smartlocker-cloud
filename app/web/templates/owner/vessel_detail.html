@@ -21,6 +21,18 @@
     <div class="stat-card"><div class="label">Low Stock</div><div class="value {% if low_stock_count > 0 %}red{% else %}green{% endif %}">{{ low_stock_count }}</div></div>
 </div>
 
+<div class="panel" style="border-left: 3px solid {% if inventory_status.tone == 'ready' %}var(--accent-green){% else %}var(--accent-orange){% endif %}; margin-bottom: 16px;">
+    <div class="flex justify-between items-center" style="gap: 12px;">
+        <div>
+            <strong>{{ inventory_status.title }}</strong>
+            <div style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">{{ inventory_status.detail }}</div>
+        </div>
+        <span class="status-badge {{ 'online' if inventory_status.tone == 'ready' else 'delayed' }}" style="white-space: nowrap;">
+            {{ inventory_status.badge }}
+        </span>
+    </div>
+</div>
+
 <div class="panel">
     <div class="panel-title">Vessel</div>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">

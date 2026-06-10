@@ -143,6 +143,44 @@ class PlatformSplitContractTest(unittest.TestCase):
         self.assertEqual(actions[0]["badge"], "setup")
         self.assertEqual(actions[1]["badge"], "ready")
 
+    def test_client_vessel_inventory_status_explains_empty_and_ready_states(self):
+        inventory_status = getattr(dashboard, "_client_vessel_inventory_status", None)
+
+        self.assertIsNotNone(inventory_status)
+        self.assertEqual(
+            inventory_status(devices=[], products=[]),
+            {
+                "title": "SmartLocker not installed",
+                "detail": "PPG must assign a SmartLocker before live stock can appear for this vessel.",
+                "badge": "setup",
+                "tone": "warning",
+            },
+        )
+        self.assertEqual(
+            inventory_status(
+                devices=[SimpleNamespace(is_online=True)],
+                products=[{"name": "SIGMACOVER 280"}],
+            ),
+            {
+                "title": "Inventory visible",
+                "detail": "Stock combines SmartLocker reports with PPG inventory adjustments.",
+                "badge": "1 product",
+                "tone": "ready",
+            },
+        )
+        self.assertEqual(
+            inventory_status(
+                devices=[SimpleNamespace(is_online=False)],
+                products=[],
+            ),
+            {
+                "title": "Waiting for stock",
+                "detail": "A SmartLocker is installed, but no stock is visible yet. PPG can add stock or wait for the next device sync.",
+                "badge": "empty",
+                "tone": "warning",
+            },
+        )
+
     def test_ppg_preview_for_empty_company_does_not_show_global_support(self):
         self.assertFalse(
             _client_dashboard_uses_global_support_scope(

@@ -242,6 +242,33 @@ def _empty_inventory_row(product_id: str, product_name: str, product_type: str) 
     }
 
 
+def _client_vessel_inventory_status(devices: list, products: list) -> dict:
+    """Explain the client-visible inventory state for one vessel."""
+    if not devices:
+        return {
+            "title": "SmartLocker not installed",
+            "detail": "PPG must assign a SmartLocker before live stock can appear for this vessel.",
+            "badge": "setup",
+            "tone": "warning",
+        }
+
+    if products:
+        product_count = len(products)
+        return {
+            "title": "Inventory visible",
+            "detail": "Stock combines SmartLocker reports with PPG inventory adjustments.",
+            "badge": f"{product_count} product" if product_count == 1 else f"{product_count} products",
+            "tone": "ready",
+        }
+
+    return {
+        "title": "Waiting for stock",
+        "detail": "A SmartLocker is installed, but no stock is visible yet. PPG can add stock or wait for the next device sync.",
+        "badge": "empty",
+        "tone": "warning",
+    }
+
+
 async def _client_vessel_inventory_context(db: AsyncSession, vessel: Vessel) -> dict:
     """Build read-only vessel inventory for the client portal."""
     device_ids = [device.id for device in vessel.devices]
@@ -685,5 +712,9 @@ async def client_vessel_detail(
         "total_liters": inventory["total_liters"],
         "product_count": inventory["product_count"],
         "low_stock_count": inventory["low_stock_count"],
+        "inventory_status": _client_vessel_inventory_status(
+            vessel.devices,
+            inventory["products"],
+        ),
         "products": inventory["products"],
     })

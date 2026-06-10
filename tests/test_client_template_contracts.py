@@ -144,6 +144,18 @@ class ClientTemplateContractTest(unittest.TestCase):
 
         self.assertIn('"company_id": company_id', source)
 
+    def test_client_vessel_detail_renders_inventory_status(self):
+        source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
+        start = source.index('TemplateResponse("owner/vessel_detail.html"')
+        end = source.index('"products": inventory["products"]', start)
+        detail_context = source[start:end]
+        template = (TEMPLATE_ROOT / "owner" / "vessel_detail.html").read_text(encoding="utf-8")
+
+        self.assertIn('"inventory_status": _client_vessel_inventory_status(', detail_context)
+        self.assertIn("inventory_status.title", template)
+        self.assertIn("inventory_status.detail", template)
+        self.assertIn("inventory_status.badge", template)
+
 
 if __name__ == "__main__":
     unittest.main()
