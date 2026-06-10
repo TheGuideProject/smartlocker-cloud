@@ -78,7 +78,7 @@ class UserManagementContractTest(unittest.TestCase):
             {
                 "label": "Client Portal",
                 "login_href": "/client/login",
-                "detail": "Customer vessel workspace",
+                "detail": "Client vessel workspace",
             },
         )
         self.assertEqual(

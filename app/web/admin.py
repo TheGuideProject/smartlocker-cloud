@@ -185,7 +185,7 @@ def _ppg_dashboard_quick_actions(open_support_count: int, offline_device_count: 
         actions.append({
             "label": "Review support",
             "href": "/admin/support",
-            "detail": "Resolve customer/device support tickets.",
+            "detail": "Resolve client/device support tickets.",
             "badge": f"{open_support_count} open",
             "tone": "danger",
         })
@@ -209,7 +209,7 @@ def _ppg_dashboard_quick_actions(open_support_count: int, offline_device_count: 
         {
             "label": "Client portal preview",
             "href": "/client/",
-            "detail": "Open the customer-facing read-only platform.",
+            "detail": "Open the client-facing read-only platform.",
             "badge": "client",
             "tone": "info",
         },
@@ -2320,7 +2320,7 @@ async def admin_error_codes(request: Request, user = Depends(require_admin_sessi
 # ---- Support Requests ----
 
 def _support_request_client_context(support_request) -> dict:
-    """Return display context that links a support ticket back to the customer vessel."""
+    """Return display context that links a support ticket back to the client vessel."""
     device = getattr(support_request, "device", None)
     vessel = getattr(device, "vessel", None)
     fleet = getattr(vessel, "fleet", None)
@@ -2343,7 +2343,7 @@ def _support_request_client_context(support_request) -> dict:
 @router.get("/support")
 async def admin_support_requests(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Support request management page."""
-    # Get all support requests with customer/vessel context for triage.
+    # Get all support requests with client/vessel context for triage.
     result = await db.execute(
         select(SupportRequest)
         .options(

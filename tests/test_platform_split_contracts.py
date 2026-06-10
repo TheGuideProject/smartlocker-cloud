@@ -128,6 +128,7 @@ class PlatformSplitContractTest(unittest.TestCase):
         self.assertEqual(actions[0]["href"], "/client/vessels/vessel-1?company_id=company-client")
         self.assertEqual(actions[1]["label"], "Support")
         self.assertEqual(actions[1]["href"], "/client/support?company_id=company-client")
+        self.assertEqual(actions[1]["detail"], "Open tickets, device issues, and client requests.")
         self.assertEqual(actions[1]["badge"], "1 open")
         self.assertEqual(actions[2]["label"], "Activity")
         self.assertEqual(actions[2]["href"], "/client/activity?company_id=company-client")

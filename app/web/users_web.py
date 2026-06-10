@@ -57,7 +57,7 @@ def _user_portal_context(role: str) -> dict:
         return {
             "label": "Client Portal",
             "login_href": "/client/login",
-            "detail": "Customer vessel workspace",
+            "detail": "Client vessel workspace",
         }
     return {
         "label": "No web portal",

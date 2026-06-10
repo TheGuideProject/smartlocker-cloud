@@ -12,6 +12,7 @@ class PpgDashboardContractTest(unittest.TestCase):
 
         self.assertEqual(actions[0]["label"], "Review support")
         self.assertEqual(actions[0]["href"], "/admin/support")
+        self.assertEqual(actions[0]["detail"], "Resolve client/device support tickets.")
         self.assertEqual(actions[0]["badge"], "3 open")
         self.assertEqual(actions[1]["label"], "Check devices")
         self.assertEqual(actions[1]["href"], "/admin/devices")
@@ -24,6 +25,8 @@ class PpgDashboardContractTest(unittest.TestCase):
         )
 
         self.assertTrue(any(action["href"] == "/client/" for action in actions))
+        client_preview = next(action for action in actions if action["href"] == "/client/")
+        self.assertEqual(client_preview["detail"], "Open the client-facing read-only platform.")
 
     def test_quick_actions_stay_small_enough_to_scan(self):
         actions = _ppg_dashboard_quick_actions(

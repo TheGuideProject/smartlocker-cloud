@@ -150,7 +150,7 @@ def _client_dashboard_quick_actions(
         {
             "label": "Support",
             "href": f"/client/support{scope_query}",
-            "detail": "Open tickets, device issues, and customer requests.",
+            "detail": "Open tickets, device issues, and client requests.",
             "badge": f"{open_support_count} open" if open_support_count else "ready",
             "tone": "danger" if open_support_count else "success",
         },

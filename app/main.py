@@ -147,7 +147,7 @@ def _portal_entry_options() -> list[dict]:
         {
             "label": "Client Portal",
             "href": "/client/login",
-            "badge": "Customer access",
+            "badge": "Client access",
             "detail": "Review vessel stock, SmartLocker status, activity, and support requests.",
         },
     ]
