@@ -91,6 +91,20 @@ class ClientTemplateContractTest(unittest.TestCase):
         self.assertIn(f'href="/client/activity{company_scope}"', dashboard)
         self.assertIn(f'href="/client/support{company_scope}"', dashboard)
 
+    def test_client_dashboard_surfaces_redirect_messages(self):
+        source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
+        start = source.index('TemplateResponse("owner/dashboard.html"')
+        end = source.index('"active": "client_dashboard"', start)
+        dashboard_context = source[start:end]
+        template = (TEMPLATE_ROOT / "owner" / "dashboard.html").read_text(encoding="utf-8")
+
+        self.assertIn('"success": request.query_params.get("success")', dashboard_context)
+        self.assertIn('"error": request.query_params.get("error")', dashboard_context)
+        self.assertIn("{% if success %}", template)
+        self.assertIn("{% if error %}", template)
+        self.assertIn("{{ success }}", template)
+        self.assertIn("{{ error }}", template)
+
     def test_client_activity_links_preserve_company_scope(self):
         activity = (TEMPLATE_ROOT / "owner" / "activity.html").read_text(encoding="utf-8")
         company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"

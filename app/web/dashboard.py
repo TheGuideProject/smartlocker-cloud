@@ -392,6 +392,8 @@ async def owner_dashboard(
         "client_scope": client_scope,
         "current_user": current_user,
         "is_ppg_staff": is_ppg_staff,
+        "success": request.query_params.get("success"),
+        "error": request.query_params.get("error"),
         "active": "client_dashboard",
     })
 
