@@ -38,6 +38,20 @@ class BarcodeAdminContractTest(unittest.TestCase):
             "8712345678901",
         )
 
+    def test_saved_barcodes_page_has_image_fallback_and_png_link(self):
+        template = (CLOUD_ROOT / "app" / "web" / "templates" / "admin" / "barcodes_list.html").read_text(encoding="utf-8")
+
+        self.assertIn('src="/admin/barcodes/{{ bc.id }}/image.png"', template)
+        self.assertIn("onerror=", template)
+        self.assertIn("Barcode image preview unavailable", template)
+        self.assertIn("Open PNG", template)
+
+    def test_admin_guide_describes_real_barcode_import_without_batch_number(self):
+        guide = (CLOUD_ROOT / "app" / "web" / "templates" / "admin" / "guide.html").read_text(encoding="utf-8")
+
+        self.assertNotIn("Batch number, color, and can size input fields", guide)
+        self.assertIn("real manufacturer barcode import", guide)
+
 
 class InventoryAdminContractTest(unittest.TestCase):
     def test_manual_inventory_adjustments_need_a_device_target(self):

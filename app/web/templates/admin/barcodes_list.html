@@ -75,7 +75,12 @@
                 <td style="min-width: 190px;">
                     <img src="/admin/barcodes/{{ bc.id }}/image.png"
                          alt="{{ bc.barcode_data }}"
+                         loading="lazy"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
                          style="width: 160px; max-height: 72px; object-fit: contain; background: #fff; padding: 6px; border-radius: 4px; display: block;">
+                    <div style="display: none; width: 160px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; padding: 8px; color: var(--text-muted); font-size: 11px;">
+                        Barcode image preview unavailable. Open PNG from Actions.
+                    </div>
                     <code style="display: block; margin-top: 6px; font-size: 11px; background: var(--bg-input); padding: 3px 6px; border-radius: 3px; word-break: break-all;">
                         {{ bc.barcode_data }}
                     </code>
@@ -105,6 +110,13 @@
                     </span>
                 </td>
                 <td>
+                    <a href="/admin/barcodes/{{ bc.id }}/image.png"
+                       target="_blank"
+                       rel="noopener"
+                       class="btn btn-ghost"
+                       style="font-size: 12px; padding: 4px 8px;">
+                        Open PNG
+                    </a>
                     <form method="post" action="/admin/barcodes/{{ bc.id }}/delete"
                           style="display: inline;"
                           onsubmit="return confirm('Delete this barcode?');">
