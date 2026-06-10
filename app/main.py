@@ -125,12 +125,45 @@ async def debug_exception_handler(request: Request, exc: Exception):
 
 # ---- Root Routes ----
 
-@app.get("/")
-async def root(request: Request):
-    """Redirect to the correct web portal for the active session."""
+def _root_portal_destination(role: str | None) -> str | None:
+    """Return the portal destination for an authenticated root request."""
+    if not role:
+        return None
+
     from app.web.auth_web import _portal_home_for_role
 
-    return RedirectResponse(url=_portal_home_for_role(request.session.get("user_role")))
+    return _portal_home_for_role(role)
+
+
+def _portal_entry_options() -> list[dict]:
+    """Return the two top-level platform entry points."""
+    return [
+        {
+            "label": "PPG Portal",
+            "href": "/admin/login",
+            "badge": "PPG staff",
+            "detail": "Manage companies, vessels, devices, catalog, barcodes, inventory, and support.",
+        },
+        {
+            "label": "Client Portal",
+            "href": "/client/login",
+            "badge": "Customer access",
+            "detail": "Review vessel stock, SmartLocker status, activity, and support requests.",
+        },
+    ]
+
+
+@app.get("/")
+async def root(request: Request):
+    """Show a portal selector for guests, or redirect active sessions."""
+    destination = _root_portal_destination(request.session.get("user_role"))
+    if destination:
+        return RedirectResponse(url=destination)
+
+    return templates.TemplateResponse("portal_select.html", {
+        "request": request,
+        "portal_options": _portal_entry_options(),
+    })
 
 
 @app.get("/health")

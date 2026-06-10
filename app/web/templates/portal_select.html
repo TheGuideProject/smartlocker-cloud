@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartLocker Platform</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f6f8fb;
+            --panel: #ffffff;
+            --text: #142033;
+            --muted: #637083;
+            --border: #d9e1ec;
+            --ppg: #0072ce;
+            --client: #14a389;
+            --shadow: 0 18px 50px rgba(25, 40, 65, 0.12);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+        .shell {
+            width: min(960px, 100%);
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .brand-title {
+            margin: 0;
+            font-size: clamp(30px, 5vw, 48px);
+            line-height: 1;
+            letter-spacing: 0;
+        }
+        .brand-copy {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 17px;
+        }
+        .status {
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--muted);
+            border-radius: 999px;
+            padding: 10px 14px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+        }
+        .entry {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            min-height: 260px;
+            padding: 26px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+            text-decoration: none;
+            color: inherit;
+        }
+        .entry:hover,
+        .entry:focus {
+            outline: 3px solid rgba(0, 114, 206, 0.18);
+            border-color: var(--ppg);
+        }
+        .entry.client:hover,
+        .entry.client:focus {
+            outline-color: rgba(20, 163, 137, 0.2);
+            border-color: var(--client);
+        }
+        .badge {
+            width: fit-content;
+            border-radius: 999px;
+            padding: 8px 12px;
+            background: rgba(0, 114, 206, 0.1);
+            color: var(--ppg);
+            font-weight: 800;
+            font-size: 13px;
+        }
+        .entry.client .badge {
+            background: rgba(20, 163, 137, 0.12);
+            color: var(--client);
+        }
+        .entry h2 {
+            margin: 0;
+            font-size: clamp(26px, 4vw, 38px);
+            letter-spacing: 0;
+        }
+        .entry p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 17px;
+            line-height: 1.5;
+        }
+        .action {
+            margin-top: auto;
+            color: var(--ppg);
+            font-weight: 900;
+        }
+        .entry.client .action {
+            color: var(--client);
+        }
+        @media (max-width: 720px) {
+            body { padding: 18px; align-items: start; }
+            .brand { display: block; }
+            .status { display: inline-block; margin-top: 18px; }
+            .grid { grid-template-columns: 1fr; }
+            .entry { min-height: 220px; padding: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <header class="brand">
+            <div>
+                <h1 class="brand-title">SmartLocker</h1>
+                <p class="brand-copy">Choose the workspace for your role.</p>
+            </div>
+            <div class="status">PPG / Client platform</div>
+        </header>
+
+        <section class="grid" aria-label="Portal entry points">
+            <a class="entry" href="/admin/login">
+                <span class="badge">{{ portal_options[0].badge }}</span>
+                <h2>PPG Portal</h2>
+                <p>{{ portal_options[0].detail }}</p>
+                <span class="action">Open PPG Portal</span>
+            </a>
+            <a class="entry client" href="/client/login">
+                <span class="badge">{{ portal_options[1].badge }}</span>
+                <h2>Client Portal</h2>
+                <p>{{ portal_options[1].detail }}</p>
+                <span class="action">Open Client Portal</span>
+            </a>
+        </section>
+    </main>
+</body>
+</html>
