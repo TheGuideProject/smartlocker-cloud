@@ -87,6 +87,18 @@ class PortalEntryContractTest(unittest.TestCase):
         self.assertIn(".workspace-chip", stylesheet)
         self.assertIn(".workspace-chip.client", stylesheet)
 
+    def test_sidebar_header_and_footer_are_workspace_aware(self):
+        base_template = (CLOUD_ROOT / "app" / "web" / "templates" / "base.html").read_text(encoding="utf-8")
+
+        self.assertIn("workspace_badge", base_template)
+        self.assertIn("workspace_footer", base_template)
+        self.assertIn("workspace_subfooter", base_template)
+        self.assertIn("{{ workspace_badge }}", base_template)
+        self.assertIn("{{ workspace_footer }}", base_template)
+        self.assertIn("{{ workspace_subfooter }}", base_template)
+        self.assertIn("Client workspace", base_template)
+        self.assertIn("Marine Coatings", base_template)
+
 
 if __name__ == "__main__":
     unittest.main()

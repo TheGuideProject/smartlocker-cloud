@@ -13,10 +13,13 @@
 <body>
     {% set workspace_is_client = (active|default('')) in ['client_dashboard', 'client_activity', 'client_support'] %}
     {% set workspace_label = 'Client Portal' if workspace_is_client else 'PPG Portal' %}
+    {% set workspace_badge = 'Client' if workspace_is_client else 'PPG' %}
+    {% set workspace_footer = 'SmartLocker Client Portal' if workspace_is_client else 'PPG SmartLocker Platform' %}
+    {% set workspace_subfooter = 'Client workspace' if workspace_is_client else 'v3.1 - Marine Coatings' %}
     <nav class="sidebar">
         <div class="sidebar-header">
             <h2>SmartLocker</h2>
-            <span class="badge">Cloud</span>
+            <span class="badge">{{ workspace_badge }}</span>
         </div>
         <ul class="nav-links">
             {% block nav %}
@@ -56,8 +59,8 @@
             {% endblock %}
         </ul>
         <div class="sidebar-footer">
-            <div style="color: var(--text-muted); font-size: 11px;">PPG SmartLocker Platform</div>
-            <div style="color: var(--text-muted); font-size: 10px; margin-top: 2px;">v3.1 &middot; Marine Coatings</div>
+            <div style="color: var(--text-muted); font-size: 11px;">{{ workspace_footer }}</div>
+            <div style="color: var(--text-muted); font-size: 10px; margin-top: 2px;">{{ workspace_subfooter }}</div>
         </div>
     </nav>
 
