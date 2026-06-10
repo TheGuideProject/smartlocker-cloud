@@ -1,10 +1,14 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
+from app.web import admin
 from app.web.admin import (
     _apply_inventory_adjustment_summary,
     _barcode_payload_value,
 )
+
+CLOUD_ROOT = Path(__file__).resolve().parents[1]
 
 
 class BarcodeAdminContractTest(unittest.TestCase):
@@ -36,6 +40,41 @@ class BarcodeAdminContractTest(unittest.TestCase):
 
 
 class InventoryAdminContractTest(unittest.TestCase):
+    def test_manual_inventory_adjustments_need_a_device_target(self):
+        adjustment_device_id = getattr(admin, "_inventory_adjustment_device_id", None)
+
+        self.assertIsNotNone(adjustment_device_id)
+        self.assertIsNone(adjustment_device_id([]))
+        self.assertEqual(
+            adjustment_device_id([SimpleNamespace(id="device-1")]),
+            "device-1",
+        )
+
+    def test_vessel_inventory_blocks_orphan_manual_adjustments(self):
+        source = (CLOUD_ROOT / "app" / "web" / "admin.py").read_text(encoding="utf-8")
+        start = source.index("async def admin_adjust_vessel_inventory")
+        end = source.index('@router.post("/inventory/{vessel_id}/clear-all"', start)
+        adjust_route = source[start:end]
+
+        self.assertIn("if not device_id:", adjust_route)
+        self.assertIn("Add+a+SmartLocker+device+before+adding+stock", adjust_route)
+        self.assertIn('"has_devices": bool(devices)', source)
+
+    def test_vessel_pdf_import_blocks_orphan_adjustments(self):
+        source = (CLOUD_ROOT / "app" / "web" / "admin.py").read_text(encoding="utf-8")
+        start = source.index("async def admin_import_vessel_pdf")
+        end = source.index('@router.post("/inventory/adjust"', start)
+        import_route = source[start:end]
+
+        self.assertIn("if not device_id:", import_route)
+        self.assertIn("Add+a+SmartLocker+device+before+importing+stock", import_route)
+
+    def test_vessel_inventory_template_warns_when_stock_cannot_be_assigned(self):
+        template = (CLOUD_ROOT / "app" / "web" / "templates" / "admin" / "inventory_vessel.html").read_text(encoding="utf-8")
+
+        self.assertIn("{% if has_devices %}", template)
+        self.assertIn("Add a SmartLocker device before adding stock", template)
+
     def test_manual_adjustments_apply_on_top_of_edge_stock(self):
         product = SimpleNamespace(
             id="prod-1",

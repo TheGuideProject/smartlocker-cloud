@@ -34,6 +34,7 @@
 <!-- Actions bar -->
 <div class="panel" style="padding: 12px 16px;">
     <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        {% if has_devices %}
         <button onclick="document.getElementById('addModal').style.display='flex'" class="btn btn-primary">+ Add Stock</button>
         <button onclick="document.getElementById('removeModal').style.display='flex'" class="btn btn-secondary">- Remove Stock</button>
         <form action="/admin/inventory/{{ vessel.id }}/import-pdf" method="post" enctype="multipart/form-data" style="display:inline-flex; gap:8px; align-items:center;">
@@ -41,6 +42,10 @@
             <button type="button" onclick="document.getElementById('pdfInput').click()" class="btn btn-secondary">Import PDF Order</button>
         </form>
         <span style="color: var(--text-muted); font-size: 13px; margin-left: auto;">Email import coming soon</span>
+        {% else %}
+        <span style="color: var(--accent-orange); font-weight: 600;">Add a SmartLocker device before adding stock.</span>
+        <span style="color: var(--text-muted); font-size: 13px;">Inventory changes are linked to an installed locker so they appear on this vessel and sync correctly.</span>
+        {% endif %}
     </div>
 </div>
 

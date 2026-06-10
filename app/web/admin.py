@@ -171,6 +171,13 @@ def _apply_inventory_adjustment_summary(
     product_summary[product_name]["liters"] = max(0.0, new_liters)
 
 
+def _inventory_adjustment_device_id(devices: list) -> str | None:
+    """Return the device id used to attach vessel-level inventory adjustments."""
+    if not devices:
+        return None
+    return getattr(devices[0], "id", None)
+
+
 def _ppg_dashboard_quick_actions(open_support_count: int, offline_device_count: int) -> list[dict]:
     """Return a compact, priority-ordered action list for the PPG dashboard."""
     actions: list[dict] = []
@@ -1696,6 +1703,7 @@ async def admin_inventory_vessel(
         "products": products_list,
         "adjustments": adjustments,
         "all_products": all_products,
+        "has_devices": bool(devices),
     })
 
 
@@ -1716,7 +1724,12 @@ async def admin_adjust_vessel_inventory(
         select(LockerDevice).where(LockerDevice.vessel_id == vessel_id).limit(1)
     )
     device = device_result.scalar_one_or_none()
-    device_id = device.id if device else None
+    device_id = _inventory_adjustment_device_id([device] if device else [])
+    if not device_id:
+        return RedirectResponse(
+            url=f"/admin/inventory/{vessel_id}?error=Add+a+SmartLocker+device+before+adding+stock",
+            status_code=303,
+        )
 
     # Calculate weight from liters
     weight_g = 0.0
@@ -1873,7 +1886,12 @@ async def admin_import_vessel_pdf(
         select(LockerDevice).where(LockerDevice.vessel_id == vessel_id).limit(1)
     )
     device = device_result.scalar_one_or_none()
-    device_id = device.id if device else None
+    device_id = _inventory_adjustment_device_id([device] if device else [])
+    if not device_id:
+        return RedirectResponse(
+            url=f"/admin/inventory/{vessel_id}?error=Add+a+SmartLocker+device+before+importing+stock",
+            status_code=303,
+        )
 
     # Read and save PDF
     pdf_bytes = await pdf_file.read()
