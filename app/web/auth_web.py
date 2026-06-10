@@ -32,6 +32,37 @@ def _portal_home_for_role(role: str | None) -> str:
     return "/admin/login"
 
 
+def _login_path_for_request_path(path: str | None) -> str:
+    """Return the correct login page for a protected web path."""
+    if (path or "").startswith("/client"):
+        return "/client/login"
+    return "/admin/login"
+
+
+def _login_context_for_path(path: str | None) -> dict:
+    """Return copy and form targets for the portal-specific login page."""
+    is_client = (path or "").startswith("/client")
+    if is_client:
+        return {
+            "badge": "Client",
+            "subtitle": "Fleet inventory and service overview",
+            "form_action": "/client/login",
+            "email_placeholder": "user@client.com",
+            "footer": "SmartLocker Client Portal",
+            "switch_href": "/admin/login",
+            "switch_label": "PPG staff login",
+        }
+    return {
+        "badge": "PPG",
+        "subtitle": "PPG operations, devices, catalog and support",
+        "form_action": "/admin/login",
+        "email_placeholder": "admin@ppg.com",
+        "footer": "PPG SmartLocker Platform",
+        "switch_href": "/client/login",
+        "switch_label": "Client portal login",
+    }
+
+
 async def _load_active_session_user(
     request: Request,
     db: AsyncSession,
@@ -42,7 +73,7 @@ async def _load_active_session_user(
         raise HTTPException(
             status_code=303,
             detail="Not authenticated",
-            headers={"Location": "/admin/login"},
+            headers={"Location": _login_path_for_request_path(request.url.path)},
         )
 
     result = await db.execute(select(User).where(User.id == user_id))
@@ -53,7 +84,7 @@ async def _load_active_session_user(
         raise HTTPException(
             status_code=303,
             detail="Session expired",
-            headers={"Location": "/admin/login"},
+            headers={"Location": _login_path_for_request_path(request.url.path)},
         )
 
     return user
@@ -109,6 +140,7 @@ async def require_client_session(
 # ============================================================
 
 @router.get("/login", response_class=HTMLResponse)
+@router.get("/client/login", response_class=HTMLResponse)
 @router.get("/admin/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Show login form. Redirect to the correct portal if already logged in."""
@@ -120,10 +152,12 @@ async def login_page(request: Request):
     return templates.TemplateResponse("admin/login.html", {
         "request": request,
         "error": None,
+        **_login_context_for_path(request.url.path),
     })
 
 
 @router.post("/login")
+@router.post("/client/login")
 @router.post("/admin/login")
 async def login_submit(
     request: Request,
@@ -139,18 +173,21 @@ async def login_submit(
         return templates.TemplateResponse("admin/login.html", {
             "request": request,
             "error": "Invalid email or password",
+            **_login_context_for_path(request.url.path),
         }, status_code=401)
 
     if not user.is_active:
         return templates.TemplateResponse("admin/login.html", {
             "request": request,
             "error": "Account is disabled",
+            **_login_context_for_path(request.url.path),
         }, status_code=403)
 
     if user.role not in PPG_WEB_ROLES | CLIENT_WEB_ROLES:
         return templates.TemplateResponse("admin/login.html", {
             "request": request,
             "error": "Web portal access required",
+            **_login_context_for_path(request.url.path),
         }, status_code=403)
 
     # Create session
@@ -171,5 +208,6 @@ async def login_submit(
 @router.get("/admin/logout")
 async def logout(request: Request):
     """Clear session and redirect to login."""
+    login_path = _login_path_for_request_path(request.url.path)
     request.session.clear()
-    return RedirectResponse("/admin/login", status_code=303)
+    return RedirectResponse(login_path, status_code=303)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - SmartLocker Cloud</title>
+    <title>Login - SmartLocker {{ badge or 'Platform' }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -170,19 +170,19 @@
             <div class="login-brand">
                 <div class="login-brand-name">
                     <h1>SmartLocker</h1>
-                    <span class="badge">Cloud</span>
+                    <span class="badge">{{ badge or 'Cloud' }}</span>
                 </div>
-                <p>PPG Marine Coatings Management</p>
+                <p>{{ subtitle or 'SmartLocker Platform' }}</p>
             </div>
 
             {% if error %}
             <div class="login-error">{{ error }}</div>
             {% endif %}
 
-            <form method="post" action="/admin/login">
+            <form method="post" action="{{ form_action or '/admin/login' }}">
                 <div class="login-field">
                     <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" placeholder="admin@ppg.com" required autofocus>
+                    <input type="email" id="email" name="email" placeholder="{{ email_placeholder or 'admin@ppg.com' }}" required autofocus>
                 </div>
                 <div class="login-field">
                     <label for="password">Password</label>
@@ -192,7 +192,9 @@
             </form>
 
             <div class="login-footer">
-                PPG SmartLocker Platform v3.1 &middot; Marine Coatings Division
+                {{ footer or 'PPG SmartLocker Platform' }} v3.1
+                <br>
+                <a href="{{ switch_href or '/client/login' }}" style="color: var(--ppg-blue); text-decoration: none; font-weight: 600;">{{ switch_label or 'Client portal login' }}</a>
             </div>
         </div>
     </div>

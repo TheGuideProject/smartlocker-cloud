@@ -1,7 +1,11 @@
 import unittest
 from types import SimpleNamespace
 
-from app.web.auth_web import _portal_home_for_role
+from app.web.auth_web import (
+    _login_context_for_path,
+    _login_path_for_request_path,
+    _portal_home_for_role,
+)
 from app.web.dashboard import (
     _client_can_access_company,
     _client_dashboard_company_scope,
@@ -17,6 +21,30 @@ class PlatformSplitContractTest(unittest.TestCase):
     def test_client_roles_land_in_client_portal(self):
         self.assertEqual(_portal_home_for_role("ship_owner"), "/client/")
         self.assertEqual(_portal_home_for_role("crew"), "/client/")
+
+    def test_client_routes_redirect_to_client_login_when_unauthenticated(self):
+        self.assertEqual(_login_path_for_request_path("/client/"), "/client/login")
+        self.assertEqual(_login_path_for_request_path("/client/vessels/abc"), "/client/login")
+
+    def test_admin_routes_redirect_to_admin_login_when_unauthenticated(self):
+        self.assertEqual(_login_path_for_request_path("/admin/"), "/admin/login")
+        self.assertEqual(_login_path_for_request_path("/admin/devices"), "/admin/login")
+
+    def test_client_login_context_has_client_branding_and_action(self):
+        context = _login_context_for_path("/client/login")
+
+        self.assertEqual(context["badge"], "Client")
+        self.assertEqual(context["form_action"], "/client/login")
+        self.assertEqual(context["email_placeholder"], "user@client.com")
+        self.assertEqual(context["switch_href"], "/admin/login")
+
+    def test_admin_login_context_has_ppg_branding_and_action(self):
+        context = _login_context_for_path("/admin/login")
+
+        self.assertEqual(context["badge"], "PPG")
+        self.assertEqual(context["form_action"], "/admin/login")
+        self.assertEqual(context["email_placeholder"], "admin@ppg.com")
+        self.assertEqual(context["switch_href"], "/client/login")
 
     def test_ship_owner_dashboard_is_scoped_to_own_company(self):
         user = SimpleNamespace(role="ship_owner", company_id="company-client")
