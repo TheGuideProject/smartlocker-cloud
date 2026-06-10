@@ -137,18 +137,14 @@
         </header>
 
         <section class="grid" aria-label="Portal entry points">
-            <a class="entry" href="/admin/login">
-                <span class="badge">{{ portal_options[0].badge }}</span>
-                <h2>PPG Portal</h2>
-                <p>{{ portal_options[0].detail }}</p>
-                <span class="action">Open PPG Portal</span>
+            {% for portal in portal_options %}
+            <a class="entry{% if portal.label == 'Client Portal' %} client{% endif %}" href="{{ portal.href }}">
+                <span class="badge">{{ portal.badge }}</span>
+                <h2>{{ portal.label }}</h2>
+                <p>{{ portal.detail }}</p>
+                <span class="action">Open {{ portal.label }}</span>
             </a>
-            <a class="entry client" href="/client/login">
-                <span class="badge">{{ portal_options[1].badge }}</span>
-                <h2>Client Portal</h2>
-                <p>{{ portal_options[1].detail }}</p>
-                <span class="action">Open Client Portal</span>
-            </a>
+            {% endfor %}
         </section>
     </main>
 </body>

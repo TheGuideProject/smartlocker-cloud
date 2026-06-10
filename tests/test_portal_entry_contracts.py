@@ -56,11 +56,23 @@ class PortalEntryContractTest(unittest.TestCase):
     def test_portal_selector_template_has_two_distinct_entries(self):
         template = (CLOUD_ROOT / "app" / "web" / "templates" / "portal_select.html").read_text(encoding="utf-8")
 
-        self.assertIn("PPG Portal", template)
-        self.assertIn("Client Portal", template)
-        self.assertIn('href="/admin/login"', template)
-        self.assertIn('href="/client/login"', template)
+        self.assertIn("{% for portal in portal_options %}", template)
+        self.assertIn('href="{{ portal.href }}"', template)
+        self.assertIn("{{ portal.badge }}", template)
+        self.assertIn("{{ portal.label }}", template)
+        self.assertIn("{{ portal.detail }}", template)
+        self.assertIn('Open {{ portal.label }}', template)
+        self.assertNotIn("portal_options[0]", template)
+        self.assertNotIn("portal_options[1]", template)
         self.assertIn("SmartLocker", template)
+
+    def test_navigation_uses_ppg_portal_label_for_staff_workspace(self):
+        base_template = (CLOUD_ROOT / "app" / "web" / "templates" / "base.html").read_text(encoding="utf-8")
+        client_nav = (CLOUD_ROOT / "app" / "web" / "templates" / "client" / "_client_nav.html").read_text(encoding="utf-8")
+
+        self.assertIn('<span class="nav-icon">&#9671;</span> PPG Portal</a>', base_template)
+        self.assertIn('<span class="nav-icon">&#9671;</span> PPG Portal</a>', client_nav)
+        self.assertNotIn('<span class="nav-icon">&#9671;</span> Admin Portal</a>', client_nav)
 
 
 if __name__ == "__main__":
