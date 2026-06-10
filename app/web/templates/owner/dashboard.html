@@ -1,17 +1,27 @@
 {% extends "base.html" %}
 
-{% block title %}Fleet Dashboard - SmartLocker{% endblock %}
-{% block page_title %}Fleet Overview{% endblock %}
+{% block title %}Client Portal - SmartLocker{% endblock %}
+{% block page_title %}Client Portal{% endblock %}
 
 {% block nav %}
-<li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Fleet</li>
-<li><a href="/dashboard/" class="active"><span class="nav-icon">&#9670;</span> Fleet Overview</a></li>
+<li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Client</li>
+<li><a href="/client/" class="active"><span class="nav-icon">&#9670;</span> Fleet Overview</a></li>
 <li class="nav-divider"></li>
+{% if is_ppg_staff %}
 <li><a href="/admin/"><span class="nav-icon">&#9671;</span> Admin Portal</a></li>
 <li><a href="/docs" target="_blank"><span class="nav-icon">&#8599;</span> API Docs</a></li>
+{% endif %}
+<li><a href="/client/logout" style="color: var(--danger);"><span class="nav-icon">&#10140;</span> Logout</a></li>
 {% endblock %}
 
 {% block content %}
+{% if current_user and not is_ppg_staff %}
+<div class="panel" style="border-left: 3px solid var(--accent-blue); margin-bottom: 16px;">
+    <strong>Client view</strong>
+    <span style="color: var(--text-muted); margin-left: 8px;">Showing only vessels linked to your company.</span>
+</div>
+{% endif %}
+
 <!-- Fleet Summary Stats -->
 <div class="stats-grid" style="grid-template-columns: repeat(6, 1fr);">
     <div class="stat-card accent-blue">

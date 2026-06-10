@@ -19,19 +19,24 @@ from app.api.auth import verify_password
 router = APIRouter(tags=["auth-web"])
 templates = Jinja2Templates(directory="app/web/templates")
 
+PPG_WEB_ROLES = {"ppg_admin", "ppg_support"}
+CLIENT_WEB_ROLES = {"ship_owner", "crew"}
 
-# ============================================================
-# SESSION AUTH DEPENDENCY
-# ============================================================
 
-async def require_admin_session(
+def _portal_home_for_role(role: str | None) -> str:
+    """Return the correct web portal landing page for a user role."""
+    if role in PPG_WEB_ROLES:
+        return "/admin/"
+    if role in CLIENT_WEB_ROLES:
+        return "/client/"
+    return "/admin/login"
+
+
+async def _load_active_session_user(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession,
 ) -> User:
-    """
-    Require an authenticated admin/support user via session cookie.
-    Redirects to /admin/login if not authenticated.
-    """
+    """Load the active web session user or redirect to login."""
     user_id = request.session.get("user_id")
     if not user_id:
         raise HTTPException(
@@ -51,11 +56,49 @@ async def require_admin_session(
             headers={"Location": "/admin/login"},
         )
 
-    if user.role not in ("ppg_admin", "ppg_support"):
+    return user
+
+
+# ============================================================
+# SESSION AUTH DEPENDENCY
+# ============================================================
+
+async def require_admin_session(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Require an authenticated admin/support user via session cookie.
+    Redirects to /admin/login if not authenticated.
+    """
+    user = await _load_active_session_user(request, db)
+
+    if user.role not in PPG_WEB_ROLES:
         raise HTTPException(
             status_code=303,
             detail="Admin access required",
-            headers={"Location": "/admin/login"},
+            headers={"Location": _portal_home_for_role(user.role)},
+        )
+
+    return user
+
+
+async def require_client_session(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Require an authenticated user allowed to view the client portal.
+    PPG staff may enter for support/preview, while ship_owner and crew see
+    only their assigned company data.
+    """
+    user = await _load_active_session_user(request, db)
+
+    if user.role not in PPG_WEB_ROLES | CLIENT_WEB_ROLES:
+        raise HTTPException(
+            status_code=303,
+            detail="Client portal access required",
+            headers={"Location": _portal_home_for_role(user.role)},
         )
 
     return user
@@ -65,17 +108,22 @@ async def require_admin_session(
 # LOGIN / LOGOUT ROUTES
 # ============================================================
 
+@router.get("/login", response_class=HTMLResponse)
 @router.get("/admin/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    """Show login form. Redirect to /admin/ if already logged in."""
+    """Show login form. Redirect to the correct portal if already logged in."""
     if request.session.get("user_id"):
-        return RedirectResponse("/admin/", status_code=303)
+        return RedirectResponse(
+            _portal_home_for_role(request.session.get("user_role")),
+            status_code=303,
+        )
     return templates.TemplateResponse("admin/login.html", {
         "request": request,
         "error": None,
     })
 
 
+@router.post("/login")
 @router.post("/admin/login")
 async def login_submit(
     request: Request,
@@ -99,10 +147,10 @@ async def login_submit(
             "error": "Account is disabled",
         }, status_code=403)
 
-    if user.role not in ("ppg_admin", "ppg_support"):
+    if user.role not in PPG_WEB_ROLES | CLIENT_WEB_ROLES:
         return templates.TemplateResponse("admin/login.html", {
             "request": request,
-            "error": "Admin access required",
+            "error": "Web portal access required",
         }, status_code=403)
 
     # Create session
@@ -115,9 +163,11 @@ async def login_submit(
     user.last_login = datetime.utcnow()
     await db.commit()
 
-    return RedirectResponse("/admin/", status_code=303)
+    return RedirectResponse(_portal_home_for_role(user.role), status_code=303)
 
 
+@router.get("/logout")
+@router.get("/client/logout")
 @router.get("/admin/logout")
 async def logout(request: Request):
     """Clear session and redirect to login."""

@@ -93,7 +93,7 @@ app.include_router(ws_router)
 # Include web routers
 from app.web.auth_web import router as auth_web_router
 from app.web.admin import router as admin_router
-from app.web.dashboard import router as dashboard_router
+from app.web.dashboard import router as dashboard_router, legacy_router as dashboard_legacy_router
 from app.web.users_web import router as users_web_router
 from app.web.mixing_web import router as mixing_web_router
 from app.web.crud_web import router as crud_web_router
@@ -101,6 +101,7 @@ from app.web.crud_web import router as crud_web_router
 app.include_router(auth_web_router)   # Login/logout (must be before admin)
 app.include_router(admin_router)
 app.include_router(dashboard_router)
+app.include_router(dashboard_legacy_router)
 app.include_router(users_web_router)
 app.include_router(mixing_web_router)
 app.include_router(crud_web_router)
@@ -125,9 +126,11 @@ async def debug_exception_handler(request: Request, exc: Exception):
 # ---- Root Routes ----
 
 @app.get("/")
-async def root():
-    """Redirect to admin portal."""
-    return RedirectResponse(url="/admin/")
+async def root(request: Request):
+    """Redirect to the correct web portal for the active session."""
+    from app.web.auth_web import _portal_home_for_role
+
+    return RedirectResponse(url=_portal_home_for_role(request.session.get("user_role")))
 
 
 @app.get("/health")
