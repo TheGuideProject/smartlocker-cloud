@@ -101,6 +101,10 @@
             No SmartLocker device installed on this vessel.
         </div>
         {% endif %}
+
+        <div style="margin-top: 14px;">
+            <a href="/client/vessels/{{ vessel.id }}" class="btn btn-primary" style="font-size: 13px; padding: 7px 14px;">Open vessel</a>
+        </div>
     </div>
     {% endfor %}
 </div>

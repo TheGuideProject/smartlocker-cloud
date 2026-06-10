@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}{{ vessel.name }} - Client Portal{% endblock %}
+{% block page_title %}
+<a href="/client/" style="color: var(--text-muted); text-decoration: none;">Client Portal</a> &rsaquo; {{ vessel.name }}
+{% endblock %}
+
+{% block nav %}
+<li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Client</li>
+<li><a href="/client/" class="active"><span class="nav-icon">&#9670;</span> Fleet Overview</a></li>
+<li class="nav-divider"></li>
+{% if is_ppg_staff %}
+<li><a href="/admin/"><span class="nav-icon">&#9671;</span> Admin Portal</a></li>
+{% endif %}
+<li><a href="/client/logout" style="color: var(--danger);"><span class="nav-icon">&#10140;</span> Logout</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="border-left: 3px solid var(--accent-blue); margin-bottom: 16px;">
+    <strong>Read-only client view</strong>
+    <span style="color: var(--text-muted); margin-left: 8px;">Stock changes and device configuration are managed by PPG.</span>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card"><div class="label">Total Liters</div><div class="value blue">{{ total_liters }}</div></div>
+    <div class="stat-card"><div class="label">Products</div><div class="value green">{{ product_count }}</div></div>
+    <div class="stat-card"><div class="label">Low Stock</div><div class="value {% if low_stock_count > 0 %}red{% else %}green{% endif %}">{{ low_stock_count }}</div></div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Vessel</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+        <div><div style="color: var(--text-muted); font-size: 12px;">Name</div><strong>{{ vessel.name }}</strong></div>
+        <div><div style="color: var(--text-muted); font-size: 12px;">IMO</div><strong>{{ vessel.imo_number or '-' }}</strong></div>
+        <div><div style="color: var(--text-muted); font-size: 12px;">Fleet</div><strong>{{ vessel.fleet.name if vessel.fleet else '-' }}</strong></div>
+        <div><div style="color: var(--text-muted); font-size: 12px;">Company</div><strong>{{ vessel.fleet.company.name if vessel.fleet and vessel.fleet.company else '-' }}</strong></div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Devices</div>
+    <table class="data-table">
+        <thead><tr><th>Device</th><th>Status</th><th>Version</th><th>Last seen</th></tr></thead>
+        <tbody>
+        {% for device in vessel.devices %}
+        <tr>
+            <td><strong>{{ device.name or device.device_id }}</strong></td>
+            <td><span class="status-badge {{ 'online' if device.is_online else 'offline' }}">{{ 'Online' if device.is_online else 'Offline' }}</span></td>
+            <td>{{ device.software_version or '-' }}</td>
+            <td>{{ device.last_seen_ago }}</td>
+        </tr>
+        {% endfor %}
+        {% if not vessel.devices %}
+        <tr><td colspan="4" style="color: var(--text-muted); text-align: center;">No SmartLocker device installed on this vessel.</td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Products On Board</div>
+    <table class="data-table">
+        <thead><tr><th>Product</th><th>Type</th><th>Liters</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for item in products %}
+        <tr>
+            <td><strong>{{ item.name }}</strong></td>
+            <td><span class="type-badge {{ item.product_type }}">{{ item.product_type_label }}</span></td>
+            <td><strong>{{ item.liters }} L</strong></td>
+            <td>
+                {% if item.low_stock %}<span style="color: var(--danger);">Low</span>
+                {% else %}<span style="color: var(--success);">OK</span>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not products %}
+        <tr><td colspan="4" style="color: var(--text-muted); text-align: center; padding: 20px;">No stock data available yet.</td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

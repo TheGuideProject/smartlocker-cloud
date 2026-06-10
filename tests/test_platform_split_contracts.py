@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from app.web.auth_web import _portal_home_for_role
 from app.web.dashboard import (
+    _client_can_access_company,
     _client_dashboard_company_scope,
     _client_dashboard_uses_global_support_scope,
 )
@@ -50,6 +51,19 @@ class PlatformSplitContractTest(unittest.TestCase):
                 device_ids=[],
             )
         )
+
+    def test_client_can_access_only_own_company(self):
+        user = SimpleNamespace(role="ship_owner", company_id="company-client")
+
+        self.assertTrue(_client_can_access_company(user, "company-client"))
+        self.assertFalse(_client_can_access_company(user, "company-other"))
+        self.assertFalse(_client_can_access_company(user, None))
+
+    def test_ppg_staff_can_access_any_client_company(self):
+        user = SimpleNamespace(role="ppg_support", company_id=None)
+
+        self.assertTrue(_client_can_access_company(user, "company-client"))
+        self.assertTrue(_client_can_access_company(user, None))
 
 
 if __name__ == "__main__":
