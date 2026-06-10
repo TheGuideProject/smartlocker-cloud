@@ -6,6 +6,7 @@ from app.web.auth_web import (
     _login_path_for_request_path,
     _portal_home_for_role,
 )
+from app.web import dashboard
 from app.web.dashboard import (
     _client_can_access_company,
     _client_dashboard_company_scope,
@@ -86,6 +87,28 @@ class PlatformSplitContractTest(unittest.TestCase):
         self.assertTrue(_client_support_uses_global_scope(is_ppg_staff=True, scoped_company_id=None))
         self.assertFalse(_client_support_uses_global_scope(is_ppg_staff=True, scoped_company_id="company-client"))
         self.assertFalse(_client_support_uses_global_scope(is_ppg_staff=False, scoped_company_id="company-client"))
+
+    def test_client_activity_global_scope_is_ppg_only(self):
+        uses_global_scope = getattr(dashboard, "_client_activity_uses_global_scope", None)
+
+        self.assertIsNotNone(uses_global_scope)
+        self.assertTrue(uses_global_scope(is_ppg_staff=True, scoped_company_id=None))
+        self.assertFalse(uses_global_scope(is_ppg_staff=True, scoped_company_id="company-client"))
+        self.assertFalse(uses_global_scope(is_ppg_staff=False, scoped_company_id="company-client"))
+
+    def test_client_activity_stats_count_events_and_devices(self):
+        activity_event_stats = getattr(dashboard, "_client_activity_event_stats", None)
+        events = [
+            SimpleNamespace(device_id="device-a", event_type="scan"),
+            SimpleNamespace(device_id="device-a", event_type="mixing_started"),
+            SimpleNamespace(device_id="device-b", event_type="scan"),
+        ]
+
+        self.assertIsNotNone(activity_event_stats)
+        self.assertEqual(
+            activity_event_stats(events),
+            {"total": 3, "devices": 2, "types": 2},
+        )
 
     def test_support_request_stats_count_open_and_resolved(self):
         requests = [

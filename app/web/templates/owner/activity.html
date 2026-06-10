@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Activity - Client Portal{% endblock %}
+{% block page_title %}
+<a href="/client/" style="color: var(--text-muted); text-decoration: none;">Client Portal</a> &rsaquo; Activity
+{% endblock %}
+
+{% block nav %}
+{% include "owner/_client_nav.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="border-left: 3px solid var(--accent-blue); margin-bottom: 16px;">
+    <strong>Client activity view</strong>
+    <span style="color: var(--text-muted); margin-left: 8px;">Read-only device events for the selected fleet scope.</span>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card"><div class="label">Events Shown</div><div class="value blue">{{ stats.total }}</div></div>
+    <div class="stat-card"><div class="label">Devices</div><div class="value teal">{{ stats.devices }}</div></div>
+    <div class="stat-card"><div class="label">Event Types</div><div class="value green">{{ stats.types }}</div></div>
+</div>
+
+<div class="panel">
+    <div class="flex justify-between items-center mb-3">
+        <div>
+            <div class="panel-title" style="margin-bottom: 4px;">Fleet Activity</div>
+            <div style="color: var(--text-muted); font-size: 13px;">Latest 200 synced events, newest first.</div>
+        </div>
+        <a href="/client/" class="btn btn-secondary" style="font-size: 13px;">Back to fleet</a>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Device</th>
+                <th>Type</th>
+                <th>User</th>
+                <th>Location</th>
+                <th>Reference</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for event in events %}
+        <tr>
+            <td style="white-space: nowrap;">
+                <span class="font-mono" style="font-size: 12px;">{{ event.timestamp.strftime('%Y-%m-%d %H:%M') if event.timestamp else '-' }}</span>
+            </td>
+            <td>
+                <strong>{{ event.device.name or event.device.device_id if event.device else event.device_id }}</strong>
+            </td>
+            <td>
+                <span class="type-badge" style="background: rgba(96,165,250,0.12); color: var(--info-text);">
+                    {{ event.event_type.replace('_', ' ').title() if event.event_type else '-' }}
+                </span>
+            </td>
+            <td>{{ event.user_name or '-' }}</td>
+            <td style="font-size: 13px; color: var(--text-secondary);">
+                {% if event.shelf_id %}Shelf {{ event.shelf_id }}{% endif %}
+                {% if event.slot_id %}{% if event.shelf_id %} &middot; {% endif %}Slot {{ event.slot_id }}{% endif %}
+                {% if not event.shelf_id and not event.slot_id %}-{% endif %}
+            </td>
+            <td style="font-size: 13px; color: var(--text-secondary);">
+                {% if event.tag_id %}Tag {{ event.tag_id[:12] }}{% endif %}
+                {% if event.session_id %}{% if event.tag_id %}<br>{% endif %}Session {{ event.session_id[:8] }}{% endif %}
+                {% if not event.tag_id and not event.session_id %}-{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not events %}
+        <tr><td colspan="6" style="color: var(--text-muted); text-align: center; padding: 28px;">No synced activity for this fleet scope.</td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

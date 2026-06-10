@@ -55,6 +55,11 @@ def _client_support_uses_global_scope(is_ppg_staff: bool, scoped_company_id: str
     return is_ppg_staff and not scoped_company_id
 
 
+def _client_activity_uses_global_scope(is_ppg_staff: bool, scoped_company_id: str | None) -> bool:
+    """Return True only for PPG's unfiltered activity preview."""
+    return is_ppg_staff and not scoped_company_id
+
+
 def _support_request_stats(support_requests: list) -> dict:
     """Build compact support stats for the client portal."""
     open_count = sum(1 for request in support_requests if request.status in {"open", "in_progress"})
@@ -62,6 +67,17 @@ def _support_request_stats(support_requests: list) -> dict:
         "total": len(support_requests),
         "open": open_count,
         "resolved": len(support_requests) - open_count,
+    }
+
+
+def _client_activity_event_stats(events: list) -> dict:
+    """Build compact event stats for the client activity view."""
+    device_ids = {event.device_id for event in events if getattr(event, "device_id", None)}
+    event_types = {event.event_type for event in events if getattr(event, "event_type", None)}
+    return {
+        "total": len(events),
+        "devices": len(device_ids),
+        "types": len(event_types),
     }
 
 
@@ -316,6 +332,57 @@ async def client_support_requests(
         "devices": devices,
         "support_requests": support_requests,
         "stats": _support_request_stats(support_requests),
+    })
+
+
+@router.get("/activity", response_class=HTMLResponse)
+async def client_activity(
+    request: Request,
+    company_id: str = Query(None),
+    current_user = Depends(require_client_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read-only fleet activity feed for the client portal."""
+    scoped_company_id = _client_dashboard_company_scope(current_user, company_id)
+    is_ppg_staff = current_user.role in PPG_WEB_ROLES
+
+    devices = []
+    if is_ppg_staff or scoped_company_id:
+        device_query = (
+            select(LockerDevice)
+            .options(selectinload(LockerDevice.vessel).selectinload(Vessel.fleet).selectinload(Fleet.company))
+            .join(Vessel)
+            .join(Fleet)
+        )
+        if scoped_company_id:
+            device_query = device_query.where(Fleet.company_id == scoped_company_id)
+        devices_result = await db.execute(device_query.order_by(LockerDevice.device_id))
+        devices = devices_result.scalars().unique().all()
+
+    device_ids = [device.id for device in devices]
+    events = []
+    show_global_activity = _client_activity_uses_global_scope(is_ppg_staff, scoped_company_id)
+    if show_global_activity or device_ids:
+        event_query = (
+            select(DeviceEvent)
+            .options(selectinload(DeviceEvent.device))
+            .order_by(desc(DeviceEvent.timestamp))
+            .limit(200)
+        )
+        if device_ids:
+            event_query = event_query.where(DeviceEvent.device_id.in_(device_ids))
+        events_result = await db.execute(event_query)
+        events = events_result.scalars().all()
+
+    return templates.TemplateResponse("owner/activity.html", {
+        "request": request,
+        "current_user": current_user,
+        "is_ppg_staff": is_ppg_staff,
+        "active": "client_activity",
+        "company_id": scoped_company_id,
+        "devices": devices,
+        "events": events,
+        "stats": _client_activity_event_stats(events),
     })
 
 
