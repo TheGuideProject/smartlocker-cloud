@@ -1,4 +1,4 @@
-"""Company model - Ship owners / fleet operators."""
+"""Company model - Client companies and fleet operators."""
 
 import uuid
 from datetime import datetime

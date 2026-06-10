@@ -6,12 +6,12 @@
 {% endblock %}
 
 {% block nav %}
-{% include "owner/_client_nav.html" %}
+{% include "client/_client_nav.html" %}
 {% endblock %}
 
 {% block content %}
-{% include "owner/_scope_summary.html" %}
-{% include "owner/_company_selector.html" %}
+{% include "client/_scope_summary.html" %}
+{% include "client/_company_selector.html" %}
 
 {% if success %}
 <div class="panel" style="border-left: 3px solid var(--accent-green); margin-bottom: 15px; padding: 12px 20px;">

@@ -111,6 +111,12 @@ class UserManagementContractTest(unittest.TestCase):
         self.assertIn("Required for Client Admin and Crew", users_template)
         self.assertIn("Client Admin", users_template)
 
+    def test_company_model_uses_client_company_language(self):
+        source = (CLOUD_ROOT / "app" / "models" / "company.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("Ship owners", source)
+        self.assertIn("Client companies", source)
+
     def test_users_route_attaches_portal_context_for_table(self):
         source = (CLOUD_ROOT / "app" / "web" / "users_web.py").read_text(encoding="utf-8")
 

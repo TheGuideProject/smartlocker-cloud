@@ -57,8 +57,13 @@ class BarcodeAdminContractTest(unittest.TestCase):
 
         self.assertNotIn("Owner dashboard", guide)
         self.assertNotIn("Owner Dashboard", guide)
+        self.assertNotIn("Ship owners", guide)
+        self.assertNotIn("ship owners", guide)
         self.assertIn("Client portal with fleet data", guide)
         self.assertIn("Client portal with real fleet statistics", guide)
+        self.assertIn("Client teams use", guide)
+        self.assertIn("Client Portal", guide)
+        self.assertIn("PPG Portal", guide)
 
 
 class InventoryAdminContractTest(unittest.TestCase):

@@ -6,12 +6,12 @@
 {% endblock %}
 
 {% block nav %}
-{% include "owner/_client_nav.html" %}
+{% include "client/_client_nav.html" %}
 {% endblock %}
 
 {% block content %}
-{% include "owner/_scope_summary.html" %}
-{% include "owner/_company_selector.html" %}
+{% include "client/_scope_summary.html" %}
+{% include "client/_company_selector.html" %}
 
 <div class="stats-grid">
     <div class="stat-card"><div class="label">Events Shown</div><div class="value blue">{{ stats.total }}</div></div>

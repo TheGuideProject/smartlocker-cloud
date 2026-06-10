@@ -363,7 +363,7 @@ async def legacy_dashboard_redirect():
 
 
 @router.get("/", response_class=HTMLResponse)
-async def owner_dashboard(
+async def client_dashboard(
     request: Request,
     company_id: str = Query(None),
     current_user = Depends(require_client_session),
@@ -457,7 +457,7 @@ async def owner_dashboard(
     # ---- Build device lookup by vessel id for template ----
     # Already loaded via selectinload on vessels
 
-    return templates.TemplateResponse("owner/dashboard.html", {
+    return templates.TemplateResponse("client/dashboard.html", {
         "request": request,
         "vessels": vessels,
         "total_vessels": total_vessels,
@@ -532,7 +532,7 @@ async def client_support_requests(
         company_selector_options,
     )
 
-    return templates.TemplateResponse("owner/support.html", {
+    return templates.TemplateResponse("client/support.html", {
         "request": request,
         "current_user": current_user,
         "is_ppg_staff": is_ppg_staff,
@@ -661,7 +661,7 @@ async def client_activity(
         company_selector_options,
     )
 
-    return templates.TemplateResponse("owner/activity.html", {
+    return templates.TemplateResponse("client/activity.html", {
         "request": request,
         "current_user": current_user,
         "is_ppg_staff": is_ppg_staff,
@@ -702,7 +702,7 @@ async def client_vessel_detail(
     inventory = await _client_vessel_inventory_context(db, vessel)
     is_ppg_staff = current_user.role in PPG_WEB_ROLES
 
-    return templates.TemplateResponse("owner/vessel_detail.html", {
+    return templates.TemplateResponse("client/vessel_detail.html", {
         "request": request,
         "current_user": current_user,
         "is_ppg_staff": is_ppg_staff,
