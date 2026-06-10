@@ -1,0 +1,18 @@
+{% if is_ppg_staff %}
+<div class="panel" style="border-left: 3px solid var(--accent-blue); margin-bottom: 16px;">
+    <form method="get" action="{{ request.url.path }}" style="display: flex; gap: 12px; align-items: end; flex-wrap: wrap;">
+        <div style="min-width: 240px; flex: 1;">
+            <label for="company_id" style="display: block; color: var(--text-muted); font-size: 12px; margin-bottom: 6px;">Client preview</label>
+            <select id="company_id" name="company_id" onchange="this.form.submit()" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text);">
+                <option value="" {% if not company_id %}selected{% endif %}>All companies</option>
+                {% for option in company_selector_options %}
+                {% if option.id %}
+                <option value="{{ option.id }}" {% if option.selected %}selected{% endif %}>{{ option.name }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary" style="font-size: 13px;">Apply</button>
+    </form>
+</div>
+{% endif %}

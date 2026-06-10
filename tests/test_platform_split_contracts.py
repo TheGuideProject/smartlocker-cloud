@@ -65,6 +65,20 @@ class PlatformSplitContractTest(unittest.TestCase):
             "company-client",
         )
 
+    def test_client_company_selector_has_all_companies_and_selected_company(self):
+        selector_options = getattr(dashboard, "_client_company_selector_options", None)
+        companies = [
+            SimpleNamespace(id="company-a", name="Alpha Marine"),
+            SimpleNamespace(id="company-b", name="Beta Shipping"),
+        ]
+
+        self.assertIsNotNone(selector_options)
+        options = selector_options(companies, scoped_company_id="company-b")
+
+        self.assertEqual(options[0], {"id": "", "name": "All companies", "selected": False})
+        self.assertEqual(options[1], {"id": "company-a", "name": "Alpha Marine", "selected": False})
+        self.assertEqual(options[2], {"id": "company-b", "name": "Beta Shipping", "selected": True})
+
     def test_ppg_preview_for_empty_company_does_not_show_global_support(self):
         self.assertFalse(
             _client_dashboard_uses_global_support_scope(

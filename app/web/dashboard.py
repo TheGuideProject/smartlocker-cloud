@@ -60,6 +60,23 @@ def _client_activity_uses_global_scope(is_ppg_staff: bool, scoped_company_id: st
     return is_ppg_staff and not scoped_company_id
 
 
+def _client_company_selector_options(companies: list, scoped_company_id: str | None) -> list[dict]:
+    """Build company selector options for PPG client-portal previews."""
+    options = [{
+        "id": "",
+        "name": "All companies",
+        "selected": not scoped_company_id,
+    }]
+    for company in companies:
+        company_id = getattr(company, "id", "")
+        options.append({
+            "id": company_id,
+            "name": getattr(company, "name", company_id),
+            "selected": company_id == scoped_company_id,
+        })
+    return options
+
+
 def _support_request_stats(support_requests: list) -> dict:
     """Build compact support stats for the client portal."""
     open_count = sum(1 for request in support_requests if request.status in {"open", "in_progress"})
@@ -176,6 +193,18 @@ async def _client_vessel_inventory_context(db: AsyncSession, vessel: Vessel) -> 
     }
 
 
+async def _client_company_selector_context(
+    db: AsyncSession,
+    is_ppg_staff: bool,
+    scoped_company_id: str | None,
+) -> list[dict]:
+    """Return company selector options when PPG previews the client portal."""
+    if not is_ppg_staff:
+        return []
+    companies_result = await db.execute(select(Company).order_by(Company.name))
+    return _client_company_selector_options(companies_result.scalars().all(), scoped_company_id)
+
+
 @legacy_router.get("/", response_class=HTMLResponse)
 async def legacy_dashboard_redirect():
     """Keep old dashboard links working while the client portal moves to /client."""
@@ -263,6 +292,11 @@ async def owner_dashboard(
 
     # ---- Event count for summary ----
     event_count_24h = len(recent_events)
+    company_selector_options = await _client_company_selector_context(
+        db,
+        is_ppg_staff,
+        scoped_company_id,
+    )
 
     # ---- Build device lookup by vessel id for template ----
     # Already loaded via selectinload on vessels
@@ -278,6 +312,7 @@ async def owner_dashboard(
         "support_requests": support_requests,
         "event_count_24h": event_count_24h,
         "company_id": scoped_company_id,
+        "company_selector_options": company_selector_options,
         "current_user": current_user,
         "is_ppg_staff": is_ppg_staff,
         "active": "client_dashboard",
@@ -322,6 +357,11 @@ async def client_support_requests(
             support_query = support_query.where(SupportRequest.device_id.in_(edge_device_ids))
         support_result = await db.execute(support_query)
         support_requests = support_result.scalars().all()
+    company_selector_options = await _client_company_selector_context(
+        db,
+        is_ppg_staff,
+        scoped_company_id,
+    )
 
     return templates.TemplateResponse("owner/support.html", {
         "request": request,
@@ -329,6 +369,7 @@ async def client_support_requests(
         "is_ppg_staff": is_ppg_staff,
         "active": "client_support",
         "company_id": scoped_company_id,
+        "company_selector_options": company_selector_options,
         "devices": devices,
         "support_requests": support_requests,
         "stats": _support_request_stats(support_requests),
@@ -373,6 +414,11 @@ async def client_activity(
             event_query = event_query.where(DeviceEvent.device_id.in_(device_ids))
         events_result = await db.execute(event_query)
         events = events_result.scalars().all()
+    company_selector_options = await _client_company_selector_context(
+        db,
+        is_ppg_staff,
+        scoped_company_id,
+    )
 
     return templates.TemplateResponse("owner/activity.html", {
         "request": request,
@@ -380,6 +426,7 @@ async def client_activity(
         "is_ppg_staff": is_ppg_staff,
         "active": "client_activity",
         "company_id": scoped_company_id,
+        "company_selector_options": company_selector_options,
         "devices": devices,
         "events": events,
         "stats": _client_activity_event_stats(events),

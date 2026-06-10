@@ -12,6 +12,21 @@ class ClientTemplateContractTest(unittest.TestCase):
 
             self.assertIn('{% include "owner/_client_nav.html" %}', template)
 
+    def test_client_list_pages_use_company_selector_partial(self):
+        for template_name in ["dashboard.html", "support.html", "activity.html"]:
+            with self.subTest(template=template_name):
+                template = (TEMPLATE_ROOT / "owner" / template_name).read_text(encoding="utf-8")
+                self.assertIn('{% include "owner/_company_selector.html" %}', template)
+
+    def test_company_selector_is_ppg_only_and_uses_company_id(self):
+        partial = (TEMPLATE_ROOT / "owner" / "_company_selector.html").read_text(encoding="utf-8")
+
+        self.assertIn("{% if is_ppg_staff %}", partial)
+        self.assertIn('method="get"', partial)
+        self.assertIn('name="company_id"', partial)
+        self.assertIn('value=""', partial)
+        self.assertIn("company_selector_options", partial)
+
     def test_shared_client_navigation_links_core_client_pages(self):
         nav = (TEMPLATE_ROOT / "owner" / "_client_nav.html").read_text(encoding="utf-8")
 
