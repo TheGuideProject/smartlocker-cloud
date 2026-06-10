@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Support - Client Portal{% endblock %}
+{% block page_title %}
+<a href="/client/" style="color: var(--text-muted); text-decoration: none;">Client Portal</a> &rsaquo; Support
+{% endblock %}
+
+{% block nav %}
+<li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Client</li>
+<li><a href="/client/" class="{% if active == 'client_dashboard' %}active{% endif %}"><span class="nav-icon">&#9670;</span> Fleet Overview</a></li>
+<li><a href="/client/support" class="{% if active == 'client_support' %}active{% endif %}"><span class="nav-icon">&#9888;</span> Support</a></li>
+<li class="nav-divider"></li>
+{% if is_ppg_staff %}
+<li><a href="/admin/"><span class="nav-icon">&#9671;</span> Admin Portal</a></li>
+{% endif %}
+<li><a href="/client/logout" style="color: var(--danger);"><span class="nav-icon">&#10140;</span> Logout</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="border-left: 3px solid var(--accent-blue); margin-bottom: 16px;">
+    <strong>Client support view</strong>
+    <span style="color: var(--text-muted); margin-left: 8px;">Tickets are created from SmartLocker devices and handled by PPG support.</span>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card"><div class="label">Total Tickets</div><div class="value blue">{{ stats.total }}</div></div>
+    <div class="stat-card"><div class="label">Open</div><div class="value {% if stats.open > 0 %}red{% else %}green{% endif %}">{{ stats.open }}</div></div>
+    <div class="stat-card"><div class="label">Resolved / Closed</div><div class="value green">{{ stats.resolved }}</div></div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Support Tickets</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Device</th>
+                <th>Error</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Requested By</th>
+                <th>Resolution</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for sr in support_requests %}
+        <tr>
+            <td style="white-space: nowrap; font-size: 12px;">{{ sr.created_at.strftime('%Y-%m-%d %H:%M') if sr.created_at else '-' }}</td>
+            <td>
+                <strong>{{ sr.device.name or sr.device_id if sr.device else sr.device_id }}</strong>
+            </td>
+            <td>
+                <strong style="font-family: monospace;">{{ sr.error_code }}</strong>
+                <br><small style="color: var(--text-muted);">{{ sr.error_title or '-' }}</small>
+            </td>
+            <td>
+                <span class="status-badge {{ 'offline' if sr.severity == 'critical' else ('delayed' if sr.severity == 'warning' else 'online') }}">
+                    {{ sr.severity|upper if sr.severity else '-' }}
+                </span>
+            </td>
+            <td>
+                {% if sr.status == 'open' %}
+                <span style="color: var(--accent-red); font-weight: 600;">Open</span>
+                {% elif sr.status == 'in_progress' %}
+                <span style="color: var(--accent-orange); font-weight: 600;">In Progress</span>
+                {% elif sr.status == 'resolved' %}
+                <span style="color: var(--accent-green); font-weight: 600;">Resolved</span>
+                {% else %}
+                <span style="color: var(--text-muted);">{{ sr.status_label }}</span>
+                {% endif %}
+            </td>
+            <td>{{ sr.user_name or 'Crew' }}</td>
+            <td style="max-width: 260px; color: var(--text-secondary);">
+                {{ sr.resolution_notes or sr.details or '-' }}
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not support_requests %}
+        <tr><td colspan="7" style="color: var(--text-muted); text-align: center; padding: 28px;">No support tickets for your fleet.</td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

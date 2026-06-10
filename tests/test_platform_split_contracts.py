@@ -10,6 +10,8 @@ from app.web.dashboard import (
     _client_can_access_company,
     _client_dashboard_company_scope,
     _client_dashboard_uses_global_support_scope,
+    _client_support_uses_global_scope,
+    _support_request_stats,
 )
 
 
@@ -78,6 +80,24 @@ class PlatformSplitContractTest(unittest.TestCase):
                 scoped_company_id=None,
                 device_ids=[],
             )
+        )
+
+    def test_client_support_global_scope_is_ppg_only(self):
+        self.assertTrue(_client_support_uses_global_scope(is_ppg_staff=True, scoped_company_id=None))
+        self.assertFalse(_client_support_uses_global_scope(is_ppg_staff=True, scoped_company_id="company-client"))
+        self.assertFalse(_client_support_uses_global_scope(is_ppg_staff=False, scoped_company_id="company-client"))
+
+    def test_support_request_stats_count_open_and_resolved(self):
+        requests = [
+            SimpleNamespace(status="open"),
+            SimpleNamespace(status="in_progress"),
+            SimpleNamespace(status="resolved"),
+            SimpleNamespace(status="closed"),
+        ]
+
+        self.assertEqual(
+            _support_request_stats(requests),
+            {"total": 4, "open": 2, "resolved": 2},
         )
 
     def test_client_can_access_only_own_company(self):
