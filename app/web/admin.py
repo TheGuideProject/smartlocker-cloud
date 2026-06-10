@@ -207,8 +207,8 @@ def _ppg_dashboard_quick_actions(open_support_count: int, offline_device_count: 
             "tone": "primary",
         },
         {
-            "label": "Client portal preview",
-            "href": "/client/",
+            "label": "Client preview",
+            "href": "/admin/client-preview",
             "detail": "Open the client-facing read-only platform.",
             "badge": "client",
             "tone": "info",
@@ -2336,7 +2336,7 @@ def _support_request_client_context(support_request) -> dict:
         "company_name": getattr(company, "name", None) or "Unknown client",
         "vessel_name": getattr(vessel, "name", None) or "Unknown vessel",
         "device_label": device_label,
-        "client_href": f"/client/?company_id={company_id}" if company_id else None,
+        "client_href": f"/admin/client-preview?company_id={company_id}" if company_id else None,
     }
 
 

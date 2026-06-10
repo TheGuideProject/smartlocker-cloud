@@ -18,15 +18,16 @@ class PpgDashboardContractTest(unittest.TestCase):
         self.assertEqual(actions[1]["href"], "/admin/devices")
         self.assertEqual(actions[1]["badge"], "2 offline")
 
-    def test_client_portal_preview_is_always_available(self):
+    def test_client_preview_is_always_available_inside_the_ppg_portal(self):
         actions = _ppg_dashboard_quick_actions(
             open_support_count=0,
             offline_device_count=0,
         )
 
-        self.assertTrue(any(action["href"] == "/client/" for action in actions))
-        client_preview = next(action for action in actions if action["href"] == "/client/")
+        self.assertTrue(any(action["href"] == "/admin/client-preview" for action in actions))
+        client_preview = next(action for action in actions if action["href"] == "/admin/client-preview")
         self.assertEqual(client_preview["detail"], "Open the client-facing read-only platform.")
+        self.assertFalse(any(action["href"].startswith("/client") for action in actions))
 
     def test_quick_actions_stay_small_enough_to_scan(self):
         actions = _ppg_dashboard_quick_actions(

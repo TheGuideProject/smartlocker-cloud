@@ -93,6 +93,7 @@ app.include_router(ws_router)
 # Include web routers
 from app.web.auth_web import router as auth_web_router
 from app.web.admin import router as admin_router
+from app.web.client_preview import router as client_preview_router
 from app.web.dashboard import router as dashboard_router, legacy_router as dashboard_legacy_router
 from app.web.users_web import router as users_web_router
 from app.web.mixing_web import router as mixing_web_router
@@ -100,11 +101,46 @@ from app.web.crud_web import router as crud_web_router
 
 app.include_router(auth_web_router)   # Login/logout (must be before admin)
 app.include_router(admin_router)
+app.include_router(client_preview_router)
 app.include_router(dashboard_router)
 app.include_router(dashboard_legacy_router)
 app.include_router(users_web_router)
 app.include_router(mixing_web_router)
 app.include_router(crud_web_router)
+
+
+# ---- Standalone Client Portal Redirect ----
+
+def _external_client_portal_redirect(path: str, query: str, portal_url: str) -> str | None:
+    """Return the standalone client-portal URL for a /client/* request.
+
+    Returns None when no standalone portal is configured or the path does
+    not belong to the client portal. Used to hop over to the separate
+    client-portal deployment once CLIENT_PORTAL_URL is set.
+    """
+    clean_portal_url = (portal_url or "").strip().rstrip("/")
+    if not clean_portal_url:
+        return None
+    if not (path.startswith("/client") or path.startswith("/dashboard")):
+        return None
+
+    target = f"{clean_portal_url}{path}"
+    if query:
+        target = f"{target}?{query}"
+    return target
+
+
+@app.middleware("http")
+async def client_portal_redirect_middleware(request: Request, call_next):
+    """Send /client/* traffic to the standalone client portal when configured."""
+    target = _external_client_portal_redirect(
+        request.url.path,
+        request.url.query,
+        settings.CLIENT_PORTAL_URL,
+    )
+    if target:
+        return RedirectResponse(target, status_code=307)
+    return await call_next(request)
 
 
 # ---- Error Handler (shows traceback in browser for debugging) ----
@@ -146,7 +182,7 @@ def _portal_entry_options() -> list[dict]:
         },
         {
             "label": "Client Portal",
-            "href": "/client/login",
+            "href": settings.CLIENT_PORTAL_URL.strip().rstrip("/") + "/client/login" if settings.CLIENT_PORTAL_URL.strip() else "/client/login",
             "badge": "Client access",
             "detail": "Review vessel stock, SmartLocker status, activity, and support requests.",
         },

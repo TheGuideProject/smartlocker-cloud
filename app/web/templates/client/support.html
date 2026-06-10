@@ -2,7 +2,7 @@
 
 {% block title %}Support - Client Portal{% endblock %}
 {% block page_title %}
-<a href="/client/{% if company_id %}?company_id={{ company_id }}{% endif %}" style="color: var(--text-muted); text-decoration: none;">Client Portal</a> &rsaquo; Support
+<a href="/client/" style="color: var(--text-muted); text-decoration: none;">Client Portal</a> &rsaquo; Support
 {% endblock %}
 
 {% block nav %}
@@ -11,7 +11,6 @@
 
 {% block content %}
 {% include "client/_scope_summary.html" %}
-{% include "client/_company_selector.html" %}
 
 {% if success %}
 <div class="panel" style="border-left: 3px solid var(--accent-green); margin-bottom: 15px; padding: 12px 20px;">
@@ -30,7 +29,6 @@
     <div class="stat-card"><div class="label">Resolved / Closed</div><div class="value green">{{ stats.resolved }}</div></div>
 </div>
 
-{% if not is_ppg_staff %}
 <div class="panel">
     <div class="panel-title">Request PPG Support</div>
     {% if devices %}
@@ -70,7 +68,6 @@
     <div style="color: var(--text-muted); font-size: 14px;">No SmartLocker devices are linked to your company yet.</div>
     {% endif %}
 </div>
-{% endif %}
 
 <div class="panel">
     <div class="panel-title">Support Tickets</div>

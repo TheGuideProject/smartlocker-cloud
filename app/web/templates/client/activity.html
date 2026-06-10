@@ -2,7 +2,7 @@
 
 {% block title %}Activity - Client Portal{% endblock %}
 {% block page_title %}
-<a href="/client/{% if company_id %}?company_id={{ company_id }}{% endif %}" style="color: var(--text-muted); text-decoration: none;">Client Portal</a> &rsaquo; Activity
+<a href="/client/" style="color: var(--text-muted); text-decoration: none;">Client Portal</a> &rsaquo; Activity
 {% endblock %}
 
 {% block nav %}
@@ -11,7 +11,6 @@
 
 {% block content %}
 {% include "client/_scope_summary.html" %}
-{% include "client/_company_selector.html" %}
 
 <div class="stats-grid">
     <div class="stat-card"><div class="label">Events Shown</div><div class="value blue">{{ stats.total }}</div></div>
@@ -25,7 +24,7 @@
             <div class="panel-title" style="margin-bottom: 4px;">Fleet Activity</div>
             <div style="color: var(--text-muted); font-size: 13px;">Latest 200 synced events, newest first.</div>
         </div>
-        <a href="/client/{% if company_id %}?company_id={{ company_id }}{% endif %}" class="btn btn-secondary" style="font-size: 13px;">Back to fleet</a>
+        <a href="/client/" class="btn btn-secondary" style="font-size: 13px;">Back to fleet</a>
     </div>
 
     <table class="data-table">

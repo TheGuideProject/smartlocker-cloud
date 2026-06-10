@@ -24,7 +24,7 @@ class PpgSupportContractTest(unittest.TestCase):
                 "company_name": "Med Toscana",
                 "vessel_name": "Vessel One",
                 "device_label": "Locker Bridge",
-                "client_href": "/client/?company_id=company-123",
+                "client_href": "/admin/client-preview?company_id=company-123",
             },
         )
 

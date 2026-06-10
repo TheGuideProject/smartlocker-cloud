@@ -10,8 +10,6 @@ from app.web import dashboard
 from app.web.dashboard import (
     _client_can_access_company,
     _client_dashboard_company_scope,
-    _client_dashboard_uses_global_support_scope,
-    _client_support_uses_global_scope,
     _support_request_stats,
 )
 
@@ -57,62 +55,20 @@ class PlatformSplitContractTest(unittest.TestCase):
             "company-client",
         )
 
-    def test_ppg_dashboard_preview_can_choose_company_scope(self):
-        user = SimpleNamespace(role="ppg_admin", company_id=None)
-
-        self.assertEqual(
-            _client_dashboard_company_scope(user, requested_company_id="company-client"),
-            "company-client",
-        )
-
-    def test_client_company_selector_has_all_companies_and_selected_company(self):
-        selector_options = getattr(dashboard, "_client_company_selector_options", None)
-        companies = [
-            SimpleNamespace(id="company-a", name="Alpha Marine"),
-            SimpleNamespace(id="company-b", name="Beta Shipping"),
-        ]
-
-        self.assertIsNotNone(selector_options)
-        options = selector_options(companies, scoped_company_id="company-b")
-
-        self.assertEqual(options[0], {"id": "", "name": "All companies", "selected": False})
-        self.assertEqual(options[1], {"id": "company-a", "name": "Alpha Marine", "selected": False})
-        self.assertEqual(options[2], {"id": "company-b", "name": "Beta Shipping", "selected": True})
-
-    def test_client_scope_summary_describes_client_and_ppg_preview(self):
+    def test_client_scope_summary_describes_the_client_view(self):
         scope_summary = getattr(dashboard, "_client_scope_summary", None)
-        options = [
-            {"id": "", "name": "All companies", "selected": False},
-            {"id": "company-a", "name": "Alpha Marine", "selected": True},
-        ]
 
         self.assertIsNotNone(scope_summary)
         self.assertEqual(
-            scope_summary(is_ppg_staff=False, scoped_company_id="company-a", selector_options=[]),
+            scope_summary(),
             {
                 "title": "Client view",
                 "detail": "Showing only vessels linked to your company.",
                 "badge": "client",
             },
         )
-        self.assertEqual(
-            scope_summary(is_ppg_staff=True, scoped_company_id=None, selector_options=options),
-            {
-                "title": "PPG preview",
-                "detail": "Showing all client companies.",
-                "badge": "preview",
-            },
-        )
-        self.assertEqual(
-            scope_summary(is_ppg_staff=True, scoped_company_id="company-a", selector_options=options),
-            {
-                "title": "PPG preview",
-                "detail": "Showing Alpha Marine only.",
-                "badge": "preview",
-            },
-        )
 
-    def test_client_dashboard_quick_actions_preserve_company_scope(self):
+    def test_client_dashboard_quick_actions_use_company_free_links(self):
         quick_actions = getattr(dashboard, "_client_dashboard_quick_actions", None)
         vessels = [SimpleNamespace(id="vessel-1")]
         support_requests = [SimpleNamespace(status="open")]
@@ -121,23 +77,22 @@ class PlatformSplitContractTest(unittest.TestCase):
         actions = quick_actions(
             vessels=vessels,
             support_requests=support_requests,
-            scoped_company_id="company-client",
         )
 
         self.assertEqual(actions[0]["label"], "Open first vessel")
-        self.assertEqual(actions[0]["href"], "/client/vessels/vessel-1?company_id=company-client")
+        self.assertEqual(actions[0]["href"], "/client/vessels/vessel-1")
         self.assertEqual(actions[1]["label"], "Support")
-        self.assertEqual(actions[1]["href"], "/client/support?company_id=company-client")
+        self.assertEqual(actions[1]["href"], "/client/support")
         self.assertEqual(actions[1]["detail"], "Open tickets, device issues, and client requests.")
         self.assertEqual(actions[1]["badge"], "1 open")
         self.assertEqual(actions[2]["label"], "Activity")
-        self.assertEqual(actions[2]["href"], "/client/activity?company_id=company-client")
+        self.assertEqual(actions[2]["href"], "/client/activity")
 
     def test_client_dashboard_quick_actions_cover_empty_fleet(self):
         quick_actions = getattr(dashboard, "_client_dashboard_quick_actions", None)
 
         self.assertIsNotNone(quick_actions)
-        actions = quick_actions(vessels=[], support_requests=[], scoped_company_id=None)
+        actions = quick_actions(vessels=[], support_requests=[])
 
         self.assertEqual(actions[0]["label"], "No vessels yet")
         self.assertEqual(actions[0]["href"], "")
@@ -181,37 +136,6 @@ class PlatformSplitContractTest(unittest.TestCase):
                 "tone": "warning",
             },
         )
-
-    def test_ppg_preview_for_empty_company_does_not_show_global_support(self):
-        self.assertFalse(
-            _client_dashboard_uses_global_support_scope(
-                is_ppg_staff=True,
-                scoped_company_id="company-client",
-                device_ids=[],
-            )
-        )
-
-    def test_ppg_global_client_preview_can_show_global_support(self):
-        self.assertTrue(
-            _client_dashboard_uses_global_support_scope(
-                is_ppg_staff=True,
-                scoped_company_id=None,
-                device_ids=[],
-            )
-        )
-
-    def test_client_support_global_scope_is_ppg_only(self):
-        self.assertTrue(_client_support_uses_global_scope(is_ppg_staff=True, scoped_company_id=None))
-        self.assertFalse(_client_support_uses_global_scope(is_ppg_staff=True, scoped_company_id="company-client"))
-        self.assertFalse(_client_support_uses_global_scope(is_ppg_staff=False, scoped_company_id="company-client"))
-
-    def test_client_activity_global_scope_is_ppg_only(self):
-        uses_global_scope = getattr(dashboard, "_client_activity_uses_global_scope", None)
-
-        self.assertIsNotNone(uses_global_scope)
-        self.assertTrue(uses_global_scope(is_ppg_staff=True, scoped_company_id=None))
-        self.assertFalse(uses_global_scope(is_ppg_staff=True, scoped_company_id="company-client"))
-        self.assertFalse(uses_global_scope(is_ppg_staff=False, scoped_company_id="company-client"))
 
     def test_client_activity_stats_count_events_and_devices(self):
         activity_event_stats = getattr(dashboard, "_client_activity_event_stats", None)
@@ -277,11 +201,11 @@ class PlatformSplitContractTest(unittest.TestCase):
         self.assertFalse(_client_can_access_company(user, "company-other"))
         self.assertFalse(_client_can_access_company(user, None))
 
-    def test_ppg_staff_can_access_any_client_company(self):
+    def test_ppg_staff_no_longer_access_companies_via_client_portal(self):
         user = SimpleNamespace(role="ppg_support", company_id=None)
 
-        self.assertTrue(_client_can_access_company(user, "company-client"))
-        self.assertTrue(_client_can_access_company(user, None))
+        self.assertFalse(_client_can_access_company(user, "company-client"))
+        self.assertFalse(_client_can_access_company(user, None))
 
 
 if __name__ == "__main__":

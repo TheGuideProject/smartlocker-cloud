@@ -1,25 +1,30 @@
-"""Client Portal - Read-only fleet and support views."""
+"""Client Portal - Read-only fleet and support views.
+
+This portal is for client roles only (ship_owner, crew). PPG staff are
+redirected to /admin/ by require_client_session and preview client data
+from /admin/client-preview instead. Every query here is scoped to the
+authenticated user's own company; company_id query parameters are ignored.
+"""
 
 import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request, Depends, Form, Query
+from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, func, and_, desc
+from sqlalchemy import select, and_, desc
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.company import Company
 from app.models.fleet import Fleet, Vessel
 from app.models.device import LockerDevice
 from app.models.event import DeviceEvent
 from app.models.inventory import InventoryAdjustment
 from app.models.product import Product
 from app.models.support_request import SupportRequest
-from app.web.auth_web import PPG_WEB_ROLES, require_client_session
+from app.web.auth_web import require_client_session
 
 logger = logging.getLogger("smartlocker.dashboard")
 
@@ -28,110 +33,40 @@ legacy_router = APIRouter(prefix="/dashboard", tags=["dashboard-web"])
 templates = Jinja2Templates(directory="app/web/templates")
 
 
-def _client_dashboard_company_scope(user, requested_company_id: str | None) -> str | None:
-    """Return the company scope for the client portal dashboard."""
-    if getattr(user, "role", None) in PPG_WEB_ROLES:
-        return requested_company_id
+def _client_dashboard_company_scope(user, requested_company_id: str | None = None) -> str | None:
+    """Return the company scope for the client portal.
+
+    The scope is always the user's assigned company. A company_id requested
+    via query string is deliberately ignored so clients can never browse
+    another company's data.
+    """
+    del requested_company_id  # Never honoured: clients only see their company.
     return getattr(user, "company_id", None)
 
 
 def _client_can_access_company(user, company_id: str | None) -> bool:
-    """Return whether a user may view client data for a company."""
-    if getattr(user, "role", None) in PPG_WEB_ROLES:
-        return True
+    """Return whether a client user may view data for a company."""
     return bool(company_id) and getattr(user, "company_id", None) == company_id
 
 
-def _client_dashboard_uses_global_support_scope(
-    is_ppg_staff: bool,
-    scoped_company_id: str | None,
-    device_ids: list[str],
-) -> bool:
-    """Return True only for PPG's unfiltered global client-portal preview."""
-    return is_ppg_staff and not scoped_company_id and not device_ids
-
-
-def _client_support_uses_global_scope(is_ppg_staff: bool, scoped_company_id: str | None) -> bool:
-    """Return True only for PPG's unfiltered support preview."""
-    return is_ppg_staff and not scoped_company_id
-
-
-def _client_activity_uses_global_scope(is_ppg_staff: bool, scoped_company_id: str | None) -> bool:
-    """Return True only for PPG's unfiltered activity preview."""
-    return is_ppg_staff and not scoped_company_id
-
-
-def _client_company_selector_options(companies: list, scoped_company_id: str | None) -> list[dict]:
-    """Build company selector options for PPG client-portal previews."""
-    options = [{
-        "id": "",
-        "name": "All companies",
-        "selected": not scoped_company_id,
-    }]
-    for company in companies:
-        company_id = getattr(company, "id", "")
-        options.append({
-            "id": company_id,
-            "name": getattr(company, "name", company_id),
-            "selected": company_id == scoped_company_id,
-        })
-    return options
-
-
-def _client_scope_summary(
-    is_ppg_staff: bool,
-    scoped_company_id: str | None,
-    selector_options: list[dict],
-) -> dict:
-    """Describe the active client-portal data scope for the page header."""
-    if not is_ppg_staff:
-        return {
-            "title": "Client view",
-            "detail": "Showing only vessels linked to your company.",
-            "badge": "client",
-        }
-    if not scoped_company_id:
-        return {
-            "title": "PPG preview",
-            "detail": "Showing all client companies.",
-            "badge": "preview",
-        }
-
-    company_name = next(
-        (
-            option["name"]
-            for option in selector_options
-            if option.get("id") == scoped_company_id
-        ),
-        scoped_company_id,
-    )
+def _client_scope_summary() -> dict:
+    """Describe the client-portal data scope for the page header."""
     return {
-        "title": "PPG preview",
-        "detail": f"Showing {company_name} only.",
-        "badge": "preview",
+        "title": "Client view",
+        "detail": "Showing only vessels linked to your company.",
+        "badge": "client",
     }
 
 
-def _client_scope_query(scoped_company_id: str | None) -> str:
-    if not scoped_company_id:
-        return ""
-    return f"?{urlencode({'company_id': scoped_company_id})}"
-
-
-def _client_dashboard_quick_actions(
-    vessels: list,
-    support_requests: list,
-    scoped_company_id: str | None,
-) -> list[dict]:
+def _client_dashboard_quick_actions(vessels: list, support_requests: list) -> list[dict]:
     """Return a compact, priority-ordered action list for the client dashboard."""
-    scope_query = _client_scope_query(scoped_company_id)
     actions: list[dict] = []
 
     if vessels:
         first_vessel = vessels[0]
         actions.append({
             "label": "Open first vessel",
-            "href": f"/client/vessels/{first_vessel.id}{scope_query}",
+            "href": f"/client/vessels/{first_vessel.id}",
             "detail": "Review installed SmartLocker devices and visible stock.",
             "badge": "fleet",
             "tone": "primary",
@@ -149,14 +84,14 @@ def _client_dashboard_quick_actions(
     actions.extend([
         {
             "label": "Support",
-            "href": f"/client/support{scope_query}",
+            "href": "/client/support",
             "detail": "Open tickets, device issues, and client requests.",
             "badge": f"{open_support_count} open" if open_support_count else "ready",
             "tone": "danger" if open_support_count else "success",
         },
         {
             "label": "Activity",
-            "href": f"/client/activity{scope_query}",
+            "href": "/client/activity",
             "detail": "See scans, inventory events, and locker activity.",
             "badge": "latest",
             "tone": "info",
@@ -200,15 +135,11 @@ def _client_support_request_severity(severity: str | None) -> str:
     return "warning"
 
 
-def _client_support_redirect(company_id: str | None, **params: str) -> str:
-    """Build a client support redirect while preserving optional company scope."""
-    query_params = {}
-    if company_id:
-        query_params["company_id"] = company_id
-    query_params.update(params)
-    if not query_params:
+def _client_support_redirect(**params: str) -> str:
+    """Build a client support redirect with optional feedback messages."""
+    if not params:
         return "/client/support"
-    return f"/client/support?{urlencode(query_params)}"
+    return f"/client/support?{urlencode(params)}"
 
 
 def _client_activity_event_stats(events: list) -> dict:
@@ -344,16 +275,38 @@ async def _client_vessel_inventory_context(db: AsyncSession, vessel: Vessel) -> 
     }
 
 
-async def _client_company_selector_context(
-    db: AsyncSession,
-    is_ppg_staff: bool,
-    scoped_company_id: str | None,
-) -> list[dict]:
-    """Return company selector options when PPG previews the client portal."""
-    if not is_ppg_staff:
+async def _company_vessels(db: AsyncSession, company_id: str | None) -> list:
+    """Load the vessels (with fleet and devices) for one client company."""
+    if not company_id:
         return []
-    companies_result = await db.execute(select(Company).order_by(Company.name))
-    return _client_company_selector_options(companies_result.scalars().all(), scoped_company_id)
+    vessel_query = (
+        select(Vessel)
+        .options(
+            selectinload(Vessel.fleet).selectinload(Fleet.company),
+            selectinload(Vessel.devices),
+        )
+        .join(Fleet)
+        .where(Fleet.company_id == company_id)
+        .order_by(Vessel.name)
+    )
+    vessel_result = await db.execute(vessel_query)
+    return vessel_result.scalars().unique().all()
+
+
+async def _company_devices(db: AsyncSession, company_id: str | None) -> list:
+    """Load the SmartLocker devices for one client company."""
+    if not company_id:
+        return []
+    device_query = (
+        select(LockerDevice)
+        .options(selectinload(LockerDevice.vessel).selectinload(Vessel.fleet).selectinload(Fleet.company))
+        .join(Vessel)
+        .join(Fleet)
+        .where(Fleet.company_id == company_id)
+        .order_by(LockerDevice.device_id)
+    )
+    devices_result = await db.execute(device_query)
+    return devices_result.scalars().unique().all()
 
 
 @legacy_router.get("/", response_class=HTMLResponse)
@@ -365,29 +318,13 @@ async def legacy_dashboard_redirect():
 @router.get("/", response_class=HTMLResponse)
 async def client_dashboard(
     request: Request,
-    company_id: str = Query(None),
     current_user = Depends(require_client_session),
     db: AsyncSession = Depends(get_db),
 ):
-    """Client fleet overview with real data."""
-    scoped_company_id = _client_dashboard_company_scope(current_user, company_id)
-    is_ppg_staff = current_user.role in PPG_WEB_ROLES
+    """Client fleet overview, always scoped to the user's company."""
+    scoped_company_id = _client_dashboard_company_scope(current_user)
 
-    # ---- Query vessels (optionally filtered by company_id) ----
-    vessels = []
-    if is_ppg_staff or scoped_company_id:
-        vessel_query = (
-            select(Vessel)
-            .options(
-                selectinload(Vessel.fleet).selectinload(Fleet.company),
-                selectinload(Vessel.devices),
-            )
-        )
-        if scoped_company_id:
-            vessel_query = vessel_query.join(Fleet).where(Fleet.company_id == scoped_company_id)
-
-        vessel_result = await db.execute(vessel_query.order_by(Vessel.name))
-        vessels = vessel_result.scalars().unique().all()
+    vessels = await _company_vessels(db, scoped_company_id)
 
     # ---- Collect all devices from those vessels ----
     all_devices = []
@@ -419,43 +356,20 @@ async def client_dashboard(
         )
         recent_events = events_result.scalars().all()
 
-    # ---- Open support requests ----
+    # ---- Open support requests for this company's devices ----
     support_requests = []
-    show_global_support = _client_dashboard_uses_global_support_scope(
-        is_ppg_staff,
-        scoped_company_id,
-        device_ids,
-    )
-    if show_global_support or device_ids:
-        support_query = select(SupportRequest).where(
-            SupportRequest.status.in_(["open", "in_progress"])
-        )
-        if device_ids:
-            # Filter to devices belonging to these vessels
-            edge_device_ids = [d.device_id for d in all_devices]
-            support_query = support_query.where(
-                SupportRequest.device_id.in_(edge_device_ids)
-            )
+    if device_ids:
+        edge_device_ids = [d.device_id for d in all_devices]
         support_result = await db.execute(
-            support_query.order_by(desc(SupportRequest.created_at)).limit(20)
+            select(SupportRequest)
+            .where(
+                SupportRequest.status.in_(["open", "in_progress"]),
+                SupportRequest.device_id.in_(edge_device_ids),
+            )
+            .order_by(desc(SupportRequest.created_at))
+            .limit(20)
         )
         support_requests = support_result.scalars().all()
-
-    # ---- Event count for summary ----
-    event_count_24h = len(recent_events)
-    company_selector_options = await _client_company_selector_context(
-        db,
-        is_ppg_staff,
-        scoped_company_id,
-    )
-    client_scope = _client_scope_summary(
-        is_ppg_staff,
-        scoped_company_id,
-        company_selector_options,
-    )
-
-    # ---- Build device lookup by vessel id for template ----
-    # Already loaded via selectinload on vessels
 
     return templates.TemplateResponse("client/dashboard.html", {
         "request": request,
@@ -466,19 +380,12 @@ async def client_dashboard(
         "offline_count": offline_count,
         "recent_events": recent_events,
         "support_requests": support_requests,
-        "event_count_24h": event_count_24h,
-        "company_id": scoped_company_id,
-        "company_selector_options": company_selector_options,
-        "client_scope": client_scope,
+        "event_count_24h": len(recent_events),
+        "client_scope": _client_scope_summary(),
         "current_user": current_user,
-        "is_ppg_staff": is_ppg_staff,
         "success": request.query_params.get("success"),
         "error": request.query_params.get("error"),
-        "quick_actions": _client_dashboard_quick_actions(
-            vessels,
-            support_requests,
-            scoped_company_id,
-        ),
+        "quick_actions": _client_dashboard_quick_actions(vessels, support_requests),
         "active": "client_dashboard",
     })
 
@@ -486,60 +393,31 @@ async def client_dashboard(
 @router.get("/support", response_class=HTMLResponse)
 async def client_support_requests(
     request: Request,
-    company_id: str = Query(None),
     current_user = Depends(require_client_session),
     db: AsyncSession = Depends(get_db),
 ):
-    """Read-only support ticket list for the client portal."""
-    scoped_company_id = _client_dashboard_company_scope(current_user, company_id)
-    is_ppg_staff = current_user.role in PPG_WEB_ROLES
+    """Support ticket list for the client's own devices."""
+    scoped_company_id = _client_dashboard_company_scope(current_user)
 
-    devices = []
-    if is_ppg_staff or scoped_company_id:
-        device_query = (
-            select(LockerDevice)
-            .options(selectinload(LockerDevice.vessel).selectinload(Vessel.fleet).selectinload(Fleet.company))
-            .join(Vessel)
-            .join(Fleet)
-        )
-        if scoped_company_id:
-            device_query = device_query.where(Fleet.company_id == scoped_company_id)
-        devices_result = await db.execute(device_query.order_by(LockerDevice.device_id))
-        devices = devices_result.scalars().unique().all()
+    devices = await _company_devices(db, scoped_company_id)
 
     edge_device_ids = [device.device_id for device in devices]
     support_requests = []
-    show_global_support = _client_support_uses_global_scope(is_ppg_staff, scoped_company_id)
-    if show_global_support or edge_device_ids:
-        support_query = (
+    if edge_device_ids:
+        support_result = await db.execute(
             select(SupportRequest)
             .options(selectinload(SupportRequest.device))
+            .where(SupportRequest.device_id.in_(edge_device_ids))
             .order_by(desc(SupportRequest.created_at))
             .limit(200)
         )
-        if edge_device_ids:
-            support_query = support_query.where(SupportRequest.device_id.in_(edge_device_ids))
-        support_result = await db.execute(support_query)
         support_requests = support_result.scalars().all()
-    company_selector_options = await _client_company_selector_context(
-        db,
-        is_ppg_staff,
-        scoped_company_id,
-    )
-    client_scope = _client_scope_summary(
-        is_ppg_staff,
-        scoped_company_id,
-        company_selector_options,
-    )
 
     return templates.TemplateResponse("client/support.html", {
         "request": request,
         "current_user": current_user,
-        "is_ppg_staff": is_ppg_staff,
         "active": "client_support",
-        "company_id": scoped_company_id,
-        "company_selector_options": company_selector_options,
-        "client_scope": client_scope,
+        "client_scope": _client_scope_summary(),
         "devices": devices,
         "support_requests": support_requests,
         "stats": _support_request_stats(support_requests),
@@ -557,30 +435,11 @@ async def client_create_support_request(
     error_title: str = Form(""),
     severity: str = Form("warning"),
     details: str = Form(""),
-    company_id: str = Form(None),
 ):
     """Create a client-originated support request for a device in their scope."""
-    scoped_company_id = _client_dashboard_company_scope(current_user, company_id)
-    is_ppg_staff = current_user.role in PPG_WEB_ROLES
-    if is_ppg_staff:
-        return RedirectResponse(
-            _client_support_redirect(
-                scoped_company_id,
-                error="Use the PPG support dashboard for staff actions",
-            ),
-            status_code=303,
-        )
+    scoped_company_id = _client_dashboard_company_scope(current_user)
 
-    devices = []
-    if scoped_company_id:
-        devices_result = await db.execute(
-            select(LockerDevice)
-            .join(Vessel)
-            .join(Fleet)
-            .where(Fleet.company_id == scoped_company_id)
-        )
-        devices = devices_result.scalars().all()
-
+    devices = await _company_devices(db, scoped_company_id)
     allowed_device_ids = {device.device_id for device in devices}
     validation_error = _client_support_request_error(
         device_id,
@@ -589,7 +448,7 @@ async def client_create_support_request(
     )
     if validation_error:
         return RedirectResponse(
-            _client_support_redirect(scoped_company_id, error=validation_error),
+            _client_support_redirect(error=validation_error),
             status_code=303,
         )
 
@@ -607,7 +466,7 @@ async def client_create_support_request(
     await db.flush()
 
     return RedirectResponse(
-        _client_support_redirect(scoped_company_id, success="Support request sent"),
+        _client_support_redirect(success="Support request sent"),
         status_code=303,
     )
 
@@ -615,60 +474,31 @@ async def client_create_support_request(
 @router.get("/activity", response_class=HTMLResponse)
 async def client_activity(
     request: Request,
-    company_id: str = Query(None),
     current_user = Depends(require_client_session),
     db: AsyncSession = Depends(get_db),
 ):
-    """Read-only fleet activity feed for the client portal."""
-    scoped_company_id = _client_dashboard_company_scope(current_user, company_id)
-    is_ppg_staff = current_user.role in PPG_WEB_ROLES
+    """Read-only fleet activity feed for the client's own devices."""
+    scoped_company_id = _client_dashboard_company_scope(current_user)
 
-    devices = []
-    if is_ppg_staff or scoped_company_id:
-        device_query = (
-            select(LockerDevice)
-            .options(selectinload(LockerDevice.vessel).selectinload(Vessel.fleet).selectinload(Fleet.company))
-            .join(Vessel)
-            .join(Fleet)
-        )
-        if scoped_company_id:
-            device_query = device_query.where(Fleet.company_id == scoped_company_id)
-        devices_result = await db.execute(device_query.order_by(LockerDevice.device_id))
-        devices = devices_result.scalars().unique().all()
+    devices = await _company_devices(db, scoped_company_id)
 
     device_ids = [device.id for device in devices]
     events = []
-    show_global_activity = _client_activity_uses_global_scope(is_ppg_staff, scoped_company_id)
-    if show_global_activity or device_ids:
-        event_query = (
+    if device_ids:
+        events_result = await db.execute(
             select(DeviceEvent)
             .options(selectinload(DeviceEvent.device))
+            .where(DeviceEvent.device_id.in_(device_ids))
             .order_by(desc(DeviceEvent.timestamp))
             .limit(200)
         )
-        if device_ids:
-            event_query = event_query.where(DeviceEvent.device_id.in_(device_ids))
-        events_result = await db.execute(event_query)
         events = events_result.scalars().all()
-    company_selector_options = await _client_company_selector_context(
-        db,
-        is_ppg_staff,
-        scoped_company_id,
-    )
-    client_scope = _client_scope_summary(
-        is_ppg_staff,
-        scoped_company_id,
-        company_selector_options,
-    )
 
     return templates.TemplateResponse("client/activity.html", {
         "request": request,
         "current_user": current_user,
-        "is_ppg_staff": is_ppg_staff,
         "active": "client_activity",
-        "company_id": scoped_company_id,
-        "company_selector_options": company_selector_options,
-        "client_scope": client_scope,
+        "client_scope": _client_scope_summary(),
         "devices": devices,
         "events": events,
         "stats": _client_activity_event_stats(events),
@@ -695,19 +525,15 @@ async def client_vessel_detail(
     if not vessel or not vessel.fleet:
         return RedirectResponse("/client/?error=Vessel+not+found", status_code=303)
 
-    company_id = vessel.fleet.company_id
-    if not _client_can_access_company(current_user, company_id):
+    if not _client_can_access_company(current_user, vessel.fleet.company_id):
         return RedirectResponse("/client/?error=Vessel+not+available", status_code=303)
 
     inventory = await _client_vessel_inventory_context(db, vessel)
-    is_ppg_staff = current_user.role in PPG_WEB_ROLES
 
     return templates.TemplateResponse("client/vessel_detail.html", {
         "request": request,
         "current_user": current_user,
-        "is_ppg_staff": is_ppg_staff,
         "active": "client_dashboard",
-        "company_id": company_id,
         "vessel": vessel,
         "total_liters": inventory["total_liters"],
         "product_count": inventory["product_count"],

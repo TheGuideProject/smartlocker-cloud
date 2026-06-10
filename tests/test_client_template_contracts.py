@@ -12,11 +12,11 @@ class ClientTemplateContractTest(unittest.TestCase):
 
             self.assertIn('{% include "client/_client_nav.html" %}', template)
 
-    def test_client_list_pages_use_company_selector_partial(self):
+    def test_client_pages_have_no_company_selector(self):
         for template_name in ["dashboard.html", "support.html", "activity.html"]:
             with self.subTest(template=template_name):
                 template = (TEMPLATE_ROOT / "client" / template_name).read_text(encoding="utf-8")
-                self.assertIn('{% include "client/_company_selector.html" %}', template)
+                self.assertNotIn("_company_selector", template)
 
     def test_client_list_pages_use_scope_summary_partial(self):
         for template_name in ["dashboard.html", "support.html", "activity.html"]:
@@ -31,19 +31,19 @@ class ClientTemplateContractTest(unittest.TestCase):
         self.assertIn("client_scope.detail", partial)
         self.assertIn("client_scope.badge", partial)
 
-    def test_company_selector_is_ppg_only_and_uses_company_id(self):
-        partial = (TEMPLATE_ROOT / "client" / "_company_selector.html").read_text(encoding="utf-8")
+    def test_company_selector_lives_in_the_admin_preview(self):
+        self.assertFalse((TEMPLATE_ROOT / "client" / "_company_selector.html").exists())
 
-        self.assertIn("{% if is_ppg_staff %}", partial)
-        self.assertIn('method="get"', partial)
-        self.assertIn('name="company_id"', partial)
-        self.assertIn('value=""', partial)
-        self.assertIn("company_selector_options", partial)
+        preview = (TEMPLATE_ROOT / "admin" / "client_preview.html").read_text(encoding="utf-8")
+        self.assertIn('method="get"', preview)
+        self.assertIn('name="company_id"', preview)
+        self.assertIn('value=""', preview)
+        self.assertIn("company_selector_options", preview)
 
-    def test_client_support_page_has_client_only_request_form(self):
+    def test_client_support_page_has_the_request_form(self):
         template = (TEMPLATE_ROOT / "client" / "support.html").read_text(encoding="utf-8")
 
-        self.assertIn("{% if not is_ppg_staff %}", template)
+        self.assertNotIn("is_ppg_staff", template)
         self.assertIn('action="/client/support/create"', template)
         self.assertIn('name="device_id"', template)
         self.assertIn('name="error_title"', template)
@@ -76,20 +76,20 @@ class ClientTemplateContractTest(unittest.TestCase):
         self.assertIn('href="/client/support', nav)
         self.assertIn('href="/client/logout"', nav)
 
-    def test_client_navigation_preserves_company_scope(self):
+    def test_client_navigation_uses_plain_company_free_links(self):
         nav = (TEMPLATE_ROOT / "client" / "_client_nav.html").read_text(encoding="utf-8")
-        company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"
 
-        self.assertIn(f'href="/client/{company_scope}"', nav)
-        self.assertIn(f'href="/client/activity{company_scope}"', nav)
-        self.assertIn(f'href="/client/support{company_scope}"', nav)
+        self.assertIn('href="/client/"', nav)
+        self.assertIn('href="/client/activity"', nav)
+        self.assertIn('href="/client/support"', nav)
+        self.assertNotIn("company_id", nav)
 
-    def test_client_dashboard_links_preserve_company_scope(self):
+    def test_client_dashboard_uses_plain_company_free_links(self):
         dashboard = (TEMPLATE_ROOT / "client" / "dashboard.html").read_text(encoding="utf-8")
-        company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"
 
-        self.assertIn(f'href="/client/activity{company_scope}"', dashboard)
-        self.assertIn(f'href="/client/support{company_scope}"', dashboard)
+        self.assertIn('href="/client/activity"', dashboard)
+        self.assertIn('href="/client/support"', dashboard)
+        self.assertNotIn("company_id", dashboard)
 
     def test_client_dashboard_surfaces_redirect_messages(self):
         source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
@@ -119,19 +119,18 @@ class ClientTemplateContractTest(unittest.TestCase):
         self.assertIn("{{ action.badge }}", dashboard)
         self.assertIn("{% if action.href %}", dashboard)
 
-    def test_client_activity_links_preserve_company_scope(self):
+    def test_client_activity_links_back_to_the_fleet_overview(self):
         activity = (TEMPLATE_ROOT / "client" / "activity.html").read_text(encoding="utf-8")
-        company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"
 
-        self.assertIn(f'href="/client/{company_scope}"', activity)
+        self.assertIn('href="/client/"', activity)
+        self.assertNotIn("company_id", activity)
 
-    def test_client_detail_breadcrumbs_preserve_company_scope(self):
-        company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"
-
+    def test_client_detail_breadcrumbs_link_back_without_company_scope(self):
         for template_name in ["support.html", "vessel_detail.html"]:
             with self.subTest(template=template_name):
                 template = (TEMPLATE_ROOT / "client" / template_name).read_text(encoding="utf-8")
-                self.assertIn(f'href="/client/{company_scope}"', template)
+                self.assertIn('href="/client/"', template)
+                self.assertNotIn("company_id", template)
 
     def test_client_activity_route_renders_activity_template(self):
         source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
@@ -139,10 +138,10 @@ class ClientTemplateContractTest(unittest.TestCase):
         self.assertIn('@router.get("/activity"', source)
         self.assertIn('"client/activity.html"', source)
 
-    def test_client_vessel_detail_passes_company_scope_to_template(self):
+    def test_client_vessel_detail_checks_company_access(self):
         source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
 
-        self.assertIn('"company_id": company_id', source)
+        self.assertIn("_client_can_access_company(current_user, vessel.fleet.company_id)", source)
 
     def test_client_vessel_detail_renders_inventory_status(self):
         source = Path("app/web/dashboard.py").read_text(encoding="utf-8")

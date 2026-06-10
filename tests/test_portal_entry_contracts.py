@@ -71,8 +71,9 @@ class PortalEntryContractTest(unittest.TestCase):
         client_nav = (CLOUD_ROOT / "app" / "web" / "templates" / "client" / "_client_nav.html").read_text(encoding="utf-8")
 
         self.assertIn('<span class="nav-icon">&#9671;</span> PPG Portal</a>', base_template)
-        self.assertIn('<span class="nav-icon">&#9671;</span> PPG Portal</a>', client_nav)
-        self.assertNotIn('<span class="nav-icon">&#9671;</span> Admin Portal</a>', client_nav)
+        self.assertIn('href="/admin/client-preview"', base_template)
+        self.assertNotIn("PPG Portal", client_nav)
+        self.assertNotIn('href="/admin', client_nav)
 
     def test_top_bar_shows_workspace_badge(self):
         base_template = (CLOUD_ROOT / "app" / "web" / "templates" / "base.html").read_text(encoding="utf-8")

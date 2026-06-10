@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "SmartLocker Cloud"
     DEBUG: bool = False
 
+    # Standalone client portal (separate Railway service).
+    # When set, /client/* requests on this app redirect there.
+    CLIENT_PORTAL_URL: str = ""
+
     # File uploads
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE_MB: int = 50

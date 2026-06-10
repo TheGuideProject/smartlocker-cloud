@@ -136,22 +136,34 @@ async def require_ppg_admin_session(
     return user
 
 
+def _client_portal_redirect_for_role(role: str | None) -> str | None:
+    """Return where a non-client role must be sent instead of /client/*.
+
+    Client roles (ship_owner, crew) get None and may stay in the client
+    portal. PPG staff are sent back to the PPG portal: they preview client
+    data from /admin/client-preview, never from the client portal itself.
+    """
+    if role in CLIENT_WEB_ROLES:
+        return None
+    return _portal_home_for_role(role)
+
+
 async def require_client_session(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
-    Require an authenticated user allowed to view the client portal.
-    PPG staff may enter for support/preview, while ship_owner and crew see
-    only their assigned company data.
+    Require an authenticated client user (ship_owner or crew) via session.
+    PPG staff and unknown roles are redirected out of the client portal.
     """
     user = await _load_active_session_user(request, db)
 
-    if user.role not in PPG_WEB_ROLES | CLIENT_WEB_ROLES:
+    redirect_target = _client_portal_redirect_for_role(user.role)
+    if redirect_target:
         raise HTTPException(
             status_code=303,
-            detail="Client portal access required",
-            headers={"Location": _portal_home_for_role(user.role)},
+            detail="Client portal is for client users only",
+            headers={"Location": redirect_target},
         )
 
     return user
