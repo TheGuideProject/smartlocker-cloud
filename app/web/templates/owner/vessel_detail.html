@@ -6,14 +6,7 @@
 {% endblock %}
 
 {% block nav %}
-<li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Client</li>
-<li><a href="/client/" class="{% if active == 'client_dashboard' %}active{% endif %}"><span class="nav-icon">&#9670;</span> Fleet Overview</a></li>
-<li><a href="/client/support" class="{% if active == 'client_support' %}active{% endif %}"><span class="nav-icon">&#9888;</span> Support</a></li>
-<li class="nav-divider"></li>
-{% if is_ppg_staff %}
-<li><a href="/admin/"><span class="nav-icon">&#9671;</span> Admin Portal</a></li>
-{% endif %}
-<li><a href="/client/logout" style="color: var(--danger);"><span class="nav-icon">&#10140;</span> Logout</a></li>
+{% include "owner/_client_nav.html" %}
 {% endblock %}
 
 {% block content %}
