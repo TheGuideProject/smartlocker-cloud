@@ -249,6 +249,29 @@ a:hover { color: var(--ppg-blue-dark); }
     align-items: center;
 }
 
+.workspace-chip {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    padding: 6px 11px;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.workspace-chip.ppg {
+    background: var(--info-light);
+    border-color: #bfdbfe;
+    color: var(--info-text);
+}
+
+.workspace-chip.client {
+    background: #ecfdf5;
+    border-color: #bbf7d0;
+    color: #047857;
+}
+
 .page-content {
     padding: 24px 32px;
     flex: 1;

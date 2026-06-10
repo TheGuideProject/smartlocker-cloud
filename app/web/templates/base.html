@@ -11,6 +11,8 @@
     {% block head %}{% endblock %}
 </head>
 <body>
+    {% set workspace_is_client = (active|default('')) in ['client_dashboard', 'client_activity', 'client_support'] %}
+    {% set workspace_label = 'Client Portal' if workspace_is_client else 'PPG Portal' %}
     <nav class="sidebar">
         <div class="sidebar-header">
             <h2>SmartLocker</h2>
@@ -63,6 +65,7 @@
         <header class="top-bar">
             <h1>{% block page_title %}Dashboard{% endblock %}</h1>
             <div class="top-actions">
+                <span class="workspace-chip {% if workspace_is_client %}client{% else %}ppg{% endif %}">{{ workspace_label }}</span>
                 {% block actions %}{% endblock %}
             </div>
         </header>

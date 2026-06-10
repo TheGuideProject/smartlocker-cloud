@@ -74,6 +74,19 @@ class PortalEntryContractTest(unittest.TestCase):
         self.assertIn('<span class="nav-icon">&#9671;</span> PPG Portal</a>', client_nav)
         self.assertNotIn('<span class="nav-icon">&#9671;</span> Admin Portal</a>', client_nav)
 
+    def test_top_bar_shows_workspace_badge(self):
+        base_template = (CLOUD_ROOT / "app" / "web" / "templates" / "base.html").read_text(encoding="utf-8")
+        stylesheet = (CLOUD_ROOT / "app" / "static" / "style.css").read_text(encoding="utf-8")
+
+        self.assertIn("workspace_is_client", base_template)
+        self.assertIn("workspace_label", base_template)
+        self.assertIn("Client Portal", base_template)
+        self.assertIn("PPG Portal", base_template)
+        self.assertIn('class="workspace-chip', base_template)
+        self.assertIn("{{ workspace_label }}", base_template)
+        self.assertIn(".workspace-chip", stylesheet)
+        self.assertIn(".workspace-chip.client", stylesheet)
+
 
 if __name__ == "__main__":
     unittest.main()
