@@ -112,6 +112,37 @@ class PlatformSplitContractTest(unittest.TestCase):
             },
         )
 
+    def test_client_dashboard_quick_actions_preserve_company_scope(self):
+        quick_actions = getattr(dashboard, "_client_dashboard_quick_actions", None)
+        vessels = [SimpleNamespace(id="vessel-1")]
+        support_requests = [SimpleNamespace(status="open")]
+
+        self.assertIsNotNone(quick_actions)
+        actions = quick_actions(
+            vessels=vessels,
+            support_requests=support_requests,
+            scoped_company_id="company-client",
+        )
+
+        self.assertEqual(actions[0]["label"], "Open first vessel")
+        self.assertEqual(actions[0]["href"], "/client/vessels/vessel-1?company_id=company-client")
+        self.assertEqual(actions[1]["label"], "Support")
+        self.assertEqual(actions[1]["href"], "/client/support?company_id=company-client")
+        self.assertEqual(actions[1]["badge"], "1 open")
+        self.assertEqual(actions[2]["label"], "Activity")
+        self.assertEqual(actions[2]["href"], "/client/activity?company_id=company-client")
+
+    def test_client_dashboard_quick_actions_cover_empty_fleet(self):
+        quick_actions = getattr(dashboard, "_client_dashboard_quick_actions", None)
+
+        self.assertIsNotNone(quick_actions)
+        actions = quick_actions(vessels=[], support_requests=[], scoped_company_id=None)
+
+        self.assertEqual(actions[0]["label"], "No vessels yet")
+        self.assertEqual(actions[0]["href"], "")
+        self.assertEqual(actions[0]["badge"], "setup")
+        self.assertEqual(actions[1]["badge"], "ready")
+
     def test_ppg_preview_for_empty_company_does_not_show_global_support(self):
         self.assertFalse(
             _client_dashboard_uses_global_support_scope(

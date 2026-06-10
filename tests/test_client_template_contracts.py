@@ -105,6 +105,20 @@ class ClientTemplateContractTest(unittest.TestCase):
         self.assertIn("{{ success }}", template)
         self.assertIn("{{ error }}", template)
 
+    def test_client_dashboard_renders_backend_quick_actions(self):
+        source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
+        start = source.index('TemplateResponse("owner/dashboard.html"')
+        end = source.index('"active": "client_dashboard"', start)
+        dashboard_context = source[start:end]
+        dashboard = (TEMPLATE_ROOT / "owner" / "dashboard.html").read_text(encoding="utf-8")
+
+        self.assertIn('"quick_actions": _client_dashboard_quick_actions(', dashboard_context)
+        self.assertIn("Next actions", dashboard)
+        self.assertIn("{% for action in quick_actions %}", dashboard)
+        self.assertIn("{{ action.label }}", dashboard)
+        self.assertIn("{{ action.badge }}", dashboard)
+        self.assertIn("{% if action.href %}", dashboard)
+
     def test_client_activity_links_preserve_company_scope(self):
         activity = (TEMPLATE_ROOT / "owner" / "activity.html").read_text(encoding="utf-8")
         company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"

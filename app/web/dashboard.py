@@ -1,4 +1,4 @@
-"""Ship Owner Dashboard - Read-only view of their fleet data."""
+"""Client Portal - Read-only fleet and support views."""
 
 import logging
 from datetime import datetime, timedelta
@@ -110,6 +110,59 @@ def _client_scope_summary(
         "detail": f"Showing {company_name} only.",
         "badge": "preview",
     }
+
+
+def _client_scope_query(scoped_company_id: str | None) -> str:
+    if not scoped_company_id:
+        return ""
+    return f"?{urlencode({'company_id': scoped_company_id})}"
+
+
+def _client_dashboard_quick_actions(
+    vessels: list,
+    support_requests: list,
+    scoped_company_id: str | None,
+) -> list[dict]:
+    """Return a compact, priority-ordered action list for the client dashboard."""
+    scope_query = _client_scope_query(scoped_company_id)
+    actions: list[dict] = []
+
+    if vessels:
+        first_vessel = vessels[0]
+        actions.append({
+            "label": "Open first vessel",
+            "href": f"/client/vessels/{first_vessel.id}{scope_query}",
+            "detail": "Review installed SmartLocker devices and visible stock.",
+            "badge": "fleet",
+            "tone": "primary",
+        })
+    else:
+        actions.append({
+            "label": "No vessels yet",
+            "href": "",
+            "detail": "PPG configures vessels, devices, and initial stock.",
+            "badge": "setup",
+            "tone": "muted",
+        })
+
+    open_support_count = len(support_requests)
+    actions.extend([
+        {
+            "label": "Support",
+            "href": f"/client/support{scope_query}",
+            "detail": "Open tickets, device issues, and customer requests.",
+            "badge": f"{open_support_count} open" if open_support_count else "ready",
+            "tone": "danger" if open_support_count else "success",
+        },
+        {
+            "label": "Activity",
+            "href": f"/client/activity{scope_query}",
+            "detail": "See scans, inventory events, and locker activity.",
+            "badge": "latest",
+            "tone": "info",
+        },
+    ])
+    return actions
 
 
 def _support_request_stats(support_requests: list) -> dict:
@@ -289,7 +342,7 @@ async def owner_dashboard(
     current_user = Depends(require_client_session),
     db: AsyncSession = Depends(get_db),
 ):
-    """Ship owner fleet overview with real data."""
+    """Client fleet overview with real data."""
     scoped_company_id = _client_dashboard_company_scope(current_user, company_id)
     is_ppg_staff = current_user.role in PPG_WEB_ROLES
 
@@ -394,6 +447,11 @@ async def owner_dashboard(
         "is_ppg_staff": is_ppg_staff,
         "success": request.query_params.get("success"),
         "error": request.query_params.get("error"),
+        "quick_actions": _client_dashboard_quick_actions(
+            vessels,
+            support_requests,
+            scoped_company_id,
+        ),
         "active": "client_dashboard",
     })
 
