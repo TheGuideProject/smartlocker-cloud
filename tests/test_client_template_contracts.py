@@ -15,16 +15,50 @@ class ClientTemplateContractTest(unittest.TestCase):
     def test_shared_client_navigation_links_core_client_pages(self):
         nav = (TEMPLATE_ROOT / "owner" / "_client_nav.html").read_text(encoding="utf-8")
 
-        self.assertIn('href="/client/"', nav)
+        self.assertIn('href="/client/', nav)
         self.assertIn('href="/client/activity', nav)
-        self.assertIn('href="/client/support"', nav)
+        self.assertIn('href="/client/support', nav)
         self.assertIn('href="/client/logout"', nav)
+
+    def test_client_navigation_preserves_company_scope(self):
+        nav = (TEMPLATE_ROOT / "owner" / "_client_nav.html").read_text(encoding="utf-8")
+        company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"
+
+        self.assertIn(f'href="/client/{company_scope}"', nav)
+        self.assertIn(f'href="/client/activity{company_scope}"', nav)
+        self.assertIn(f'href="/client/support{company_scope}"', nav)
+
+    def test_client_dashboard_links_preserve_company_scope(self):
+        dashboard = (TEMPLATE_ROOT / "owner" / "dashboard.html").read_text(encoding="utf-8")
+        company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"
+
+        self.assertIn(f'href="/client/activity{company_scope}"', dashboard)
+        self.assertIn(f'href="/client/support{company_scope}"', dashboard)
+
+    def test_client_activity_links_preserve_company_scope(self):
+        activity = (TEMPLATE_ROOT / "owner" / "activity.html").read_text(encoding="utf-8")
+        company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"
+
+        self.assertIn(f'href="/client/{company_scope}"', activity)
+
+    def test_client_detail_breadcrumbs_preserve_company_scope(self):
+        company_scope = "{% if company_id %}?company_id={{ company_id }}{% endif %}"
+
+        for template_name in ["support.html", "vessel_detail.html"]:
+            with self.subTest(template=template_name):
+                template = (TEMPLATE_ROOT / "owner" / template_name).read_text(encoding="utf-8")
+                self.assertIn(f'href="/client/{company_scope}"', template)
 
     def test_client_activity_route_renders_activity_template(self):
         source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
 
         self.assertIn('@router.get("/activity"', source)
         self.assertIn('"owner/activity.html"', source)
+
+    def test_client_vessel_detail_passes_company_scope_to_template(self):
+        source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
+
+        self.assertIn('"company_id": company_id', source)
 
 
 if __name__ == "__main__":

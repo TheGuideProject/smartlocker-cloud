@@ -418,6 +418,7 @@ async def client_vessel_detail(
         "current_user": current_user,
         "is_ppg_staff": is_ppg_staff,
         "active": "client_dashboard",
+        "company_id": company_id,
         "vessel": vessel,
         "total_liters": inventory["total_liters"],
         "product_count": inventory["product_count"],

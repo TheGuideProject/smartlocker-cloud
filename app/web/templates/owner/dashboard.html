@@ -200,6 +200,6 @@
 </div>
 {% endif %}
 <div style="margin-top: 12px;">
-    <a href="/client/support" class="btn btn-secondary" style="font-size: 13px;">View support history</a>
+    <a href="/client/support{% if company_id %}?company_id={{ company_id }}{% endif %}" class="btn btn-secondary" style="font-size: 13px;">View support history</a>
 </div>
 {% endblock %}
