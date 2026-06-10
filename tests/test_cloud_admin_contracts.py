@@ -52,6 +52,14 @@ class BarcodeAdminContractTest(unittest.TestCase):
         self.assertNotIn("Batch number, color, and can size input fields", guide)
         self.assertIn("real manufacturer barcode import", guide)
 
+    def test_admin_guide_uses_client_portal_language(self):
+        guide = (CLOUD_ROOT / "app" / "web" / "templates" / "admin" / "guide.html").read_text(encoding="utf-8")
+
+        self.assertNotIn("Owner dashboard", guide)
+        self.assertNotIn("Owner Dashboard", guide)
+        self.assertIn("Client portal with fleet data", guide)
+        self.assertIn("Client portal with real fleet statistics", guide)
+
 
 class InventoryAdminContractTest(unittest.TestCase):
     def test_manual_inventory_adjustments_need_a_device_target(self):
