@@ -42,7 +42,9 @@
             <li><a href="/admin/device-logs" class="{% if active == 'device_logs' %}active{% endif %}"><span class="nav-icon">&#9776;</span> Device Logs</a></li>
 
             <li class="nav-section" style="padding: 16px 20px 6px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); list-style: none;">Admin</li>
+            {% if request.session.get('user_role') == 'ppg_admin' %}
             <li><a href="/admin/users" class="{% if active == 'users' %}active{% endif %}"><span class="nav-icon">&#9679;</span> Users</a></li>
+            {% endif %}
             <li><a href="/admin/error-codes" class="{% if active == 'error_codes' %}active{% endif %}"><span class="nav-icon">&#9888;</span> Error Codes</a></li>
             <li><a href="/admin/guide" class="{% if active == 'guide' %}active{% endif %}"><span class="nav-icon">&#9881;</span> System Guide</a></li>
 

@@ -23,6 +23,11 @@ PPG_WEB_ROLES = {"ppg_admin", "ppg_support"}
 CLIENT_WEB_ROLES = {"ship_owner", "crew"}
 
 
+def _can_manage_users(role: str | None) -> bool:
+    """Return whether a web role may create or edit user accounts."""
+    return role == "ppg_admin"
+
+
 def _portal_home_for_role(role: str | None) -> str:
     """Return the correct web portal landing page for a user role."""
     if role in PPG_WEB_ROLES:
@@ -109,6 +114,23 @@ async def require_admin_session(
             status_code=303,
             detail="Admin access required",
             headers={"Location": _portal_home_for_role(user.role)},
+        )
+
+    return user
+
+
+async def require_ppg_admin_session(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Require a PPG Admin session for platform administration actions."""
+    user = await require_admin_session(request, db)
+
+    if not _can_manage_users(user.role):
+        raise HTTPException(
+            status_code=303,
+            detail="PPG Admin access required",
+            headers={"Location": "/admin/?error=PPG+Admin+access+required"},
         )
 
     return user

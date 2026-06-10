@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models.user import User, UserRole
 from app.models.company import Company
 from app.api.auth import hash_password
-from app.web.auth_web import require_admin_session
+from app.web.auth_web import require_ppg_admin_session
 
 router = APIRouter(prefix="/admin", tags=["users-web"])
 templates = Jinja2Templates(directory="app/web/templates")
@@ -51,7 +51,7 @@ def _users_error_redirect(message: str) -> RedirectResponse:
 async def users_page(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_session),
+    current_user: User = Depends(require_ppg_admin_session),
 ):
     """List all users with their companies."""
     # Fetch users with company relationship
@@ -88,7 +88,7 @@ async def users_page(
 async def add_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_session),
+    current_user: User = Depends(require_ppg_admin_session),
     email: str = Form(...),
     password: str = Form(...),
     name: str = Form(...),
@@ -129,7 +129,7 @@ async def edit_user(
     user_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_session),
+    current_user: User = Depends(require_ppg_admin_session),
     name: str = Form(...),
     role: str = Form(...),
     company_id: Optional[str] = Form(None),
@@ -164,7 +164,7 @@ async def reset_password(
     user_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_session),
+    current_user: User = Depends(require_ppg_admin_session),
     new_password: str = Form(...),
 ):
     """Reset a user's password."""
@@ -191,7 +191,7 @@ async def toggle_active(
     user_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_session),
+    current_user: User = Depends(require_ppg_admin_session),
 ):
     """Toggle user active status. Prevents deactivating the last admin."""
     result = await db.execute(select(User).where(User.id == user_id))
