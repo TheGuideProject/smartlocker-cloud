@@ -11,7 +11,7 @@
 {% block content %}
 <!-- Add Company Form -->
 <div id="addCompanyPanel" class="panel" style="display: none;">
-    <div class="panel-title">Add Ship Owner Company</div>
+    <div class="panel-title">Add Client Company</div>
     <form action="/admin/companies/add" method="post">
         <div class="form-row">
             <div class="form-group">
@@ -39,7 +39,7 @@
     <div style="font-size: 48px; margin-bottom: 15px;">&#127970;</div>
     <div style="color: var(--text-secondary); font-size: 16px; margin-bottom: 10px;">No companies registered yet</div>
     <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">
-        Start by adding a ship owner company, then create fleets and vessels.
+        Start by adding a client company, then create fleets and vessels.
     </div>
     <button class="btn btn-primary" onclick="document.getElementById('addCompanyPanel').style.display='block'">+ Add First Company</button>
 </div>
@@ -267,7 +267,7 @@
         <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
             <div style="font-size: 28px; margin-bottom: 5px;">&#127970;</div>
             <div style="color: var(--text-primary); font-weight: 600; font-size: 13px;">1. Company</div>
-            <div style="color: var(--text-muted); font-size: 11px;">Ship owner</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Client company</div>
         </div>
         <div style="padding: 15px; background: var(--bg-input); border-radius: 6px;">
             <div style="font-size: 28px; margin-bottom: 5px;">&#9875;</div>

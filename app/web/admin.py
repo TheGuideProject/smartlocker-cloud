@@ -659,7 +659,7 @@ async def admin_add_company(
     contact_phone: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add a new company (ship owner)."""
+    """Add a new client company."""
     company = Company(
         name=name,
         contact_email=contact_email or None,

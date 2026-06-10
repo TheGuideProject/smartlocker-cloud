@@ -23,7 +23,7 @@
 
 <div class="panel" style="border-left: 3px solid var(--accent-blue); margin-bottom: 15px; padding: 12px 20px;">
     <strong>PPG / Client separation:</strong>
-    <span style="color: var(--text-muted);">PPG Admin and PPG Support use the PPG platform and do not need a company. Ship Owner and Crew use the Client Portal and must be assigned to a company.</span>
+    <span style="color: var(--text-muted);">PPG Admin and PPG Support use the PPG platform and do not need a company. Client Admin and Crew use the Client Portal and must be assigned to a company.</span>
 </div>
 
 <!-- Add User Form (hidden by default) -->
@@ -64,7 +64,7 @@
                     {% endfor %}
                 </select>
                 <div id="addUserCompanyHint" style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">
-                    Required for Ship Owner and Crew. Ignored for PPG staff.
+                    Required for Client Admin and Crew. Ignored for PPG staff.
                 </div>
             </div>
             <div class="form-group" style="display: flex; align-items: flex-end;">
@@ -103,7 +103,7 @@
                 {% elif user.role == 'ppg_support' %}
                 <span class="type-badge" style="background: rgba(244,162,97,0.15); color: var(--accent-orange);">PPG Support</span>
                 {% elif user.role == 'ship_owner' %}
-                <span class="type-badge" style="background: rgba(95,168,211,0.15); color: var(--accent-blue);">Ship Owner</span>
+                <span class="type-badge" style="background: rgba(95,168,211,0.15); color: var(--accent-blue);">Client Admin</span>
                 {% elif user.role == 'crew' %}
                 <span class="type-badge" style="background: rgba(46,196,182,0.15); color: var(--accent-green);">Crew</span>
                 {% else %}

@@ -19,6 +19,12 @@ templates = Jinja2Templates(directory="app/web/templates")
 
 PPG_USER_ROLES = {UserRole.PPG_ADMIN.value, UserRole.PPG_SUPPORT.value}
 CLIENT_USER_ROLES = {UserRole.SHIP_OWNER.value, UserRole.CREW.value}
+USER_ROLE_LABELS = {
+    UserRole.PPG_ADMIN.value: "PPG Admin",
+    UserRole.PPG_SUPPORT.value: "PPG Support",
+    UserRole.SHIP_OWNER.value: "Client Admin",
+    UserRole.CREW.value: "Crew",
+}
 
 
 def _company_assignment_for_role(role: str, company_id: Optional[str]) -> tuple[bool, Optional[str], Optional[str]]:
@@ -60,6 +66,14 @@ def _user_portal_context(role: str) -> dict:
     }
 
 
+def _user_role_options() -> list[dict]:
+    """Return user roles with labels that match the PPG/client portal split."""
+    return [
+        {"value": role.value, "label": USER_ROLE_LABELS.get(role.value, role.value.replace("_", " ").title())}
+        for role in UserRole
+    ]
+
+
 def _users_error_redirect(message: str) -> RedirectResponse:
     return RedirectResponse(
         url=f"/admin/users?error={message.replace(' ', '+')}",
@@ -89,10 +103,7 @@ async def users_page(
     companies = result.scalars().all()
 
     # Available roles
-    roles = [
-        {"value": r.value, "label": r.value.replace("_", " ").title()}
-        for r in UserRole
-    ]
+    roles = _user_role_options()
 
     return templates.TemplateResponse("admin/users.html", {
         "request": request,

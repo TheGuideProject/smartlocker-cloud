@@ -4,7 +4,7 @@ SmartLocker Cloud - FastAPI Application Entry Point
 Starts the web server with:
 - REST API endpoints (/api/...)
 - Admin portal (/admin/...)
-- Ship Owner dashboard (/dashboard/...)
+- Client portal (/client/... plus legacy /dashboard redirect)
 - Auto-generated API docs (/docs)
 """
 

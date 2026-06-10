@@ -90,6 +90,27 @@ class UserManagementContractTest(unittest.TestCase):
             },
         )
 
+    def test_user_role_options_use_client_facing_labels(self):
+        user_role_options = getattr(users_web, "_user_role_options", None)
+
+        self.assertIsNotNone(user_role_options)
+        self.assertIn({"value": "ship_owner", "label": "Client Admin"}, user_role_options())
+        self.assertIn({"value": "crew", "label": "Crew"}, user_role_options())
+
+    def test_admin_templates_use_client_language_for_customer_side(self):
+        fleet_template = (CLOUD_ROOT / "app" / "web" / "templates" / "admin" / "fleet.html").read_text(encoding="utf-8")
+        users_template = (CLOUD_ROOT / "app" / "web" / "templates" / "admin" / "users.html").read_text(encoding="utf-8")
+
+        self.assertNotIn("Ship Owner", fleet_template)
+        self.assertNotIn("ship owner company", fleet_template)
+        self.assertIn("Add Client Company", fleet_template)
+        self.assertIn("client company", fleet_template)
+
+        self.assertNotIn("Ship Owner", users_template)
+        self.assertIn("Client Admin and Crew use the Client Portal", users_template)
+        self.assertIn("Required for Client Admin and Crew", users_template)
+        self.assertIn("Client Admin", users_template)
+
     def test_users_route_attaches_portal_context_for_table(self):
         source = (CLOUD_ROOT / "app" / "web" / "users_web.py").read_text(encoding="utf-8")
 
