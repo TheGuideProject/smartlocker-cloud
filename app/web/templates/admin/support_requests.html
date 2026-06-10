@@ -32,6 +32,7 @@
             <tr>
                 <th>Date</th>
                 <th>Device</th>
+                <th>Client / Vessel</th>
                 <th>Error Code</th>
                 <th>Severity</th>
                 <th>Details</th>
@@ -45,7 +46,14 @@
         <tr>
             <td style="white-space: nowrap; font-size: 12px;">{{ sr.created_at.strftime('%Y-%m-%d %H:%M') if sr.created_at else '-' }}</td>
             <td>
-                <strong>{{ sr.device.name or sr.device_id if sr.device else sr.device_id }}</strong>
+                <strong>{{ sr.client_context.device_label if sr.client_context else (sr.device.name or sr.device_id if sr.device else sr.device_id) }}</strong>
+            </td>
+            <td>
+                <strong>{{ sr.client_context.company_name if sr.client_context else 'Unknown client' }}</strong>
+                <br><small style="color:var(--text-muted);">{{ sr.client_context.vessel_name if sr.client_context else 'Unknown vessel' }}</small>
+                {% if sr.client_context and sr.client_context.client_href %}
+                <br><a href="{{ sr.client_context.client_href }}" style="color:var(--accent-blue); font-size:12px;">Open client preview</a>
+                {% endif %}
             </td>
             <td>
                 <a href="/admin/error-codes#{{ sr.error_code }}" style="color:var(--accent-blue); text-decoration:none; font-family:monospace; font-weight:600;">
@@ -86,7 +94,7 @@
         <!-- Resolution notes (hidden) -->
         {% if sr.resolution_notes %}
         <tr id="notes_{{ sr.id }}" style="display: none;">
-            <td colspan="8" style="background: var(--bg-input, var(--bg-hover)); padding: 12px 20px;">
+            <td colspan="9" style="background: var(--bg-input, var(--bg-hover)); padding: 12px 20px;">
                 <strong>Resolution:</strong> {{ sr.resolution_notes }}
                 <br><span style="color: var(--text-muted); font-size: 12px;">Resolved by {{ sr.resolved_by or 'admin' }} on {{ sr.resolved_at.strftime('%Y-%m-%d %H:%M') if sr.resolved_at else '-' }}</span>
             </td>
@@ -95,7 +103,7 @@
         {% endfor %}
 
         {% if not support_requests %}
-        <tr><td colspan="8" style="color:var(--text-muted); text-align:center; padding:30px;">
+        <tr><td colspan="9" style="color:var(--text-muted); text-align:center; padding:30px;">
             No support requests yet. When crew members request PPG support from a device, requests will appear here.
         </td></tr>
         {% endif %}

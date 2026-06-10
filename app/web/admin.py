@@ -2301,17 +2301,45 @@ async def admin_error_codes(request: Request, user = Depends(require_admin_sessi
 
 # ---- Support Requests ----
 
+def _support_request_client_context(support_request) -> dict:
+    """Return display context that links a support ticket back to the customer vessel."""
+    device = getattr(support_request, "device", None)
+    vessel = getattr(device, "vessel", None)
+    fleet = getattr(vessel, "fleet", None)
+    company = getattr(fleet, "company", None)
+    company_id = getattr(company, "id", None)
+    device_label = (
+        getattr(device, "name", None)
+        or getattr(support_request, "device_id", None)
+        or "-"
+    )
+
+    return {
+        "company_name": getattr(company, "name", None) or "Unknown client",
+        "vessel_name": getattr(vessel, "name", None) or "Unknown vessel",
+        "device_label": device_label,
+        "client_href": f"/client/?company_id={company_id}" if company_id else None,
+    }
+
+
 @router.get("/support")
 async def admin_support_requests(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Support request management page."""
-    # Get all support requests with device info
+    # Get all support requests with customer/vessel context for triage.
     result = await db.execute(
         select(SupportRequest)
-        .options(selectinload(SupportRequest.device))
+        .options(
+            selectinload(SupportRequest.device)
+            .selectinload(LockerDevice.vessel)
+            .selectinload(Vessel.fleet)
+            .selectinload(Fleet.company)
+        )
         .order_by(SupportRequest.created_at.desc())
         .limit(100)
     )
     requests_list = result.scalars().all()
+    for support_request in requests_list:
+        support_request.client_context = _support_request_client_context(support_request)
 
     # Get stats
     total_result = await db.execute(select(func.count(SupportRequest.id)))
