@@ -118,6 +118,51 @@ def _build_product_colors_from_chart(chart_data: dict) -> dict:
     return product_colors
 
 
+def _color_names_from_payload(colors_payload) -> list[str]:
+    """Return simple color labels for mobile clients from cloud color payloads."""
+    if not colors_payload:
+        return []
+    if isinstance(colors_payload, str):
+        return [colors_payload]
+    if not isinstance(colors_payload, list):
+        return []
+
+    names: list[str] = []
+    for item in colors_payload:
+        if isinstance(item, str):
+            name = item.strip()
+        elif isinstance(item, dict):
+            name = str(item.get("name") or item.get("color") or "").strip()
+        else:
+            name = ""
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _product_colors_payload(product: Product, chart_colors: dict) -> list:
+    """Return the rich cloud color payload, falling back to maintenance chart colors."""
+    return product.colors_json if product.colors_json else chart_colors.get(product.name, [])
+
+
+def _product_config_dict(product: Product, chart_colors: dict) -> dict:
+    """Build a product config row for Raspberry and Android clients."""
+    colors_payload = _product_colors_payload(product, chart_colors)
+    return {
+        "id": str(product.id),
+        "ppg_code": product.ppg_code,
+        "name": product.name,
+        "product_type": product.product_type,
+        "density_g_per_ml": product.density_g_per_ml,
+        "pot_life_minutes": product.pot_life_minutes,
+        "hazard_class": product.hazard_class,
+        "can_sizes_ml": product.can_sizes_ml,
+        "can_tare_weight_g": product.can_tare_weight_g,
+        "colors_json": colors_payload,
+        "colors": _color_names_from_payload(colors_payload),
+    }
+
+
 # ---- Schemas ----
 
 class PairRequest(BaseModel):
@@ -303,18 +348,7 @@ async def pair_device(
     # Build config payload
     config = {
         "products": [
-            {
-                "id": str(p.id),
-                "ppg_code": p.ppg_code,
-                "name": p.name,
-                "product_type": p.product_type,
-                "density_g_per_ml": p.density_g_per_ml,
-                "pot_life_minutes": p.pot_life_minutes,
-                "hazard_class": p.hazard_class,
-                "can_sizes_ml": p.can_sizes_ml,
-                "can_tare_weight_g": p.can_tare_weight_g,
-                "colors_json": p.colors_json if p.colors_json else pair_chart_colors.get(p.name, []),
-            }
+            _product_config_dict(p, pair_chart_colors)
             for p in products
         ],
         "recipes": [
@@ -464,18 +498,7 @@ async def get_device_config(
         "config_version": device.config_version,
         "slot_count": device.slot_count or 4,
         "products": [
-            {
-                "id": str(p.id),
-                "ppg_code": p.ppg_code,
-                "name": p.name,
-                "product_type": p.product_type,
-                "density_g_per_ml": p.density_g_per_ml,
-                "pot_life_minutes": p.pot_life_minutes,
-                "hazard_class": p.hazard_class,
-                "can_sizes_ml": p.can_sizes_ml,
-                "can_tare_weight_g": p.can_tare_weight_g,
-                "colors_json": p.colors_json if p.colors_json else chart_product_colors.get(p.name, []),
-            }
+            _product_config_dict(p, chart_product_colors)
             for p in products
         ],
         "recipes": [

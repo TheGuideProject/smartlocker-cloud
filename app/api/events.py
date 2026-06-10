@@ -1,11 +1,12 @@
 """Event Ingestion API - Receives batched events from edge devices."""
 
+import json
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select, text, and_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +38,22 @@ class EventIn(BaseModel):
     data: Optional[dict] = None
     confirmation: str = "unconfirmed"
     sequence_num: int = 0
+
+    @field_validator("data", mode="before")
+    @classmethod
+    def coerce_android_payload_data(cls, value: Any) -> Optional[dict]:
+        """Accept Android/Raspberry event payloads even if data arrives as JSON text."""
+        if value is None or isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return {"_raw": value[:500]}
+            if isinstance(parsed, dict):
+                return parsed
+            return {"_raw": value[:500]}
+        return {"_raw": str(value)[:500]}
 
 
 class EventBatch(BaseModel):
