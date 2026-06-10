@@ -21,6 +21,11 @@
 </div>
 {% endif %}
 
+<div class="panel" style="border-left: 3px solid var(--accent-blue); margin-bottom: 15px; padding: 12px 20px;">
+    <strong>PPG / Client separation:</strong>
+    <span style="color: var(--text-muted);">PPG Admin and PPG Support use the PPG platform and do not need a company. Ship Owner and Crew use the Client Portal and must be assigned to a company.</span>
+</div>
+
 <!-- Add User Form (hidden by default) -->
 <div id="addUserPanel" class="panel" style="display: none;">
     <div class="panel-title">Add New User</div>
@@ -42,7 +47,7 @@
             </div>
             <div class="form-group">
                 <label>Role</label>
-                <select name="role" required>
+                <select name="role" id="addUserRole" required onchange="syncAddUserCompanyRequirement()">
                     {% for r in roles %}
                     <option value="{{ r.value }}">{{ r.label }}</option>
                     {% endfor %}
@@ -52,12 +57,15 @@
         <div class="form-row">
             <div class="form-group">
                 <label>Company</label>
-                <select name="company_id">
-                    <option value="">-- No Company (PPG Staff) --</option>
+                <select name="company_id" id="addUserCompany">
+                    <option value="">-- PPG staff only --</option>
                     {% for company in companies %}
                     <option value="{{ company.id }}">{{ company.name }}</option>
                     {% endfor %}
                 </select>
+                <div id="addUserCompanyHint" style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">
+                    Required for Ship Owner and Crew. Ignored for PPG staff.
+                </div>
             </div>
             <div class="form-group" style="display: flex; align-items: flex-end;">
                 <!-- spacer -->
@@ -148,11 +156,12 @@
                     <div class="form-group" style="margin-bottom: 0; min-width: 160px;">
                         <label>Company</label>
                         <select name="company_id">
-                            <option value="">-- None --</option>
+                            <option value="">-- PPG staff only --</option>
                             {% for company in companies %}
                             <option value="{{ company.id }}" {% if user.company_id == company.id %}selected{% endif %}>{{ company.name }}</option>
                             {% endfor %}
                         </select>
+                        <div style="color: var(--text-muted); font-size: 11px; margin-top: 3px;">Client roles require a company. PPG roles clear company automatically.</div>
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button type="submit" class="btn btn-success" style="height: 36px; font-size: 12px;">Save</button>
@@ -207,5 +216,19 @@ function togglePasswordForm(userId) {
     // Toggle password form
     passwordRow.style.display = passwordRow.style.display === 'none' ? 'table-row' : 'none';
 }
+
+function syncAddUserCompanyRequirement() {
+    var role = document.getElementById('addUserRole').value;
+    var company = document.getElementById('addUserCompany');
+    var hint = document.getElementById('addUserCompanyHint');
+    var clientRole = role === 'ship_owner' || role === 'crew';
+    company.required = clientRole;
+    hint.style.color = clientRole ? 'var(--accent-orange)' : 'var(--text-muted)';
+    hint.textContent = clientRole
+        ? 'Required: client users can only see vessels from this company.'
+        : 'PPG staff use the PPG platform; company will be left empty.';
+}
+
+syncAddUserCompanyRequirement();
 </script>
 {% endblock %}

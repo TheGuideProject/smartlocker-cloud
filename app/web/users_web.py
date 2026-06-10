@@ -17,6 +17,33 @@ from app.web.auth_web import require_admin_session
 router = APIRouter(prefix="/admin", tags=["users-web"])
 templates = Jinja2Templates(directory="app/web/templates")
 
+PPG_USER_ROLES = {UserRole.PPG_ADMIN.value, UserRole.PPG_SUPPORT.value}
+CLIENT_USER_ROLES = {UserRole.SHIP_OWNER.value, UserRole.CREW.value}
+
+
+def _company_assignment_for_role(role: str, company_id: Optional[str]) -> tuple[bool, Optional[str], Optional[str]]:
+    """Validate and normalize company assignment for a web user role."""
+    clean_role = (role or "").strip()
+    clean_company_id = (company_id or "").strip() or None
+
+    if clean_role not in PPG_USER_ROLES | CLIENT_USER_ROLES:
+        return False, None, "Invalid user role"
+
+    if clean_role in PPG_USER_ROLES:
+        return True, None, None
+
+    if not clean_company_id:
+        return False, None, "Client users must be assigned to a company"
+
+    return True, clean_company_id, None
+
+
+def _users_error_redirect(message: str) -> RedirectResponse:
+    return RedirectResponse(
+        url=f"/admin/users?error={message.replace(' ', '+')}",
+        status_code=303,
+    )
+
 
 # ---- GET /users - List all users ----
 
@@ -76,12 +103,16 @@ async def add_user(
             url="/admin/users?error=Email+already+exists", status_code=303
         )
 
+    valid_assignment, normalized_company_id, assignment_error = _company_assignment_for_role(role, company_id)
+    if not valid_assignment:
+        return _users_error_redirect(assignment_error or "Invalid user setup")
+
     user = User(
         email=email.strip(),
         password_hash=hash_password(password),
         name=name.strip(),
         role=role,
-        company_id=company_id if company_id else None,
+        company_id=normalized_company_id,
     )
     db.add(user)
     await db.flush()
@@ -112,9 +143,13 @@ async def edit_user(
             url="/admin/users?error=User+not+found", status_code=303
         )
 
+    valid_assignment, normalized_company_id, assignment_error = _company_assignment_for_role(role, company_id)
+    if not valid_assignment:
+        return _users_error_redirect(assignment_error or "Invalid user setup")
+
     user.name = name.strip()
     user.role = role
-    user.company_id = company_id if company_id else None
+    user.company_id = normalized_company_id
     await db.flush()
 
     return RedirectResponse(
