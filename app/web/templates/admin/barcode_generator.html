@@ -187,16 +187,9 @@
             <hr class="bc-divider">
 
             <div class="bc-field">
-                <label>Batch Number</label>
-                <div class="bc-batch-row">
-                    <div>
-                        <input type="text" id="batch_start" name="batch_start" placeholder="Start (e.g. 80008800)" required>
-                    </div>
-                    <div>
-                        <input type="text" id="batch_end" name="batch_end" placeholder="End (optional)">
-                    </div>
-                </div>
-                <div class="hint">Leave "End" empty for a single label, or enter a range for batch generation (max 50).</div>
+                <label for="real_barcode">Real Barcode (optional)</label>
+                <input type="text" id="real_barcode" name="real_barcode" placeholder="Scan or paste the manufacturer barcode">
+                <div class="hint">Leave empty to generate a SmartLocker barcode from the PPG code and color.</div>
             </div>
             <div class="bc-field">
                 <label for="barcode_type">Barcode Type</label>
@@ -212,10 +205,9 @@
         <!-- PDF download form (hidden, submitted separately) -->
         <form id="pdfForm" action="/admin/barcode-generator/pdf" method="post" style="display:none;">
             <input type="hidden" name="ppg_code" id="pdf_ppg_code">
-            <input type="hidden" name="batch_start" id="pdf_batch_start">
-            <input type="hidden" name="batch_end" id="pdf_batch_end">
             <input type="hidden" name="product_name" id="pdf_product_name">
             <input type="hidden" name="color" id="pdf_color">
+            <input type="hidden" name="real_barcode" id="pdf_real_barcode">
             <input type="hidden" name="barcode_type" id="pdf_barcode_type">
         </form>
         <button type="button" class="bc-btn bc-btn-pdf" id="downloadPdfBtn" style="display:none;">
@@ -232,7 +224,7 @@
         <div id="previewArea">
             <div class="bc-empty">
                 <div class="icon">&#128203;</div>
-                <p>Configure your label and click "Generate Preview"</p>
+                <p>Configure your label or import a real barcode, then click "Generate Preview"</p>
             </div>
         </div>
         <div class="bc-spinner" id="spinner"></div>
@@ -371,10 +363,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Copy values to PDF form
             document.getElementById('pdf_ppg_code').value = formData.get('ppg_code');
-            document.getElementById('pdf_batch_start').value = formData.get('batch_start');
-            document.getElementById('pdf_batch_end').value = formData.get('batch_end');
             document.getElementById('pdf_product_name').value = formData.get('product_name');
             document.getElementById('pdf_color').value = formData.get('color');
+            document.getElementById('pdf_real_barcode').value = formData.get('real_barcode');
             document.getElementById('pdf_barcode_type').value = formData.get('barcode_type');
             downloadPdfBtn.style.display = 'block';
         } catch (err) {

@@ -24,8 +24,8 @@
         <div class="value green">{{ product_summary.values()|map(attribute='total_scans')|sum }}</div>
     </div>
     <div class="stat-card accent-orange">
-        <div class="label">Batches</div>
-        <div class="value orange">{{ barcodes|map(attribute='batch_number')|unique|list|length }}</div>
+        <div class="label">Barcode Types</div>
+        <div class="value orange">{{ barcodes|map(attribute='barcode_type')|unique|list|length }}</div>
     </div>
 </div>
 
@@ -59,9 +59,9 @@
     <table class="data-table" style="border: none; border-radius: 0;">
         <thead>
             <tr>
+                <th>Barcode</th>
                 <th>Product</th>
                 <th>PPG Code</th>
-                <th>Batch</th>
                 <th>Color</th>
                 <th>Type</th>
                 <th>Scans</th>
@@ -72,13 +72,20 @@
         <tbody>
             {% for bc in barcodes %}
             <tr>
+                <td style="min-width: 190px;">
+                    <img src="/admin/barcodes/{{ bc.id }}/image.png"
+                         alt="{{ bc.barcode_data }}"
+                         style="width: 160px; max-height: 72px; object-fit: contain; background: #fff; padding: 6px; border-radius: 4px; display: block;">
+                    <code style="display: block; margin-top: 6px; font-size: 11px; background: var(--bg-input); padding: 3px 6px; border-radius: 3px; word-break: break-all;">
+                        {{ bc.barcode_data }}
+                    </code>
+                </td>
                 <td><strong style="color: var(--text-primary);">{{ bc.product_name }}</strong></td>
                 <td>
                     <code style="font-size: 12px; background: var(--bg-input); padding: 2px 6px; border-radius: 3px;">
                         {{ bc.ppg_code }}
                     </code>
                 </td>
-                <td style="font-family: monospace; font-size: 13px;">{{ bc.batch_number }}</td>
                 <td>{{ bc.color or '-' }}</td>
                 <td>
                     <span class="type-badge" style="background: rgba(96,165,250,0.12); color: var(--info-text);">

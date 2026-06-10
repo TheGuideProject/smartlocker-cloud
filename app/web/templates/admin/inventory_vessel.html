@@ -12,6 +12,12 @@
 </div>
 {% endif %}
 
+{% if request.query_params.get('success') %}
+<div class="panel" style="border-left: 3px solid var(--accent-green); margin-bottom: 15px;">
+    <span style="color: var(--accent-green); font-weight: 600;">Saved:</span> {{ request.query_params.get('success') }}.
+</div>
+{% endif %}
+
 {% if request.query_params.get('error') %}
 <div class="panel" style="border-left: 3px solid var(--accent-red); margin-bottom: 15px;">
     <span style="color: var(--accent-red); font-weight: 600;">Error:</span> {{ request.query_params.get('error') }}

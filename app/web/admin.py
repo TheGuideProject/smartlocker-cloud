@@ -10,8 +10,8 @@ import logging
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, Query, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.orm import selectinload
@@ -113,6 +113,62 @@ def _extract_product_colors(parsed_data: dict) -> dict:
                 if color not in colors[product]:
                     colors[product].append(color)
     return colors
+
+
+def _barcode_payload_value(ppg_code: str, color: str = "", real_barcode: str = "") -> str:
+    """Return the exact payload to encode in a saved product barcode."""
+    imported = (real_barcode or "").strip()
+    if imported:
+        return imported
+
+    code = re.sub(r"\s+", "", (ppg_code or "").strip().upper())
+    if not code:
+        raise ValueError("PPG code is required when no real barcode is provided.")
+
+    clean_color = re.sub(r"[^A-Z0-9._-]+", "", (color or "").strip().upper())
+    return f"SL_{code}_{clean_color}" if clean_color else f"SL_{code}"
+
+
+def _signed_inventory_liters(adjustment_type: str, quantity_liters: float | None) -> float:
+    """Convert an inventory adjustment into signed liters."""
+    liters = float(quantity_liters or 0.0)
+    if adjustment_type in {"manual_add", "pdf_import"}:
+        return liters
+    if adjustment_type in {"manual_remove", "mixing_consumption", "auto_consumed"}:
+        return -liters
+    return 0.0
+
+
+def _apply_inventory_adjustment_summary(
+    product_summary: dict,
+    product,
+    adjustment_type: str,
+    quantity_liters: float | None,
+    vessel_product_colors: dict,
+) -> None:
+    """Apply a cloud-side inventory adjustment to the visible vessel summary."""
+    signed_liters = _signed_inventory_liters(adjustment_type, quantity_liters)
+    if not product or signed_liters == 0:
+        return
+
+    product_name = getattr(product, "name", "") or "Unknown Product"
+    product_type = getattr(product, "product_type", "") or "base_paint"
+    if product_name not in product_summary:
+        product_summary[product_name] = {
+            "name": product_name,
+            "product_id": getattr(product, "id", ""),
+            "product_type": product_type,
+            "product_type_label": product_type.replace("_", " ").title(),
+            "liters": 0.0,
+            "full_liters": 0.0,
+            "low_stock": False,
+            "colors": vessel_product_colors.get(product_name, []),
+            "hardener_name": None,
+            "is_hardener_pair": False,
+        }
+
+    new_liters = float(product_summary[product_name].get("liters") or 0.0) + signed_liters
+    product_summary[product_name]["liters"] = max(0.0, new_liters)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -1517,45 +1573,28 @@ async def admin_inventory_vessel(
             if can.weight_full_g and density > 0:
                 ps["full_liters"] += (can.weight_full_g / density) / 1000.0
 
-        if device_ids:
-            adj_result = await db.execute(
-                select(InventoryAdjustment).where(
-                    InventoryAdjustment.device_id.in_(device_ids),
-                    InventoryAdjustment.adjustment_type.in_(["manual_add", "pdf_import"]),
-                )
+    if device_ids:
+        adj_result = await db.execute(
+            select(InventoryAdjustment).where(
+                InventoryAdjustment.device_id.in_(device_ids),
+                InventoryAdjustment.adjustment_type.in_([
+                    "manual_add",
+                    "pdf_import",
+                    "manual_remove",
+                    "mixing_consumption",
+                    "auto_consumed",
+                ]),
             )
-            for adj in adj_result.scalars().all():
-                if adj.product_id and adj.product_id in products_by_id:
-                    p = products_by_id[adj.product_id]
-                    adj_liters = adj.quantity_liters or 0
-                    if p.name in product_summary:
-                        product_summary[p.name]["liters"] += adj_liters
-                    else:
-                        product_summary[p.name] = {
-                            "name": p.name,
-                            "product_id": p.id,
-                            "product_type": p.product_type,
-                            "product_type_label": p.product_type.replace("_", " ").title(),
-                            "liters": round(adj_liters, 1),
-                            "full_liters": 0.0,
-                            "low_stock": False,
-                            "colors": vessel_product_colors.get(p.name, []),
-                            "hardener_name": None,
-                            "is_hardener_pair": False,
-                        }
-            adj_remove_result = await db.execute(
-                select(InventoryAdjustment).where(
-                    InventoryAdjustment.device_id.in_(device_ids),
-                    InventoryAdjustment.adjustment_type == "manual_remove",
-                )
+        )
+        for adj in adj_result.scalars().all():
+            product = products_by_id.get(adj.product_id)
+            _apply_inventory_adjustment_summary(
+                product_summary,
+                product,
+                adj.adjustment_type,
+                adj.quantity_liters,
+                vessel_product_colors,
             )
-            for adj in adj_remove_result.scalars().all():
-                if adj.product_id and adj.product_id in products_by_id:
-                    p = products_by_id[adj.product_id]
-                    if p.name in product_summary:
-                        product_summary[p.name]["liters"] -= (adj.quantity_liters or 0)
-                        if product_summary[p.name]["liters"] < 0:
-                            product_summary[p.name]["liters"] = 0
 
     # Calculate low stock flags + round liters
     for pname, ps in product_summary.items():
@@ -1646,7 +1685,8 @@ async def admin_adjust_vessel_inventory(
         created_by="admin",
     )
     db.add(adjustment)
-    return RedirectResponse(url=f"/admin/inventory/{vessel_id}", status_code=303)
+    await db.flush()
+    return RedirectResponse(url=f"/admin/inventory/{vessel_id}?success=Stock+updated", status_code=303)
 
 
 @router.post("/inventory/{vessel_id}/clear-all")
@@ -2445,20 +2485,21 @@ async def admin_barcode_create(
     user=Depends(require_admin_session),
     db: AsyncSession = Depends(get_db),
     ppg_code: str = Form(...),
-    batch_start: str = Form(...),
-    batch_end: str = Form(""),
     product_name: str = Form(...),
     color: str = Form(""),
     product_id: str = Form(""),
+    real_barcode: str = Form(""),
     barcode_type: str = Form("code128"),
 ):
     """Generate barcode preview(s), save to DB, and return HTML fragment."""
     from app.models.product_barcode import ProductBarcode
 
     ppg_code = ppg_code.strip().upper()
-    product_name = product_name.strip().upper().replace(" ", "-")
-    color = color.strip().upper().replace(" ", "") if color else ""
+    product_name = product_name.strip().upper()
+    color = color.strip().upper() if color else ""
     barcode_type = barcode_type.strip().lower()
+    if barcode_type not in {"code128", "qr"}:
+        barcode_type = "code128"
     product_id = product_id.strip() if product_id else ""
 
     # If no product_id provided, try to find by ppg_code
@@ -2470,52 +2511,34 @@ async def admin_barcode_create(
         if product:
             product_id = product.id
 
-    batches: list[str] = []
-    batch_start = batch_start.strip()
-    batch_end = batch_end.strip()
-
-    if batch_end and batch_start.isdigit() and batch_end.isdigit():
-        start_n = int(batch_start)
-        end_n = int(batch_end)
-        if end_n < start_n:
-            start_n, end_n = end_n, start_n
-        end_n = min(end_n, start_n + 49)
-        width = max(len(batch_start), len(batch_end))
-        batches = [str(n).zfill(width) for n in range(start_n, end_n + 1)]
-    else:
-        batches = [batch_start]
-
     previews: list[dict] = []
     saved_count = 0
-    for batch in batches:
-        # Short barcode format: SL-{PPG_CODE}-{BATCH} (scanner-friendly)
-        data_string = f"SL_{ppg_code}_{batch}"
-        png_bytes = _make_barcode_image(data_string, barcode_type)
-        b64 = base64.b64encode(png_bytes).decode()
-        previews.append({
-            "data": data_string,
-            "image_b64": b64,
-            "batch": batch,
-        })
+    data_string = _barcode_payload_value(ppg_code, color, real_barcode)
+    png_bytes = _make_barcode_image(data_string, barcode_type)
+    b64 = base64.b64encode(png_bytes).decode()
+    previews.append({
+        "data": data_string,
+        "image_b64": b64,
+    })
 
-        # Save barcode to database (skip duplicates)
-        if product_id:
-            existing = await db.execute(
-                select(ProductBarcode).where(ProductBarcode.barcode_data == data_string)
+    # Save barcode to database (skip duplicates)
+    if product_id:
+        existing = await db.execute(
+            select(ProductBarcode).where(ProductBarcode.barcode_data == data_string)
+        )
+        if not existing.scalar_one_or_none():
+            barcode_record = ProductBarcode(
+                barcode_data=data_string,
+                product_id=product_id,
+                ppg_code=ppg_code,
+                batch_number="",
+                product_name=product_name,
+                color=color,
+                barcode_type=barcode_type,
+                created_by=user.get("email", "admin") if isinstance(user, dict) else getattr(user, "email", "admin"),
             )
-            if not existing.scalar_one_or_none():
-                barcode_record = ProductBarcode(
-                    barcode_data=data_string,
-                    product_id=product_id,
-                    ppg_code=ppg_code,
-                    batch_number=batch,
-                    product_name=product_name,
-                    color=color,
-                    barcode_type=barcode_type,
-                    created_by=user.get("email", "admin") if isinstance(user, dict) else getattr(user, "email", "admin"),
-                )
-                db.add(barcode_record)
-                saved_count += 1
+            db.add(barcode_record)
+            saved_count += 1
 
     if saved_count > 0:
         try:
@@ -2540,10 +2563,9 @@ async def admin_barcode_pdf(
     request: Request,
     user=Depends(require_admin_session),
     ppg_code: str = Form(...),
-    batch_start: str = Form(...),
-    batch_end: str = Form(""),
     product_name: str = Form(...),
-    color: str = Form(...),
+    color: str = Form(""),
+    real_barcode: str = Form(""),
     barcode_type: str = Form("code128"),
 ):
     """Generate a PDF with printable barcode labels (10cm x 5cm each)."""
@@ -2552,24 +2574,11 @@ async def admin_barcode_pdf(
     from reportlab.pdfgen import canvas as rl_canvas
 
     ppg_code = ppg_code.strip().upper()
-    product_name = product_name.strip().upper().replace(" ", "-")
-    color = color.strip().upper().replace(" ", "")
+    product_name = product_name.strip().upper()
+    color = color.strip().upper()
     barcode_type = barcode_type.strip().lower()
-
-    batch_start = batch_start.strip()
-    batch_end = batch_end.strip()
-
-    batches: list[str] = []
-    if batch_end and batch_start.isdigit() and batch_end.isdigit():
-        start_n = int(batch_start)
-        end_n = int(batch_end)
-        if end_n < start_n:
-            start_n, end_n = end_n, start_n
-        end_n = min(end_n, start_n + 49)
-        width = max(len(batch_start), len(batch_end))
-        batches = [str(n).zfill(width) for n in range(start_n, end_n + 1)]
-    else:
-        batches = [batch_start]
+    if barcode_type not in {"code128", "qr"}:
+        barcode_type = "code128"
 
     label_w = 100 * mm
     label_h = 50 * mm
@@ -2577,45 +2586,40 @@ async def admin_barcode_pdf(
     pdf_buf = io.BytesIO()
     c = rl_canvas.Canvas(pdf_buf, pagesize=(label_w, label_h))
 
-    for i, batch in enumerate(batches):
-        if i > 0:
-            c.showPage()
+    data_string = _barcode_payload_value(ppg_code, color, real_barcode)
+    png_bytes = _make_barcode_image(data_string, barcode_type)
+    img_reader = ImageReader(io.BytesIO(png_bytes))
 
-        # Short barcode format: SL-{PPG_CODE}-{BATCH}
-        data_string = f"SL_{ppg_code}_{batch}"
-        png_bytes = _make_barcode_image(data_string, barcode_type)
-        img_reader = ImageReader(io.BytesIO(png_bytes))
+    # Title
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(8 * mm, label_h - 8 * mm, "PPG SmartLocker Label")
 
-        # Title
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(8 * mm, label_h - 8 * mm, "PPG SmartLocker Label")
+    # Barcode image - centered
+    img_w_pt = 60 * mm if barcode_type != "qr" else 28 * mm
+    img_h_pt = 20 * mm if barcode_type != "qr" else 28 * mm
+    img_x = (label_w - img_w_pt) / 2
+    img_y = label_h - 12 * mm - img_h_pt
+    c.drawImage(img_reader, img_x, img_y, width=img_w_pt, height=img_h_pt, preserveAspectRatio=True, mask='auto')
 
-        # Barcode image - centered
-        img_w_pt = 60 * mm if barcode_type != "qr" else 28 * mm
-        img_h_pt = 20 * mm if barcode_type != "qr" else 28 * mm
-        img_x = (label_w - img_w_pt) / 2
-        img_y = label_h - 12 * mm - img_h_pt
-        c.drawImage(img_reader, img_x, img_y, width=img_w_pt, height=img_h_pt, preserveAspectRatio=True, mask='auto')
+    # Short barcode ID below barcode
+    c.setFont("Courier-Bold", 9)
+    c.drawCentredString(label_w / 2, img_y - 4 * mm, data_string[:42])
 
-        # Short barcode ID below barcode
-        c.setFont("Courier-Bold", 9)
-        c.drawCentredString(label_w / 2, img_y - 4 * mm, data_string)
+    # Info lines at bottom
+    c.setFont("Helvetica", 7)
+    bottom_y = 6 * mm
+    c.drawString(8 * mm, bottom_y + 5 * mm, f"PPG Code: {ppg_code}")
+    c.drawString(8 * mm, bottom_y, f"Product: {product_name}   Color: {color or '-'}")
 
-        # Info lines at bottom
-        c.setFont("Helvetica", 7)
-        bottom_y = 6 * mm
-        c.drawString(8 * mm, bottom_y + 5 * mm, f"PPG Code: {ppg_code}   Batch: {batch}")
-        c.drawString(8 * mm, bottom_y, f"Product: {product_name}   Color: {color}")
-
-        # Border
-        c.setStrokeColorRGB(0.6, 0.6, 0.6)
-        c.setLineWidth(0.5)
-        c.rect(2 * mm, 2 * mm, label_w - 4 * mm, label_h - 4 * mm)
+    # Border
+    c.setStrokeColorRGB(0.6, 0.6, 0.6)
+    c.setLineWidth(0.5)
+    c.rect(2 * mm, 2 * mm, label_w - 4 * mm, label_h - 4 * mm)
 
     c.save()
     pdf_buf.seek(0)
 
-    filename = f"labels_{ppg_code}_{batches[0]}.pdf" if len(batches) == 1 else f"labels_{ppg_code}_{batches[0]}-{batches[-1]}.pdf"
+    filename = f"label_{ppg_code}.pdf"
 
     return StreamingResponse(
         pdf_buf,
@@ -2701,6 +2705,33 @@ async def admin_barcodes_list(
     })
 
 
+@router.get("/barcodes/{barcode_id}/image.png")
+async def admin_barcode_image(
+    barcode_id: str,
+    user=Depends(require_admin_session),
+    db: AsyncSession = Depends(get_db),
+):
+    """Render the saved barcode payload as a PNG image."""
+    from app.models.product_barcode import ProductBarcode
+
+    result = await db.execute(
+        select(ProductBarcode).where(ProductBarcode.id == barcode_id)
+    )
+    barcode = result.scalar_one_or_none()
+    if not barcode:
+        raise HTTPException(status_code=404, detail="Barcode not found")
+
+    png_bytes = _make_barcode_image(
+        barcode.barcode_data,
+        barcode.barcode_type or "code128",
+    )
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.post("/barcodes/{barcode_id}/delete")
 async def admin_barcode_delete(
     barcode_id: str,
@@ -2718,4 +2749,3 @@ async def admin_barcode_delete(
     if barcode:
         await db.delete(barcode)
     return RedirectResponse(url="/admin/barcodes?success=Barcode+deleted", status_code=303)
-
