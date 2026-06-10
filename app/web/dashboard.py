@@ -456,6 +456,8 @@ async def client_support_requests(
         "devices": devices,
         "support_requests": support_requests,
         "stats": _support_request_stats(support_requests),
+        "success": request.query_params.get("success"),
+        "error": request.query_params.get("error"),
     })
 
 

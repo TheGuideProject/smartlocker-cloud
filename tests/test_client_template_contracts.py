@@ -57,6 +57,17 @@ class ClientTemplateContractTest(unittest.TestCase):
         self.assertIn('SupportRequest(', source)
         self.assertIn('error_code="CLIENT"', source)
 
+    def test_client_support_page_surfaces_redirect_messages(self):
+        source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
+        template = (TEMPLATE_ROOT / "owner" / "support.html").read_text(encoding="utf-8")
+
+        self.assertIn('"success": request.query_params.get("success")', source)
+        self.assertIn('"error": request.query_params.get("error")', source)
+        self.assertIn("{% if success %}", template)
+        self.assertIn("{% if error %}", template)
+        self.assertIn("{{ success }}", template)
+        self.assertIn("{{ error }}", template)
+
     def test_shared_client_navigation_links_core_client_pages(self):
         nav = (TEMPLATE_ROOT / "owner" / "_client_nav.html").read_text(encoding="utf-8")
 
