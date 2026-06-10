@@ -2,6 +2,7 @@ from pathlib import Path
 import unittest
 
 from app.web import auth_web
+from app.web import users_web
 from app.web.users_web import _company_assignment_for_role
 
 CLOUD_ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +60,50 @@ class UserManagementContractTest(unittest.TestCase):
         self.assertFalse(valid)
         self.assertIsNone(company_id)
         self.assertEqual(error, "Invalid user role")
+
+    def test_user_portal_context_separates_ppg_and_client_roles(self):
+        user_portal_context = getattr(users_web, "_user_portal_context", None)
+
+        self.assertIsNotNone(user_portal_context)
+        self.assertEqual(
+            user_portal_context("ppg_admin"),
+            {
+                "label": "PPG Portal",
+                "login_href": "/admin/login",
+                "detail": "PPG operations workspace",
+            },
+        )
+        self.assertEqual(
+            user_portal_context("crew"),
+            {
+                "label": "Client Portal",
+                "login_href": "/client/login",
+                "detail": "Customer vessel workspace",
+            },
+        )
+        self.assertEqual(
+            user_portal_context("external"),
+            {
+                "label": "No web portal",
+                "login_href": "",
+                "detail": "Role is not enabled for web access",
+            },
+        )
+
+    def test_users_route_attaches_portal_context_for_table(self):
+        source = (CLOUD_ROOT / "app" / "web" / "users_web.py").read_text(encoding="utf-8")
+
+        self.assertIn("_user_portal_context", source)
+        self.assertIn("user.portal_context", source)
+
+    def test_users_template_shows_portal_column_and_login_links(self):
+        template = (CLOUD_ROOT / "app" / "web" / "templates" / "admin" / "users.html").read_text(encoding="utf-8")
+
+        self.assertIn("<th>Portal</th>", template)
+        self.assertIn("user.portal_context.label", template)
+        self.assertIn("user.portal_context.detail", template)
+        self.assertIn("user.portal_context.login_href", template)
+        self.assertIn("Open login", template)
 
 
 if __name__ == "__main__":

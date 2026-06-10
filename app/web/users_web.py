@@ -38,6 +38,28 @@ def _company_assignment_for_role(role: str, company_id: Optional[str]) -> tuple[
     return True, clean_company_id, None
 
 
+def _user_portal_context(role: str) -> dict:
+    """Return the web portal context for a user role."""
+    clean_role = (role or "").strip()
+    if clean_role in PPG_USER_ROLES:
+        return {
+            "label": "PPG Portal",
+            "login_href": "/admin/login",
+            "detail": "PPG operations workspace",
+        }
+    if clean_role in CLIENT_USER_ROLES:
+        return {
+            "label": "Client Portal",
+            "login_href": "/client/login",
+            "detail": "Customer vessel workspace",
+        }
+    return {
+        "label": "No web portal",
+        "login_href": "",
+        "detail": "Role is not enabled for web access",
+    }
+
+
 def _users_error_redirect(message: str) -> RedirectResponse:
     return RedirectResponse(
         url=f"/admin/users?error={message.replace(' ', '+')}",
@@ -59,6 +81,8 @@ async def users_page(
         select(User).options(selectinload(User.company)).order_by(User.created_at.desc())
     )
     users = result.scalars().all()
+    for user in users:
+        user.portal_context = _user_portal_context(user.role)
 
     # Fetch companies for the dropdown
     result = await db.execute(select(Company).order_by(Company.name))

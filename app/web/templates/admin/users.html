@@ -85,6 +85,7 @@
             <th>Name</th>
             <th>Email</th>
             <th>Role</th>
+            <th>Portal</th>
             <th>Company</th>
             <th>Active</th>
             <th>Last Login</th>
@@ -107,6 +108,13 @@
                 <span class="type-badge" style="background: rgba(46,196,182,0.15); color: var(--accent-green);">Crew</span>
                 {% else %}
                 <span class="type-badge" style="background: rgba(141,153,174,0.15); color: var(--text-muted);">{{ user.role }}</span>
+                {% endif %}
+            </td>
+            <td>
+                <strong>{{ user.portal_context.label }}</strong>
+                <br><small style="color: var(--text-muted);">{{ user.portal_context.detail }}</small>
+                {% if user.portal_context.login_href %}
+                <br><a href="{{ user.portal_context.login_href }}" style="color: var(--accent-blue); font-size: 12px;">Open login</a>
                 {% endif %}
             </td>
             <td>{{ user.company.name if user.company else '-' }}</td>
@@ -139,7 +147,7 @@
 
         <!-- Inline Edit Form (hidden) -->
         <tr id="edit-{{ user.id }}" style="display: none;">
-            <td colspan="7" style="background: var(--bg-input); padding: 15px 20px;">
+            <td colspan="8" style="background: var(--bg-input); padding: 15px 20px;">
                 <form action="/admin/users/{{ user.id }}/edit" method="post" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
                     <div class="form-group" style="margin-bottom: 0; min-width: 160px; flex: 1;">
                         <label>Name</label>
@@ -173,7 +181,7 @@
 
         <!-- Inline Password Reset Form (hidden) -->
         <tr id="password-{{ user.id }}" style="display: none;">
-            <td colspan="7" style="background: var(--bg-input); padding: 15px 20px;">
+            <td colspan="8" style="background: var(--bg-input); padding: 15px 20px;">
                 <form action="/admin/users/{{ user.id }}/reset-password" method="post" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
                     <div class="form-group" style="margin-bottom: 0; min-width: 200px; flex: 1;">
                         <label>New Password for <strong>{{ user.name }}</strong></label>
@@ -190,7 +198,7 @@
 
         {% if not users %}
         <tr>
-            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
                 No users yet. Click "+ Add User" to create one.
             </td>
         </tr>
