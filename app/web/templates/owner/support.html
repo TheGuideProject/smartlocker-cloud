@@ -19,6 +19,48 @@
     <div class="stat-card"><div class="label">Resolved / Closed</div><div class="value green">{{ stats.resolved }}</div></div>
 </div>
 
+{% if not is_ppg_staff %}
+<div class="panel">
+    <div class="panel-title">Request PPG Support</div>
+    {% if devices %}
+    <form action="/client/support/create" method="post" style="display: grid; gap: 12px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+            <div>
+                <label for="device_id" style="display: block; color: var(--text-muted); font-size: 12px; margin-bottom: 6px;">SmartLocker</label>
+                <select id="device_id" name="device_id" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text);">
+                    <option value="">Select device</option>
+                    {% for device in devices %}
+                    <option value="{{ device.device_id }}">{{ device.name or device.device_id }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="severity" style="display: block; color: var(--text-muted); font-size: 12px; margin-bottom: 6px;">Urgency</label>
+                <select id="severity" name="severity" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text);">
+                    <option value="warning">Needs attention</option>
+                    <option value="critical">Production blocked</option>
+                    <option value="info">Question</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label for="error_title" style="display: block; color: var(--text-muted); font-size: 12px; margin-bottom: 6px;">Issue</label>
+            <input id="error_title" name="error_title" maxlength="255" required placeholder="Short description" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text);">
+        </div>
+        <div>
+            <label for="details" style="display: block; color: var(--text-muted); font-size: 12px; margin-bottom: 6px;">Details</label>
+            <textarea id="details" name="details" rows="3" placeholder="What happened, vessel context, and any operator notes" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text);"></textarea>
+        </div>
+        <div>
+            <button type="submit" class="btn btn-primary" style="font-size: 13px;">Send request</button>
+        </div>
+    </form>
+    {% else %}
+    <div style="color: var(--text-muted); font-size: 14px;">No SmartLocker devices are linked to your company yet.</div>
+    {% endif %}
+</div>
+{% endif %}
+
 <div class="panel">
     <div class="panel-title">Support Tickets</div>
     <table class="data-table">

@@ -170,6 +170,36 @@ class PlatformSplitContractTest(unittest.TestCase):
             {"total": 4, "open": 2, "resolved": 2},
         )
 
+    def test_client_support_request_validation_requires_known_device_and_title(self):
+        request_error = getattr(dashboard, "_client_support_request_error", None)
+        allowed_devices = {"locker-1", "locker-2"}
+
+        self.assertIsNotNone(request_error)
+        self.assertEqual(
+            request_error("", "Scale problem", allowed_devices),
+            "Select a SmartLocker device",
+        )
+        self.assertEqual(
+            request_error("locker-x", "Scale problem", allowed_devices),
+            "Device is not available for this client",
+        )
+        self.assertEqual(
+            request_error("locker-1", "", allowed_devices),
+            "Describe the support request",
+        )
+        self.assertIsNone(
+            request_error("locker-1", "Scale problem", allowed_devices),
+        )
+
+    def test_client_support_request_severity_defaults_to_warning(self):
+        request_severity = getattr(dashboard, "_client_support_request_severity", None)
+
+        self.assertIsNotNone(request_severity)
+        self.assertEqual(request_severity("critical"), "critical")
+        self.assertEqual(request_severity("info"), "info")
+        self.assertEqual(request_severity("unknown"), "warning")
+        self.assertEqual(request_severity(""), "warning")
+
     def test_client_can_access_only_own_company(self):
         user = SimpleNamespace(role="ship_owner", company_id="company-client")
 

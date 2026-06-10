@@ -2,8 +2,9 @@
 
 import logging
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request, Depends, Query
+from fastapi import APIRouter, Request, Depends, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, and_, desc
@@ -119,6 +120,42 @@ def _support_request_stats(support_requests: list) -> dict:
         "open": open_count,
         "resolved": len(support_requests) - open_count,
     }
+
+
+def _client_support_request_error(
+    device_id: str | None,
+    error_title: str | None,
+    allowed_device_ids: set[str],
+) -> str | None:
+    """Validate a client-created support request against accessible devices."""
+    clean_device_id = (device_id or "").strip()
+    clean_title = (error_title or "").strip()
+    if not clean_device_id:
+        return "Select a SmartLocker device"
+    if clean_device_id not in allowed_device_ids:
+        return "Device is not available for this client"
+    if not clean_title:
+        return "Describe the support request"
+    return None
+
+
+def _client_support_request_severity(severity: str | None) -> str:
+    """Normalize client support severity into the supported model values."""
+    clean_severity = (severity or "").strip().lower()
+    if clean_severity in {"info", "warning", "critical"}:
+        return clean_severity
+    return "warning"
+
+
+def _client_support_redirect(company_id: str | None, **params: str) -> str:
+    """Build a client support redirect while preserving optional company scope."""
+    query_params = {}
+    if company_id:
+        query_params["company_id"] = company_id
+    query_params.update(params)
+    if not query_params:
+        return "/client/support"
+    return f"/client/support?{urlencode(query_params)}"
 
 
 def _client_activity_event_stats(events: list) -> dict:
@@ -420,6 +457,70 @@ async def client_support_requests(
         "support_requests": support_requests,
         "stats": _support_request_stats(support_requests),
     })
+
+
+@router.post("/support/create")
+async def client_create_support_request(
+    request: Request,
+    current_user = Depends(require_client_session),
+    db: AsyncSession = Depends(get_db),
+    device_id: str = Form(""),
+    error_title: str = Form(""),
+    severity: str = Form("warning"),
+    details: str = Form(""),
+    company_id: str = Form(None),
+):
+    """Create a client-originated support request for a device in their scope."""
+    scoped_company_id = _client_dashboard_company_scope(current_user, company_id)
+    is_ppg_staff = current_user.role in PPG_WEB_ROLES
+    if is_ppg_staff:
+        return RedirectResponse(
+            _client_support_redirect(
+                scoped_company_id,
+                error="Use the PPG support dashboard for staff actions",
+            ),
+            status_code=303,
+        )
+
+    devices = []
+    if scoped_company_id:
+        devices_result = await db.execute(
+            select(LockerDevice)
+            .join(Vessel)
+            .join(Fleet)
+            .where(Fleet.company_id == scoped_company_id)
+        )
+        devices = devices_result.scalars().all()
+
+    allowed_device_ids = {device.device_id for device in devices}
+    validation_error = _client_support_request_error(
+        device_id,
+        error_title,
+        allowed_device_ids,
+    )
+    if validation_error:
+        return RedirectResponse(
+            _client_support_redirect(scoped_company_id, error=validation_error),
+            status_code=303,
+        )
+
+    support_request = SupportRequest(
+        device_id=device_id.strip(),
+        alarm_id="client-portal",
+        error_code="CLIENT",
+        error_title=error_title.strip()[:255],
+        severity=_client_support_request_severity(severity),
+        details=(details or "").strip() or None,
+        user_name=getattr(current_user, "name", None) or getattr(current_user, "email", None) or "Client Portal",
+        status="open",
+    )
+    db.add(support_request)
+    await db.flush()
+
+    return RedirectResponse(
+        _client_support_redirect(scoped_company_id, success="Support request sent"),
+        status_code=303,
+    )
 
 
 @router.get("/activity", response_class=HTMLResponse)

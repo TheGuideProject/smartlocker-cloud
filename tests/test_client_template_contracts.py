@@ -40,6 +40,23 @@ class ClientTemplateContractTest(unittest.TestCase):
         self.assertIn('value=""', partial)
         self.assertIn("company_selector_options", partial)
 
+    def test_client_support_page_has_client_only_request_form(self):
+        template = (TEMPLATE_ROOT / "owner" / "support.html").read_text(encoding="utf-8")
+
+        self.assertIn("{% if not is_ppg_staff %}", template)
+        self.assertIn('action="/client/support/create"', template)
+        self.assertIn('name="device_id"', template)
+        self.assertIn('name="error_title"', template)
+        self.assertIn('name="severity"', template)
+        self.assertIn('name="details"', template)
+
+    def test_client_support_create_route_exists(self):
+        source = Path("app/web/dashboard.py").read_text(encoding="utf-8")
+
+        self.assertIn('@router.post("/support/create"', source)
+        self.assertIn('SupportRequest(', source)
+        self.assertIn('error_code="CLIENT"', source)
+
     def test_shared_client_navigation_links_core_client_pages(self):
         nav = (TEMPLATE_ROOT / "owner" / "_client_nav.html").read_text(encoding="utf-8")
 
