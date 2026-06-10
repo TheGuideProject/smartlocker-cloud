@@ -154,13 +154,17 @@
 
 <!-- Quick Actions -->
 <div class="section-title">Quick Actions</div>
-<div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
-    <a href="/admin/products" class="btn btn-primary">Manage Products</a>
-    <a href="/admin/recipes" class="btn btn-primary">Manage Recipes</a>
-    <a href="/admin/devices" class="btn btn-secondary">View Devices</a>
-    <a href="/admin/inventory" class="btn btn-secondary">Inventory</a>
-    <a href="/admin/mixing-sessions" class="btn btn-secondary">Mixing Sessions</a>
-    <a href="/admin/events" class="btn btn-secondary">Event Log</a>
-    <a href="/docs" target="_blank" class="btn btn-ghost">API Docs</a>
+<div class="grid-auto" style="margin-bottom: 20px;">
+    {% for action in quick_actions %}
+    <a href="{{ action.href }}" class="panel" style="display: block; text-decoration: none; border-left: 3px solid {% if action.tone == 'danger' %}var(--accent-red){% elif action.tone == 'warning' %}var(--accent-orange){% elif action.tone == 'primary' %}var(--accent-blue){% else %}var(--border){% endif %};">
+        <div style="display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;">
+            <div>
+                <div style="font-weight: 700; color: var(--text-primary);">{{ action.label }}</div>
+                <div style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">{{ action.detail }}</div>
+            </div>
+            <span class="type-badge" style="white-space: nowrap;">{{ action.badge }}</span>
+        </div>
+    </a>
+    {% endfor %}
 </div>
 {% endblock %}

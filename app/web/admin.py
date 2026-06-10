@@ -171,6 +171,59 @@ def _apply_inventory_adjustment_summary(
     product_summary[product_name]["liters"] = max(0.0, new_liters)
 
 
+def _ppg_dashboard_quick_actions(open_support_count: int, offline_device_count: int) -> list[dict]:
+    """Return a compact, priority-ordered action list for the PPG dashboard."""
+    actions: list[dict] = []
+    if open_support_count > 0:
+        actions.append({
+            "label": "Review support",
+            "href": "/admin/support",
+            "detail": "Resolve customer/device support tickets.",
+            "badge": f"{open_support_count} open",
+            "tone": "danger",
+        })
+    if offline_device_count > 0:
+        actions.append({
+            "label": "Check devices",
+            "href": "/admin/devices",
+            "detail": "Find devices that stopped reporting.",
+            "badge": f"{offline_device_count} offline",
+            "tone": "warning",
+        })
+
+    actions.extend([
+        {
+            "label": "Pair device",
+            "href": "/admin/pairing",
+            "detail": "Create a code for a vessel Android/Zebra unit.",
+            "badge": "setup",
+            "tone": "primary",
+        },
+        {
+            "label": "Client portal preview",
+            "href": "/client/",
+            "detail": "Open the customer-facing read-only platform.",
+            "badge": "client",
+            "tone": "info",
+        },
+        {
+            "label": "Inventory",
+            "href": "/admin/inventory",
+            "detail": "Review vessel stock and cloud adjustments.",
+            "badge": "stock",
+            "tone": "neutral",
+        },
+        {
+            "label": "Catalog",
+            "href": "/admin/products",
+            "detail": "Products, barcodes, recipes and charts.",
+            "badge": "PPG",
+            "tone": "neutral",
+        },
+    ])
+    return actions[:6]
+
+
 @router.get("/", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, user = Depends(require_admin_session), db: AsyncSession = Depends(get_db)):
     """Admin dashboard overview."""
@@ -226,6 +279,7 @@ async def admin_dashboard(request: Request, user = Depends(require_admin_session
         "recent_errors": recent_errors,
         "offline_devices": offline_devices,
         "open_support_count": open_support_count,
+        "quick_actions": _ppg_dashboard_quick_actions(open_support_count, len(offline_devices)),
     })
 
 
