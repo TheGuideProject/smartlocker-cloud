@@ -39,7 +39,8 @@ class Settings(BaseSettings):
     # volume solids, density, plus a grounded technical bot). The cloud is
     # the bridge: it holds the service key and caches results so devices
     # never see the key and keep working when Product Equivalence is down.
-    PRODUCT_EQUIVALENCE_URL: str = "https://mip-pe.online"
+    # NOTE: the apex mip-pe.online 404s — the app is served on the www host.
+    PRODUCT_EQUIVALENCE_URL: str = "https://www.mip-pe.online"
     SMARTLOCKER_SERVICE_KEY: str = ""  # must match the key set on Product Equivalence
     PRODUCT_SPEC_CACHE_TTL_HOURS: int = 168  # 7 days
     PRODUCT_EQUIVALENCE_TIMEOUT_SECONDS: float = 15.0
