@@ -16,6 +16,7 @@ from app.models.support_request import SupportRequest
 from app.models.command import DeviceCommand
 from app.models.product_barcode import ProductBarcode
 from app.models.device_log import DeviceLog
+from app.models.product_spec_cache import ProductSpecCache
 
 __all__ = [
     "User", "Company", "Fleet", "Vessel", "LockerDevice",
@@ -28,4 +29,5 @@ __all__ = [
     "DeviceCommand",
     "ProductBarcode",
     "DeviceLog",
+    "ProductSpecCache",
 ]

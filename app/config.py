@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "admin@ppg.com"
     ADMIN_PASSWORD: str = "Smartlocker2026"
 
+    # Product Equivalence integration (technical datasheets: coverage m²/L,
+    # volume solids, density, plus a grounded technical bot). The cloud is
+    # the bridge: it holds the service key and caches results so devices
+    # never see the key and keep working when Product Equivalence is down.
+    PRODUCT_EQUIVALENCE_URL: str = "https://mip-pe.online"
+    SMARTLOCKER_SERVICE_KEY: str = ""  # must match the key set on Product Equivalence
+    PRODUCT_SPEC_CACHE_TTL_HOURS: int = 168  # 7 days
+    PRODUCT_EQUIVALENCE_TIMEOUT_SECONDS: float = 15.0
+
     class Config:
         env_file = ".env"
         extra = "allow"
