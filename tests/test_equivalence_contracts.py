@@ -34,6 +34,7 @@ class EquivalenceHelperContractTest(unittest.TestCase):
             "specs": {"volumeSolidsPercent": 75},
             "candidates": [{"name": "SIGMACOVER 280", "kind": "ppg"}],
         }
+        data["mixing"] = {"ratioBase": 4, "ratioHardener": 1, "thinnerPct": 5, "source": "datasheet-text"}
         eq._apply_remote_to_cache(row, data)
         self.assertEqual(row.matched_name, "SIGMACOVER 280")
         self.assertEqual(row.match_type, "exact")
@@ -41,7 +42,10 @@ class EquivalenceHelperContractTest(unittest.TestCase):
         self.assertEqual(row.coverage_source, "computed")
         self.assertEqual(row.confidence, "high")
         self.assertFalse(row.needs_validation)
-        self.assertEqual(row.specs_json, {"volumeSolidsPercent": 75})
+        self.assertEqual(row.specs_json["volumeSolidsPercent"], 75)
+        # mixing is folded into specs_json (no schema change)
+        self.assertEqual(row.specs_json["mixing"]["ratioBase"], 4)
+        self.assertEqual(row.specs_json["mixing"]["thinnerPct"], 5)
         self.assertEqual(len(row.candidates_json), 1)
         self.assertIsNotNone(row.fetched_at)
 

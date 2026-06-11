@@ -91,7 +91,13 @@ def _apply_remote_to_cache(row: ProductSpecCache, data: dict) -> None:
     row.coverage_source = coverage.get("source")
     row.confidence = data.get("confidence")
     row.needs_validation = bool(data.get("needsValidation", True))
-    row.specs_json = data.get("specs")
+    # Fold the datasheet-parsed mixing ratio (base:hardener + thinner %) into
+    # specs_json so it reaches the device without any schema change.
+    specs = dict(data.get("specs") or {})
+    mixing = data.get("mixing")
+    if mixing:
+        specs["mixing"] = mixing
+    row.specs_json = specs or None
     row.candidates_json = data.get("candidates") or []
     row.fetched_at = datetime.utcnow()
 
